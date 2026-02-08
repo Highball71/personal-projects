@@ -8,6 +8,14 @@
 import SwiftUI
 import SwiftData
 
+/// Captures the date + meal type for a tapped slot so the recipe picker
+/// sheet always has valid data when it renders.
+struct MealSlotSelection: Identifiable {
+    let id = UUID()
+    let date: Date
+    let mealType: MealType
+}
+
 /// The weekly meal planning view. Shows 7 days in a vertical scroll,
 /// each with breakfast/lunch/dinner slots. Navigate between weeks
 /// with the arrow buttons at the top.
@@ -18,10 +26,9 @@ struct MealPlanView: View {
     // The first day of the currently displayed week
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
 
-    // State for the recipe picker sheet
-    @State private var selectedDate: Date?
-    @State private var selectedMealType: MealType?
-    @State private var showingRecipePicker = false
+    // State for the recipe picker sheet — using a single identifiable value
+    // so .sheet(item:) guarantees the data is available when the sheet renders
+    @State private var selectedSlot: MealSlotSelection?
 
     /// The 7 days of the currently displayed week
     var weekDays: [Date] {
@@ -39,9 +46,7 @@ struct MealPlanView: View {
                             date: day,
                             mealPlans: mealPlans(for: day),
                             onSlotTapped: { mealType in
-                                selectedDate = day
-                                selectedMealType = mealType
-                                showingRecipePicker = true
+                                selectedSlot = MealSlotSelection(date: day, mealType: mealType)
                             },
                             onSlotCleared: { mealType in
                                 clearMealSlot(date: day, mealType: mealType)
@@ -52,11 +57,9 @@ struct MealPlanView: View {
                 .padding()
             }
             .navigationTitle("Meal Plan")
-            .sheet(isPresented: $showingRecipePicker) {
-                if let date = selectedDate, let mealType = selectedMealType {
-                    RecipePickerView { recipe in
-                        assignRecipe(recipe, to: date, for: mealType)
-                    }
+            .sheet(item: $selectedSlot) { slot in
+                RecipePickerView { recipe in
+                    assignRecipe(recipe, to: slot.date, for: slot.mealType)
                 }
             }
         }
