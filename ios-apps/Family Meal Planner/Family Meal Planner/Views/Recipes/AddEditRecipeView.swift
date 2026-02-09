@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 /// Handles both adding a new recipe and editing an existing one.
 /// When `recipeToEdit` is nil → add mode (form starts empty).
@@ -29,6 +30,15 @@ struct AddEditRecipeView: View {
     @State private var sourceType: RecipeSource?
     @State private var sourceDetail = ""
 
+    // Photo-to-recipe state
+    @State private var showingPhotoOptions = false
+    @State private var showingCamera = false
+    @State private var showingPhotoLibrary = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var isExtractingRecipe = false
+    @State private var extractionError: String?
+    @State private var showingExtractionError = false
+
     var isEditing: Bool { recipeToEdit != nil }
 
     /// Placeholder text that changes based on the selected source type
@@ -48,6 +58,14 @@ struct AddEditRecipeView: View {
                 // MARK: - Recipe Info Section
                 Section("Recipe Info") {
                     TextField("Recipe Name", text: $name)
+
+                    // Photo-to-recipe: scan a cookbook page to auto-fill the form
+                    Button {
+                        showingPhotoOptions = true
+                    } label: {
+                        Label("Scan from Photo", systemImage: "camera.fill")
+                    }
+                    .disabled(isExtractingRecipe)
 
                     Picker("Category", selection: $category) {
                         ForEach(RecipeCategory.allCases) { cat in
@@ -114,6 +132,70 @@ struct AddEditRecipeView: View {
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
+            // Choose between camera and photo library
+            .confirmationDialog("Add Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Take Photo") {
+                        showingCamera = true
+                    }
+                }
+                Button("Choose from Library") {
+                    showingPhotoLibrary = true
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+            // Photo library picker
+            .photosPicker(isPresented: $showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
+            // Camera (UIImagePickerController wrapper)
+            .fullScreenCover(isPresented: $showingCamera) {
+                CameraView { image in
+                    showingCamera = false
+                    if let image {
+                        Task { await extractRecipeFromImage(image) }
+                    }
+                }
+                .ignoresSafeArea()
+            }
+            // When a photo is picked from the library, load it and extract
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await extractRecipeFromImage(image)
+                    } else {
+                        extractionError = "Could not load the selected photo."
+                        showingExtractionError = true
+                    }
+                    selectedPhotoItem = nil
+                }
+            }
+            // Loading overlay while Claude processes the image
+            .overlay {
+                if isExtractingRecipe {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("Reading recipe from photo...")
+                                .font(.headline)
+                            Text("This may take a few seconds")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(32)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    }
+                }
+            }
+            // Error alert
+            .alert("Recipe Extraction Failed", isPresented: $showingExtractionError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(extractionError ?? "An unknown error occurred.")
+            }
             .onAppear {
                 // If editing, populate the form with the existing recipe's data
                 if let recipe = recipeToEdit {
@@ -134,6 +216,33 @@ struct AddEditRecipeView: View {
                 }
             }
         }
+    }
+
+    /// Send the image to Claude API and populate form fields with the result.
+    @MainActor
+    private func extractRecipeFromImage(_ image: UIImage) async {
+        isExtractingRecipe = true
+        extractionError = nil
+
+        do {
+            let extracted = try await ClaudeAPIService.extractRecipe(from: image)
+
+            // Populate form fields with extracted data
+            name = extracted.name
+            category = extracted.recipeCategory
+            servings = extracted.servings ?? 4
+            prepTimeMinutes = extracted.prepTimeMinutes ?? 30
+            instructions = extracted.instructions
+            ingredientRows = extracted.ingredientFormRows
+
+            // Auto-set source to "Photo from Cookbook"
+            sourceType = .photo
+        } catch {
+            extractionError = error.localizedDescription
+            showingExtractionError = true
+        }
+
+        isExtractingRecipe = false
     }
 
     private func saveRecipe() {
