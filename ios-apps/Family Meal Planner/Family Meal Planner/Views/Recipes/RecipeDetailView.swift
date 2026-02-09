@@ -42,7 +42,6 @@ struct RecipeDetailView: View {
             if !recipe.instructions.isEmpty {
                 Section("Instructions") {
                     Text(recipe.instructions)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
