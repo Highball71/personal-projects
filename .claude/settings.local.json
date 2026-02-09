@@ -1,5 +1,11 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix meal plan white screen bug when tapping days\n\nReplace .sheet\\(isPresented:\\) with .sheet\\(item:\\) to fix a SwiftUI timing\nissue where selectedDate/selectedMealType could be nil when the sheet\ncontent was evaluated, producing a blank white screen.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
+    ],
     "deny": [
       "Read(.env)",
       "Read(.env.*)",
@@ -13,9 +19,6 @@
     "ask": [
       "Bash(git push:*)",
       "Bash(npm publish:*)"
-    ],
-    "allow": [
-      "Bash(find:*)"
     ]
   }
 }
