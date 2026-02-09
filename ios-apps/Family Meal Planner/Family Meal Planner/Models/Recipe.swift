@@ -19,6 +19,11 @@ final class Recipe {
     var instructions: String
     var dateCreated: Date
 
+    // Where this recipe came from (cookbook, website, photo, etc.).
+    // Optional — older or manually entered recipes may not have a source.
+    var sourceType: RecipeSource?
+    var sourceDetail: String?
+
     // .cascade means: when you delete a recipe, its ingredients
     // are automatically deleted too. No orphaned data.
     @Relationship(deleteRule: .cascade, inverse: \Ingredient.recipe)
@@ -30,7 +35,9 @@ final class Recipe {
         servings: Int = 4,
         prepTimeMinutes: Int = 30,
         instructions: String = "",
-        ingredients: [Ingredient] = []
+        ingredients: [Ingredient] = [],
+        sourceType: RecipeSource? = nil,
+        sourceDetail: String? = nil
     ) {
         self.name = name
         self.category = category
@@ -39,5 +46,7 @@ final class Recipe {
         self.instructions = instructions
         self.ingredients = ingredients
         self.dateCreated = Date()
+        self.sourceType = sourceType
+        self.sourceDetail = sourceDetail
     }
 }

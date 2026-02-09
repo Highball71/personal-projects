@@ -26,8 +26,21 @@ struct AddEditRecipeView: View {
     @State private var prepTimeMinutes = 30
     @State private var instructions = ""
     @State private var ingredientRows: [IngredientFormData] = []
+    @State private var sourceType: RecipeSource?
+    @State private var sourceDetail = ""
 
     var isEditing: Bool { recipeToEdit != nil }
+
+    /// Placeholder text that changes based on the selected source type
+    private var sourcePlaceholder: String {
+        switch sourceType {
+        case .cookbook: "Book title, p. 42"
+        case .website: "https://..."
+        case .photo:   "Cookbook name"
+        case .other:   "Where is this from?"
+        case nil:      ""
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -73,6 +86,21 @@ struct AddEditRecipeView: View {
                     TextEditor(text: $instructions)
                         .frame(minHeight: 150)
                 }
+
+                // MARK: - Source Section
+                Section("Source") {
+                    Picker("Source Type", selection: $sourceType) {
+                        Text("None").tag(RecipeSource?.none)
+                        ForEach(RecipeSource.allCases) { source in
+                            Text(source.rawValue).tag(RecipeSource?.some(source))
+                        }
+                    }
+
+                    // Only show the detail field when a source type is selected
+                    if sourceType != nil {
+                        TextField(sourcePlaceholder, text: $sourceDetail)
+                    }
+                }
             }
             .navigationTitle(isEditing ? "Edit Recipe" : "New Recipe")
             .navigationBarTitleDisplayMode(.inline)
@@ -101,6 +129,8 @@ struct AddEditRecipeView: View {
                             unit: ingredient.unit
                         )
                     }
+                    sourceType = recipe.sourceType
+                    sourceDetail = recipe.sourceDetail ?? ""
                 }
             }
         }
@@ -120,6 +150,9 @@ struct AddEditRecipeView: View {
             recipe.prepTimeMinutes = prepTimeMinutes
             recipe.instructions = instructions
 
+            recipe.sourceType = sourceType
+            recipe.sourceDetail = sourceDetail.isEmpty ? nil : sourceDetail
+
             // Replace all ingredients: delete old, add new
             for ingredient in recipe.ingredients {
                 modelContext.delete(ingredient)
@@ -133,7 +166,9 @@ struct AddEditRecipeView: View {
                 servings: servings,
                 prepTimeMinutes: prepTimeMinutes,
                 instructions: instructions,
-                ingredients: validIngredients
+                ingredients: validIngredients,
+                sourceType: sourceType,
+                sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail
             )
             modelContext.insert(recipe)
         }

@@ -32,7 +32,9 @@ enum SampleData {
             4. Simmer for 20 minutes.
             5. Cook spaghetti according to package directions.
             6. Serve sauce over pasta.
-            """
+            """,
+            sourceType: .cookbook,
+            sourceDetail: "The Joy of Cooking, p. 312"
         )
         spaghetti.ingredients = [
             Ingredient(name: "Spaghetti", quantity: 1, unit: .pound),
@@ -78,7 +80,9 @@ enum SampleData {
             3. Slice chicken.
             4. Toss romaine lettuce with Caesar dressing.
             5. Top with sliced chicken, croutons, and parmesan.
-            """
+            """,
+            sourceType: .website,
+            sourceDetail: "budgetbytes.com"
         )
         salad.ingredients = [
             Ingredient(name: "Chicken breast", quantity: 1, unit: .pound),

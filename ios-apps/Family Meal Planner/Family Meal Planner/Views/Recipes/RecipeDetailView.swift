@@ -42,9 +42,20 @@ struct RecipeDetailView: View {
             if !recipe.instructions.isEmpty {
                 Section("Instructions") {
                     Text(recipe.instructions)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if let sourceType = recipe.sourceType {
+                Section("Source") {
+                    LabeledContent("Type", value: sourceType.rawValue)
+                    if let detail = recipe.sourceDetail, !detail.isEmpty {
+                        LabeledContent("Details", value: detail)
+                    }
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(recipe.name)
         .toolbar {
             Button("Edit") { showingEditSheet = true }
@@ -66,15 +77,27 @@ struct RecipeDetailView: View {
 #Preview {
     NavigationStack {
         RecipeDetailView(recipe: Recipe(
-            name: "Preview Recipe",
+            name: "Spaghetti Bolognese",
             category: .dinner,
             servings: 4,
-            prepTimeMinutes: 30,
-            instructions: "Cook it up!",
+            prepTimeMinutes: 45,
+            instructions: """
+            1. Brown the ground beef in a large pan.
+            2. Add diced onions and garlic, cook until soft.
+            3. Add crushed tomatoes and Italian seasoning.
+            4. Simmer for 20 minutes.
+            5. Cook spaghetti according to package directions.
+            6. Serve sauce over pasta.
+            """,
             ingredients: [
-                Ingredient(name: "Flour", quantity: 2, unit: .cup),
-                Ingredient(name: "Eggs", quantity: 3, unit: .piece)
-            ]
+                Ingredient(name: "Spaghetti", quantity: 1, unit: .pound),
+                Ingredient(name: "Ground beef", quantity: 1, unit: .pound),
+                Ingredient(name: "Crushed tomatoes", quantity: 28, unit: .ounce),
+                Ingredient(name: "Onion", quantity: 1, unit: .whole),
+                Ingredient(name: "Garlic cloves", quantity: 3, unit: .piece),
+            ],
+            sourceType: .cookbook,
+            sourceDetail: "The Joy of Cooking, p. 312"
         ))
     }
     .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
