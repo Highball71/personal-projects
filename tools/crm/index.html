@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>HQ — David's Command Center</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HQ">
+<meta name="theme-color" content="#0f1117">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230f1117' width='100' height='100' rx='20'/><text x='50' y='68' text-anchor='middle' font-size='50' fill='%236c8cff' font-family='sans-serif' font-weight='bold'>HQ</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #242834; --border: #2e3340;
+    --text: #e8eaf0; --text2: #8b90a0; --accent: #6c8cff; --accent2: #4a6adf;
+    --red: #ff5c5c; --orange: #ffaa3c; --green: #4cdb8a; --yellow: #ffd644;
+    --radius: 14px; --tab-h: 64px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg);
+    color: var(--text); -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none; user-select: none;
+  }
+  /* Layout */
+  .app { display: flex; flex-direction: column; height: 100dvh; }
+  .header {
+    padding: 12px 20px 8px; padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header h1 span { color: var(--accent); }
+  .header p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .content { flex: 1; overflow-y: auto; padding: 16px 16px calc(var(--tab-h) + var(--safe-b) + 16px); }
+  .tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: calc(var(--tab-h) + var(--safe-b));
+    padding-bottom: var(--safe-b); background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; z-index: 90;
+  }
+  .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; color: var(--text2); font-size: 10px;
+    font-weight: 500; cursor: pointer; transition: color .15s; border: none; background: none;
+  }
+  .tab.active { color: var(--accent); }
+  .tab svg { width: 22px; height: 22px; fill: currentColor; }
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-sub { font-size: 12px; color: var(--text2); }
+  .card.overdue { border-left: 3px solid var(--red); }
+  .card.overdue .card-sub { color: var(--red); }
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 12px; text-align: center;
+  }
+  .stat-num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  /* Section */
+  .section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 8px; }
+  .empty { text-align: center; color: var(--text2); font-size: 13px; padding: 24px 0; }
+  /* Badges */
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 20px; text-transform: uppercase;
+  }
+  .badge-high { background: rgba(255,92,92,.15); color: var(--red); }
+  .badge-medium { background: rgba(255,170,60,.15); color: var(--orange); }
+  .badge-low { background: rgba(76,219,138,.15); color: var(--green); }
+  .badge-active { background: rgba(108,140,255,.15); color: var(--accent); }
+  .badge-paused { background: rgba(255,214,68,.15); color: var(--yellow); }
+  .badge-done { background: rgba(76,219,138,.15); color: var(--green); }
+  /* Toggles */
+  .toggle-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .toggle-btn {
+    flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  .toggle-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  /* FAB */
+  .fab {
+    position: fixed; bottom: calc(var(--tab-h) + var(--safe-b) + 16px); right: 16px;
+    width: 52px; height: 52px; border-radius: 50%; background: var(--accent);
+    color: #fff; border: none; font-size: 28px; cursor: pointer; z-index: 80;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(108,140,255,.4); transition: transform .15s;
+  }
+  .fab:active { transform: scale(.92); }
+  /* Modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100;
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 101;
+    background: var(--surface); border-radius: 20px 20px 0 0; padding: 20px 20px calc(20px + var(--safe-b));
+    max-height: 85dvh; overflow-y: auto;
+    transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1);
+  }
+  .modal.open { transform: translateY(0); }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .modal-header h2 { font-size: 18px; font-weight: 700; }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+    border: none; color: var(--text2); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text); font-size: 14px; font-family: inherit;
+    outline: none; transition: border .15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .field select { appearance: none; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-primary {
+    width: 100%; padding: 14px; border-radius: 12px; background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 600; border: none; cursor: pointer; font-family: inherit;
+    margin-top: 4px; transition: background .15s;
+  }
+  .btn-primary:active { background: var(--accent2); }
+  .btn-danger {
+    width: 100%; padding: 14px; border-radius: 12px; background: rgba(255,92,92,.12); color: var(--red);
+    font-size: 15px; font-weight: 600; border: none; cursor: pointer; font-family: inherit;
+    margin-top: 8px;
+  }
+  /* Settings */
+  .settings-btn {
+    width: 100%; padding: 14px 16px; border-radius: var(--radius); background: var(--surface);
+    border: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 500;
+    cursor: pointer; font-family: inherit; text-align: left; margin-bottom: 8px; transition: background .15s;
+  }
+  .settings-btn:active { background: var(--surface2); }
+  .settings-btn.danger { color: var(--red); }
+  .hidden-input { display: none; }
+  /* Checkbox */
+  .check {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+    flex-shrink: 0; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; transition: all .15s;
+  }
+  .check.checked { background: var(--green); border-color: var(--green); }
+  .check.checked::after { content: '✓'; color: #fff; font-size: 12px; font-weight: 700; }
+  .task-row { display: flex; align-items: flex-start; gap: 12px; }
+  .task-row .card { flex: 1; }
+  /* Animations */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .card { animation: fadeIn .2s ease; }
+  .page { display: none; } .page.active { display: block; }
+  /* Scrollbar */
+  .content::-webkit-scrollbar { width: 4px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  /* Swipe hint on cards */
+  .card { position: relative; overflow: hidden; }
+  .card::after {
+    content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 3px;
+    background: transparent; transition: background .15s;
+  }
+  .card:active::after { background: var(--accent); }
+  /* Toast notification */
+  .toast {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 50%;
+    transform: translateX(-50%) translateY(-80px); background: var(--surface2);
+    color: var(--text); padding: 10px 20px; border-radius: 12px; font-size: 13px;
+    font-weight: 500; z-index: 200; border: 1px solid var(--border);
+    transition: transform .35s cubic-bezier(.32,.72,0,1); pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  /* Greeting */
+  .greeting { font-size: 15px; font-weight: 500; margin-bottom: 14px; color: var(--text2); }
+  .greeting strong { color: var(--text); }
+  /* Search */
+  .search-bar {
+    width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit;
+    outline: none; margin-bottom: 12px; transition: border .15s;
+  }
+  .search-bar:focus { border-color: var(--accent); }
+  .search-bar::placeholder { color: var(--text2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1><span>HQ</span> — David's Command Center</h1>
+    <p id="headerDate"></p>
+  </div>
+  <div class="content" id="content"></div>
+  <div class="tab-bar">
+    <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+      <svg viewBox="0 0 24 24"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm-1-20v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
+      Dashboard
+    </button>
+    <button class="tab" data-tab="tasks" onclick="switchTab('tasks')">
+      <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+      Tasks
+    </button>
+    <button class="tab" data-tab="appointments" onclick="switchTab('appointments')">
+      <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+      Appts
+    </button>
+    <button class="tab" data-tab="projects" onclick="switchTab('projects')">
+      <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+      Projects
+    </button>
+    <button class="tab" data-tab="settings" onclick="switchTab('settings')">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41L9.25 5.35c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      Settings
+    </button>
+  </div>
+</div>
+<div class="overlay" id="overlay" onclick="closeModal()"></div>
+<div class="modal" id="modal"></div>
+<button class="fab" id="fab" onclick="openAddModal()">+</button>
+<div class="toast" id="toast"></div>
+<input type="file" id="importFile" class="hidden-input" accept=".json">
+<script>
+// --- State ---
+const KEYS = { tasks: 'hq_tasks', appts: 'hq_appts', projects: 'hq_projects' };
+let state = {
+  tasks: JSON.parse(localStorage.getItem(KEYS.tasks) || '[]'),
+  appts: JSON.parse(localStorage.getItem(KEYS.appts) || '[]'),
+  projects: JSON.parse(localStorage.getItem(KEYS.projects) || '[]'),
+};
+let currentTab = 'dashboard';
+let taskFilter = 'active';
+
+function save() {
+  localStorage.setItem(KEYS.tasks, JSON.stringify(state.tasks));
+  localStorage.setItem(KEYS.appts, JSON.stringify(state.appts));
+  localStorage.setItem(KEYS.projects, JSON.stringify(state.projects));
+}
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+function greeting() {
+  const h = new Date().getHours();
+  const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  return `<div class="greeting">${g}, <strong>David</strong></div>`;
+}
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function fmtTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hr = parseInt(h); const ampm = hr >= 12 ? 'PM' : 'AM';
+  return `${hr % 12 || 12}:${m} ${ampm}`;
+}
+function isOverdue(dateStr) {
+  return dateStr && dateStr < today();
+}
+
+// --- Header Date ---
+function updateHeader() {
+  const d = new Date();
+  document.getElementById('headerDate').textContent =
+    d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+// --- Tab Switching ---
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('fab').style.display = tab === 'settings' ? 'none' : 'flex';
+  render();
+}
+
+// --- Render (defined at bottom for search cursor preservation) ---
+
+function renderDashboard() {
+  const activeTasks = state.tasks.filter(t => !t.done).length;
+  const todayAppts = state.appts.filter(a => a.date === today()).length;
+  const doneCount = state.tasks.filter(t => t.done).length;
+  const todayTasks = state.tasks.filter(t => !t.done && t.due === today());
+  const overdueTasks = state.tasks.filter(t => !t.done && isOverdue(t.due));
+  const upcoming = state.appts.filter(a => a.date >= today()).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')).slice(0, 5);
+  const activeProjects = state.projects.filter(p => p.status === 'active');
+
+  let html = greeting();
+  html += `<div class="stats">
+    <div class="stat"><div class="stat-num">${activeTasks}</div><div class="stat-label">Active Tasks</div></div>
+    <div class="stat"><div class="stat-num">${todayAppts}</div><div class="stat-label">Today's Appts</div></div>
+    <div class="stat"><div class="stat-num">${doneCount}</div><div class="stat-label">Completed</div></div>
+  </div>`;
+
+  if (overdueTasks.length) {
+    html += `<div class="section-title">Overdue</div>`;
+    overdueTasks.forEach(t => { html += taskCard(t); });
+  }
+  html += `<div class="section-title">Today's Tasks</div>`;
+  html += todayTasks.length ? todayTasks.map(t => taskCard(t)).join('') : '<div class="empty">Nothing due today</div>';
+  html += `<div class="section-title">Upcoming Appointments</div>`;
+  html += upcoming.length ? upcoming.map(a => apptCard(a)).join('') : '<div class="empty">No upcoming appointments</div>';
+  html += `<div class="section-title">Active Projects</div>`;
+  html += activeProjects.length ? activeProjects.map(p => projectCard(p)).join('') : '<div class="empty">No active projects</div>';
+  return html;
+}
+
+let searchQuery = '';
+function renderTasks() {
+  let filtered;
+  if (taskFilter === 'active') filtered = state.tasks.filter(t => !t.done);
+  else if (taskFilter === 'done') filtered = state.tasks.filter(t => t.done);
+  else filtered = [...state.tasks];
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(t => t.title.toLowerCase().includes(q) || (t.notes || '').toLowerCase().includes(q));
+  }
+  filtered.sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    const p = { high: 0, medium: 1, low: 2 };
+    return (p[a.priority] || 1) - (p[b.priority] || 1) || (a.due || 'z').localeCompare(b.due || 'z');
+  });
+  let html = `<input class="search-bar" placeholder="Search tasks..." value="${esc(searchQuery)}" oninput="searchQuery=this.value;render()">`;
+  html += `<div class="toggle-row">
+    <button class="toggle-btn ${taskFilter === 'active' ? 'active' : ''}" onclick="taskFilter='active';render()">Active</button>
+    <button class="toggle-btn ${taskFilter === 'all' ? 'active' : ''}" onclick="taskFilter='all';render()">All</button>
+    <button class="toggle-btn ${taskFilter === 'done' ? 'active' : ''}" onclick="taskFilter='done';render()">Done</button>
+  </div>`;
+  html += filtered.length ? filtered.map(t => taskCard(t, true)).join('') : '<div class="empty">No tasks here</div>';
+  return html;
+}
+
+function renderAppts() {
+  const sorted = [...state.appts].sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
+  return sorted.length ? sorted.map(a => apptCard(a)).join('') : '<div class="empty">No appointments yet</div>';
+}
+
+function renderProjects() {
+  const sorted = [...state.projects].sort((a, b) => {
+    const order = { active: 0, paused: 1, done: 2 };
+    return (order[a.status] ?? 1) - (order[b.status] ?? 1);
+  });
+  return sorted.length ? sorted.map(p => projectCard(p)).join('') : '<div class="empty">No projects yet</div>';
+}
+
+function renderSettings() {
+  const total = state.tasks.length + state.appts.length + state.projects.length;
+  return `
+    <div class="section-title">Data Management</div>
+    <button class="settings-btn" onclick="exportData()">Export All Data as JSON</button>
+    <button class="settings-btn" onclick="document.getElementById('importFile').click()">Import Data from JSON Backup</button>
+    <button class="settings-btn danger" onclick="confirmClear()">Clear All Data</button>
+    <div class="section-title" style="margin-top:24px">About</div>
+    <div class="card">
+      <div class="card-title">HQ — David's Command Center</div>
+      <div class="card-sub" style="margin-top:4px">${total} total items stored locally</div>
+      <div class="card-sub">All data lives in your browser's localStorage</div>
+    </div>`;
+}
+
+// --- Cards ---
+function taskCard(t, showCheck = false) {
+  const overdue = !t.done && isOverdue(t.due);
+  const proj = t.projectId ? state.projects.find(p => p.id === t.projectId) : null;
+  const parts = [];
+  if (t.due) parts.push((overdue ? 'Overdue — ' : '') + fmtDate(t.due));
+  if (proj) parts.push(proj.title);
+  if (t.notes) parts.push(t.notes.slice(0, 40) + (t.notes.length > 40 ? '...' : ''));
+
+  let html = '<div class="task-row">';
+  if (showCheck) html += `<div class="check ${t.done ? 'checked' : ''}" onclick="toggleTask('${t.id}')" style="margin-top:14px"></div>`;
+  html += `<div class="card ${overdue ? 'overdue' : ''}" onclick="openEditTask('${t.id}')" style="cursor:pointer;${t.done ? 'opacity:.5' : ''}">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-title" style="${t.done ? 'text-decoration:line-through' : ''}">${esc(t.title)}</div>
+      <span class="badge badge-${t.priority}">${t.priority}</span>
+    </div>
+    ${parts.length ? `<div class="card-sub">${esc(parts.join(' · '))}</div>` : ''}
+  </div></div>`;
+  return html;
+}
+
+function apptCard(a) {
+  const parts = [fmtDate(a.date)];
+  if (a.time) parts.push(fmtTime(a.time));
+  if (a.location) parts.push(a.location);
+  if (a.recurring && a.recurring !== 'none') parts.push(a.recurring);
+  if (a.notes) parts.push(a.notes.slice(0, 40) + (a.notes.length > 40 ? '...' : ''));
+  return `<div class="card" onclick="openEditAppt('${a.id}')" style="cursor:pointer">
+    <div class="card-title">${esc(a.title)}</div>
+    <div class="card-sub">${esc(parts.join(' · '))}</div>
+  </div>`;
+}
+
+function projectCard(p) {
+  const taskCount = state.tasks.filter(t => t.projectId === p.id && !t.done).length;
+  const parts = [];
+  if (p.description) parts.push(p.description.slice(0, 50) + (p.description.length > 50 ? '...' : ''));
+  if (taskCount) parts.push(`${taskCount} active task${taskCount > 1 ? 's' : ''}`);
+  return `<div class="card" onclick="openEditProject('${p.id}')" style="cursor:pointer">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-title">${esc(p.title)}</div>
+      <span class="badge badge-${p.status}">${p.status}</span>
+    </div>
+    ${parts.length ? `<div class="card-sub">${esc(parts.join(' · '))}</div>` : ''}
+  </div>`;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// --- Modal ---
+function openModal(html) {
+  document.getElementById('modal').innerHTML = html;
+  requestAnimationFrame(() => {
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('modal').classList.add('open');
+  });
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('modal').classList.remove('open');
+}
+function openAddModal() {
+  const modals = { tasks: () => openTaskForm(), appointments: () => openApptForm(), projects: () => openProjectForm(), dashboard: () => openTaskForm() };
+  (modals[currentTab] || modals.dashboard)();
+}
+
+// --- Task Form ---
+function openTaskForm(task) {
+  const t = task || { title: '', due: today(), priority: 'medium', projectId: '', notes: '' };
+  const projOpts = state.projects.filter(p => p.status !== 'done')
+    .map(p => `<option value="${p.id}" ${t.projectId === p.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('');
+  openModal(`
+    <div class="modal-header"><h2>${task ? 'Edit Task' : 'New Task'}</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="field"><label>Title</label><input id="fTitle" value="${esc(t.title)}" placeholder="What needs doing?"></div>
+    <div class="row">
+      <div class="field"><label>Due Date</label><input id="fDue" type="date" value="${t.due}"></div>
+      <div class="field"><label>Priority</label><select id="fPriority">
+        <option value="high" ${t.priority === 'high' ? 'selected' : ''}>High</option>
+        <option value="medium" ${t.priority === 'medium' ? 'selected' : ''}>Medium</option>
+        <option value="low" ${t.priority === 'low' ? 'selected' : ''}>Low</option>
+      </select></div>
+    </div>
+    <div class="field"><label>Project</label><select id="fProject"><option value="">None</option>${projOpts}</select></div>
+    <div class="field"><label>Notes</label><textarea id="fNotes" placeholder="Optional details...">${esc(t.notes || '')}</textarea></div>
+    <button class="btn-primary" onclick="saveTask('${task ? task.id : ''}')">${task ? 'Update' : 'Add'} Task</button>
+    ${task ? `<button class="btn-danger" onclick="deleteTask('${task.id}')">Delete Task</button>` : ''}`);
+  setTimeout(() => document.getElementById('fTitle').focus(), 350);
+}
+function saveTask(id) {
+  const data = {
+    title: document.getElementById('fTitle').value.trim(),
+    due: document.getElementById('fDue').value,
+    priority: document.getElementById('fPriority').value,
+    projectId: document.getElementById('fProject').value,
+    notes: document.getElementById('fNotes').value.trim(),
+  };
+  if (!data.title) return;
+  if (id) {
+    const idx = state.tasks.findIndex(t => t.id === id);
+    if (idx >= 0) Object.assign(state.tasks[idx], data);
+    save(); closeModal(); render(); toast('Task updated');
+  } else {
+    state.tasks.push({ id: genId(), done: false, ...data });
+    save(); closeModal(); render(); toast('Task added');
+  }
+}
+function deleteTask(id) {
+  state.tasks = state.tasks.filter(t => t.id !== id);
+  save(); closeModal(); render(); toast('Task deleted');
+}
+function toggleTask(id) {
+  const t = state.tasks.find(t => t.id === id);
+  if (t) { t.done = !t.done; save(); render(); toast(t.done ? 'Task completed!' : 'Task reopened'); }
+}
+function openEditTask(id) {
+  const t = state.tasks.find(t => t.id === id);
+  if (t) openTaskForm(t);
+}
+
+// --- Appointment Form ---
+function openApptForm(appt) {
+  const a = appt || { title: '', date: today(), time: '', location: '', recurring: 'none', notes: '' };
+  openModal(`
+    <div class="modal-header"><h2>${appt ? 'Edit Appointment' : 'New Appointment'}</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="field"><label>Title</label><input id="aTitle" value="${esc(a.title)}" placeholder="Meeting, call, etc."></div>
+    <div class="row">
+      <div class="field"><label>Date</label><input id="aDate" type="date" value="${a.date}"></div>
+      <div class="field"><label>Time</label><input id="aTime" type="time" value="${a.time || ''}"></div>
+    </div>
+    <div class="field"><label>Location</label><input id="aLoc" value="${esc(a.location || '')}" placeholder="Optional"></div>
+    <div class="field"><label>Recurring</label><select id="aRecur">
+      <option value="none" ${a.recurring === 'none' ? 'selected' : ''}>None</option>
+      <option value="weekly" ${a.recurring === 'weekly' ? 'selected' : ''}>Weekly</option>
+      <option value="biweekly" ${a.recurring === 'biweekly' ? 'selected' : ''}>Biweekly</option>
+      <option value="monthly" ${a.recurring === 'monthly' ? 'selected' : ''}>Monthly</option>
+    </select></div>
+    <div class="field"><label>Notes</label><textarea id="aNotes" placeholder="Optional details...">${esc(a.notes || '')}</textarea></div>
+    <button class="btn-primary" onclick="saveAppt('${appt ? appt.id : ''}')">${appt ? 'Update' : 'Add'} Appointment</button>
+    ${appt ? `<button class="btn-danger" onclick="deleteAppt('${appt.id}')">Delete Appointment</button>` : ''}`);
+  setTimeout(() => document.getElementById('aTitle').focus(), 350);
+}
+function saveAppt(id) {
+  const data = {
+    title: document.getElementById('aTitle').value.trim(),
+    date: document.getElementById('aDate').value,
+    time: document.getElementById('aTime').value,
+    location: document.getElementById('aLoc').value.trim(),
+    recurring: document.getElementById('aRecur').value,
+    notes: document.getElementById('aNotes').value.trim(),
+  };
+  if (!data.title || !data.date) return;
+  if (id) {
+    const idx = state.appts.findIndex(a => a.id === id);
+    if (idx >= 0) Object.assign(state.appts[idx], data);
+    save(); closeModal(); render(); toast('Appointment updated');
+  } else {
+    state.appts.push({ id: genId(), ...data });
+    save(); closeModal(); render(); toast('Appointment added');
+  }
+}
+function deleteAppt(id) {
+  state.appts = state.appts.filter(a => a.id !== id);
+  save(); closeModal(); render(); toast('Appointment deleted');
+}
+function openEditAppt(id) {
+  const a = state.appts.find(a => a.id === id);
+  if (a) openApptForm(a);
+}
+
+// --- Project Form ---
+function openProjectForm(proj) {
+  const p = proj || { title: '', status: 'active', description: '' };
+  openModal(`
+    <div class="modal-header"><h2>${proj ? 'Edit Project' : 'New Project'}</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="field"><label>Title</label><input id="pTitle" value="${esc(p.title)}" placeholder="Project name"></div>
+    <div class="field"><label>Status</label><select id="pStatus">
+      <option value="active" ${p.status === 'active' ? 'selected' : ''}>Active</option>
+      <option value="paused" ${p.status === 'paused' ? 'selected' : ''}>Paused</option>
+      <option value="done" ${p.status === 'done' ? 'selected' : ''}>Done</option>
+    </select></div>
+    <div class="field"><label>Description</label><textarea id="pDesc" placeholder="What's this project about?">${esc(p.description || '')}</textarea></div>
+    <button class="btn-primary" onclick="saveProject('${proj ? proj.id : ''}')">${proj ? 'Update' : 'Add'} Project</button>
+    ${proj ? `<button class="btn-danger" onclick="deleteProject('${proj.id}')">Delete Project</button>` : ''}`);
+  setTimeout(() => document.getElementById('pTitle').focus(), 350);
+}
+function saveProject(id) {
+  const data = {
+    title: document.getElementById('pTitle').value.trim(),
+    status: document.getElementById('pStatus').value,
+    description: document.getElementById('pDesc').value.trim(),
+  };
+  if (!data.title) return;
+  if (id) {
+    const idx = state.projects.findIndex(p => p.id === id);
+    if (idx >= 0) Object.assign(state.projects[idx], data);
+    save(); closeModal(); render(); toast('Project updated');
+  } else {
+    state.projects.push({ id: genId(), ...data });
+    save(); closeModal(); render(); toast('Project added');
+  }
+}
+function deleteProject(id) {
+  state.projects = state.projects.filter(p => p.id !== id);
+  state.tasks.forEach(t => { if (t.projectId === id) t.projectId = ''; });
+  save(); closeModal(); render(); toast('Project deleted');
+}
+function openEditProject(id) {
+  const p = state.projects.find(p => p.id === id);
+  if (p) openProjectForm(p);
+}
+
+// --- Settings ---
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `hq-backup-${today()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Backup exported');
+}
+function confirmClear() {
+  openModal(`
+    <div class="modal-header"><h2>Clear All Data?</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:16px">This will permanently delete all tasks, appointments, and projects. This cannot be undone.</p>
+    <button class="btn-danger" onclick="clearAll()" style="margin-top:0">Yes, Clear Everything</button>
+    <button class="btn-primary" onclick="closeModal()" style="background:var(--surface2);color:var(--text);margin-top:8px">Cancel</button>`);
+}
+function clearAll() {
+  state = { tasks: [], appts: [], projects: [] }; save(); closeModal(); render();
+  toast('All data cleared');
+}
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.tasks) state.tasks = data.tasks;
+      if (data.appts) state.appts = data.appts;
+      if (data.projects) state.projects = data.projects;
+      save(); render(); toast('Data imported successfully');
+    } catch { toast('Invalid backup file'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// --- Search cursor preservation ---
+function render() {
+  const c = document.getElementById('content');
+  // Save search focus state
+  const searchEl = c.querySelector('.search-bar');
+  const hadFocus = searchEl && document.activeElement === searchEl;
+  const cursorPos = hadFocus ? searchEl.selectionStart : 0;
+  c.scrollTop = currentTab === 'tasks' && hadFocus ? c.scrollTop : 0;
+  const renderers = { dashboard: renderDashboard, tasks: renderTasks, appointments: renderAppts, projects: renderProjects, settings: renderSettings };
+  c.innerHTML = renderers[currentTab]();
+  // Restore search focus
+  if (hadFocus) {
+    const newSearch = c.querySelector('.search-bar');
+    if (newSearch) { newSearch.focus(); newSearch.selectionStart = newSearch.selectionEnd = cursorPos; }
+  }
+}
+
+// --- Keyboard dismiss on scroll ---
+document.getElementById('content').addEventListener('scroll', () => {
+  if (document.activeElement && document.activeElement.classList.contains('search-bar')) {
+    document.activeElement.blur();
+  }
+}, { passive: true });
+
+// --- Init ---
+updateHeader(); render();
+</script>
+</body>
+</html>
