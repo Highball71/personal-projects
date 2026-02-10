@@ -58,6 +58,11 @@ struct ExtractedRecipe: Codable {
         parseMinutes(from: prepTime) ?? 30
     }
 
+    /// Parse cookTime string into total minutes. Defaults to 0 (unknown).
+    var cookTimeMinutesInt: Int {
+        parseMinutes(from: cookTime) ?? 0
+    }
+
     /// Join the instructions array into a single string for the form's TextEditor.
     /// Numbers each step for readability.
     var instructionsText: String {

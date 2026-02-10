@@ -25,6 +25,7 @@ struct AddEditRecipeView: View {
     @State private var category: RecipeCategory = .dinner
     @State private var servings = 4
     @State private var prepTimeMinutes = 30
+    @State private var cookTimeMinutes = 0
     @State private var instructions = ""
     @State private var ingredientRows: [IngredientFormData] = []
     @State private var sourceType: RecipeSource?
@@ -38,6 +39,7 @@ struct AddEditRecipeView: View {
     @State private var isExtractingRecipe = false
     @State private var extractionError: String?
     @State private var showingExtractionError = false
+    @State private var showingExtractionSuccess = false
 
     var isEditing: Bool { recipeToEdit != nil }
 
@@ -79,6 +81,13 @@ struct AddEditRecipeView: View {
                         "Prep Time: \(prepTimeMinutes) min",
                         value: $prepTimeMinutes,
                         in: 5...480,
+                        step: 5
+                    )
+
+                    Stepper(
+                        "Cook Time: \(cookTimeMinutes) min",
+                        value: $cookTimeMinutes,
+                        in: 0...480,
                         step: 5
                     )
                 }
@@ -194,11 +203,32 @@ struct AddEditRecipeView: View {
                     }
                 }
             }
-            // Error alert
-            .alert("Recipe Extraction Failed", isPresented: $showingExtractionError) {
+            // Brief "Recipe extracted!" confirmation that auto-dismisses
+            .overlay {
+                if showingExtractionSuccess {
+                    VStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.green)
+                        Text("Recipe extracted!")
+                            .font(.headline)
+                    }
+                    .padding(24)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .transition(.opacity)
+                    .onAppear {
+                        // Auto-dismiss after 1.5 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            withAnimation { showingExtractionSuccess = false }
+                        }
+                    }
+                }
+            }
+            // Error alert — user-friendly message
+            .alert("Couldn't Read Recipe", isPresented: $showingExtractionError) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text(extractionError ?? "An unknown error occurred.")
+                Text("Couldn't read this recipe \u{2014} try a clearer photo.")
             }
             .onAppear {
                 // If editing, populate the form with the existing recipe's data
@@ -207,6 +237,7 @@ struct AddEditRecipeView: View {
                     category = recipe.category
                     servings = recipe.servings
                     prepTimeMinutes = recipe.prepTimeMinutes
+                    cookTimeMinutes = recipe.cookTimeMinutes
                     instructions = recipe.instructions
                     ingredientRows = recipe.ingredients.map { ingredient in
                         IngredientFormData(
@@ -236,14 +267,17 @@ struct AddEditRecipeView: View {
             category = extracted.recipeCategory
             servings = extracted.servingsInt
             prepTimeMinutes = extracted.prepTimeMinutesInt
+            cookTimeMinutes = extracted.cookTimeMinutesInt
             instructions = extracted.instructionsText
             ingredientRows = extracted.ingredientFormRows
 
             // Auto-set source to "Photo" and use Claude's description
             sourceType = .photo
             sourceDetail = extracted.sourceDescription ?? ""
+
+            // Show brief success confirmation
+            withAnimation { showingExtractionSuccess = true }
         } catch {
-            extractionError = error.localizedDescription
             showingExtractionError = true
         }
 
@@ -262,6 +296,7 @@ struct AddEditRecipeView: View {
             recipe.category = category
             recipe.servings = servings
             recipe.prepTimeMinutes = prepTimeMinutes
+            recipe.cookTimeMinutes = cookTimeMinutes
             recipe.instructions = instructions
 
             recipe.sourceType = sourceType
@@ -279,6 +314,7 @@ struct AddEditRecipeView: View {
                 category: category,
                 servings: servings,
                 prepTimeMinutes: prepTimeMinutes,
+                cookTimeMinutes: cookTimeMinutes,
                 instructions: instructions,
                 ingredients: validIngredients,
                 sourceType: sourceType,

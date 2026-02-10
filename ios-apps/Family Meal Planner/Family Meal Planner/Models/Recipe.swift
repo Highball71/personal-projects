@@ -16,6 +16,7 @@ final class Recipe {
     var category: RecipeCategory
     var servings: Int
     var prepTimeMinutes: Int
+    var cookTimeMinutes: Int
     var instructions: String
     var dateCreated: Date
 
@@ -34,6 +35,7 @@ final class Recipe {
         category: RecipeCategory = .dinner,
         servings: Int = 4,
         prepTimeMinutes: Int = 30,
+        cookTimeMinutes: Int = 0,
         instructions: String = "",
         ingredients: [Ingredient] = [],
         sourceType: RecipeSource? = nil,
@@ -43,6 +45,7 @@ final class Recipe {
         self.category = category
         self.servings = servings
         self.prepTimeMinutes = prepTimeMinutes
+        self.cookTimeMinutes = cookTimeMinutes
         self.instructions = instructions
         self.ingredients = ingredients
         self.dateCreated = Date()

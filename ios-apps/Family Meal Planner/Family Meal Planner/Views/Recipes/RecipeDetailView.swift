@@ -20,6 +20,9 @@ struct RecipeDetailView: View {
                 LabeledContent("Category", value: recipe.category.rawValue)
                 LabeledContent("Servings", value: "\(recipe.servings)")
                 LabeledContent("Prep Time", value: "\(recipe.prepTimeMinutes) minutes")
+                if recipe.cookTimeMinutes > 0 {
+                    LabeledContent("Cook Time", value: "\(recipe.cookTimeMinutes) minutes")
+                }
             }
 
             Section("Ingredients") {
