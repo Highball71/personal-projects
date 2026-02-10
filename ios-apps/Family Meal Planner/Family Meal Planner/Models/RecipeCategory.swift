@@ -18,6 +18,7 @@ enum RecipeCategory: String, Codable, CaseIterable, Identifiable {
     case snack = "Snack"
     case dessert = "Dessert"
     case side = "Side Dish"
+    case drink = "Drink"
 
     var id: String { rawValue }
 }

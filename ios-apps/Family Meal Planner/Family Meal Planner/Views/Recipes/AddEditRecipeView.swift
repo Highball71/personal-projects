@@ -234,13 +234,14 @@ struct AddEditRecipeView: View {
             // Populate form fields with extracted data
             name = extracted.name
             category = extracted.recipeCategory
-            servings = extracted.servings ?? 4
-            prepTimeMinutes = extracted.prepTimeMinutes ?? 30
-            instructions = extracted.instructions
+            servings = extracted.servingsInt
+            prepTimeMinutes = extracted.prepTimeMinutesInt
+            instructions = extracted.instructionsText
             ingredientRows = extracted.ingredientFormRows
 
-            // Auto-set source to "Photo from Cookbook"
+            // Auto-set source to "Photo" and use Claude's description
             sourceType = .photo
+            sourceDetail = extracted.sourceDescription ?? ""
         } catch {
             extractionError = error.localizedDescription
             showingExtractionError = true

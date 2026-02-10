@@ -85,30 +85,21 @@ enum ClaudeAPIService {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.timeoutInterval = 60
 
-        // System prompt tells Claude exactly what JSON shape to return,
-        // using unit strings that match our IngredientUnit rawValues
+        // System prompt: return only valid JSON, no markdown fences
         let systemPrompt = """
-            You are a recipe extraction assistant. You will be given a photo of a \
-            cookbook page or recipe card. Extract the recipe and return ONLY valid \
-            JSON (no markdown, no code fences, no extra text) with this exact structure:
-            {
-              "name": "Recipe Name",
-              "category": "dinner",
-              "servings": 4,
-              "prepTimeMinutes": 30,
-              "ingredients": [
-                {"name": "Flour", "quantity": 2.0, "unit": "cup"}
-              ],
-              "instructions": "Step 1...\\nStep 2..."
-            }
+            You are a recipe extraction assistant. Return ONLY valid JSON \
+            (no markdown, no code fences, no extra text).
+            """
 
-            Rules:
-            - "category" must be one of: breakfast, lunch, dinner, snack, dessert, side
-            - "unit" must be one of: piece, cup, tbsp, tsp, oz, lb, g, L, mL, pinch, whole
-            - "quantity" must be a number (use decimals: 0.5 for ½, 0.25 for ¼, 0.33 for ⅓, 0.75 for ¾)
-            - "instructions" should be the full text with steps separated by newlines
-            - If you cannot determine servings or prep time, use reasonable defaults
-            - If you cannot read part of the image, do your best with what's visible
+        // User prompt matches the exact spec for the expected JSON schema
+        let userPrompt = """
+            Extract the recipe from this image. Return JSON with these fields: \
+            name (string), category (string - one of: breakfast, lunch, dinner, \
+            snack, dessert, side, drink), servingSize (string), prepTime (string), \
+            cookTime (string), ingredients (array of objects with: name, amount, \
+            unit), instructions (array of strings), and sourceDescription (string \
+            - describe what this appears to be, like 'Cookbook page' or 'Screenshot \
+            of recipe blog')
             """
 
         let body: [String: Any] = [
@@ -129,7 +120,7 @@ enum ClaudeAPIService {
                         ],
                         [
                             "type": "text",
-                            "text": "Please extract the recipe from this photo."
+                            "text": userPrompt
                         ]
                     ]
                 ]

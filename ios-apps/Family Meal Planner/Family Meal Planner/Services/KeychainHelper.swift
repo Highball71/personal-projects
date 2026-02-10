@@ -27,8 +27,8 @@ enum KeychainHelper {
         }
     }
 
-    static let anthropicServiceName = "com.familymealplanner.anthropic-api-key"
-    static let anthropicAccountName = "api-key"
+    static let anthropicServiceName = "anthropic-api-key"
+    static let anthropicAccountName = "highball71"
 
     /// Retrieve the Anthropic API key from the iOS Keychain.
     static func getAnthropicAPIKey() throws -> String {
