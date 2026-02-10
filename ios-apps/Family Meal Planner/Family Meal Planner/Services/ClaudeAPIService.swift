@@ -50,28 +50,75 @@ enum ClaudeAPIService {
     /// - Returns: An ExtractedRecipe with parsed fields
     /// - Throws: APIError or KeychainHelper.KeychainError
     static func extractRecipe(from image: UIImage) async throws -> ExtractedRecipe {
+        print("[RecipeScan] Starting recipe extraction...")
+
         // Convert image to base64 JPEG
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("[RecipeScan] ERROR: Failed to convert image to JPEG data")
             throw APIError.imageConversionFailed
         }
         let base64String = imageData.base64EncodedString()
+        print("[RecipeScan] Image data size: \(imageData.count) bytes (\(String(format: "%.1f", Double(imageData.count) / 1_000_000)) MB)")
 
         // Get API key from Keychain (never hardcoded)
-        let apiKey = try KeychainHelper.getAnthropicAPIKey()
+        let apiKey: String
+        do {
+            apiKey = try KeychainHelper.getAnthropicAPIKey()
+            print("[RecipeScan] API key found in Keychain (\(apiKey.prefix(8))...)")
+        } catch {
+            #if DEBUG
+            // In the Simulator, the iOS Keychain is separate from macOS and won't
+            // have the key. Fall back to the ANTHROPIC_API_KEY environment variable
+            // (set in the Xcode scheme under Run > Arguments > Environment Variables).
+            if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
+                apiKey = envKey
+                print("[RecipeScan] Keychain unavailable, using ANTHROPIC_API_KEY env var (\(envKey.prefix(8))...)")
+            } else {
+                print("[RecipeScan] ERROR: Keychain lookup failed and ANTHROPIC_API_KEY env var not set — \(error)")
+                throw error
+            }
+            #else
+            print("[RecipeScan] ERROR: Keychain lookup failed — \(error)")
+            throw error
+            #endif
+        }
 
         // Build and send the request
         let request = try buildRequest(apiKey: apiKey, base64Image: base64String)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        print("[RecipeScan] Sending request to \(endpoint) (model: \(modelID))...")
 
-        // Check HTTP status
-        if let httpResponse = response as? HTTPURLResponse,
-           !(200...299).contains(httpResponse.statusCode) {
-            let body = String(data: data, encoding: .utf8) ?? "No response body"
-            throw APIError.httpError(statusCode: httpResponse.statusCode, message: body)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            print("[RecipeScan] ERROR: Network request failed — \(error)")
+            throw error
         }
 
+        // Check HTTP status
+        if let httpResponse = response as? HTTPURLResponse {
+            print("[RecipeScan] HTTP status: \(httpResponse.statusCode)")
+            if !(200...299).contains(httpResponse.statusCode) {
+                let body = String(data: data, encoding: .utf8) ?? "No response body"
+                print("[RecipeScan] ERROR: API returned error — \(body)")
+                throw APIError.httpError(statusCode: httpResponse.statusCode, message: body)
+            }
+        }
+
+        // Log raw response body
+        let rawBody = String(data: data, encoding: .utf8) ?? "<unreadable>"
+        print("[RecipeScan] Raw response body:\n\(rawBody)")
+
         // Parse the response
-        return try parseRecipeFromResponse(data: data)
+        do {
+            let recipe = try parseRecipeFromResponse(data: data)
+            print("[RecipeScan] Successfully parsed recipe: \"\(recipe.name)\"")
+            return recipe
+        } catch {
+            print("[RecipeScan] ERROR: Failed to parse response — \(error)")
+            throw error
+        }
     }
 
     // MARK: - Private

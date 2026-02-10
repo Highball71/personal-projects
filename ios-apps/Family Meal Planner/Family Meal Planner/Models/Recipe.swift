@@ -16,7 +16,7 @@ final class Recipe {
     var category: RecipeCategory
     var servings: Int
     var prepTimeMinutes: Int
-    var cookTimeMinutes: Int
+    var cookTimeMinutes: Int = 0
     var instructions: String
     var dateCreated: Date
 
