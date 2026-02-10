@@ -136,13 +136,17 @@ struct AddEditRecipeView: View {
             .confirmationDialog("Add Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button("Take Photo") {
+                        showingPhotoOptions = false
                         showingCamera = true
                     }
                 }
                 Button("Choose from Library") {
+                    showingPhotoOptions = false
                     showingPhotoLibrary = true
                 }
-                Button("Cancel", role: .cancel) { }
+                Button("Cancel", role: .cancel) {
+                    showingPhotoOptions = false
+                }
             }
             // Photo library picker
             .photosPicker(isPresented: $showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
