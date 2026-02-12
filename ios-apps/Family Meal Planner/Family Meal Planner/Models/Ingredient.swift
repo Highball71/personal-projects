@@ -12,9 +12,9 @@ import SwiftData
 /// Each Ingredient belongs to exactly one Recipe.
 @Model
 final class Ingredient {
-    var name: String
-    var quantity: Double
-    var unit: IngredientUnit
+    var name: String = ""
+    var quantity: Double = 1.0
+    var unit: IngredientUnit = IngredientUnit.piece
 
     // SwiftData automatically creates this inverse relationship
     // back to the Recipe that owns this ingredient.

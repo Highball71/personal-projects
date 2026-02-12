@@ -12,8 +12,8 @@ import SwiftData
 /// Example: "Monday dinner = Spaghetti Bolognese"
 @Model
 final class MealPlan {
-    var date: Date
-    var mealType: MealType
+    var date: Date = Date()
+    var mealType: MealType = MealType.dinner
 
     // .nullify means: if the linked recipe is deleted, this meal plan
     // entry stays but its recipe becomes nil (an empty slot).

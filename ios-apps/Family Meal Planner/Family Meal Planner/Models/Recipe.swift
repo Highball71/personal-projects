@@ -12,13 +12,13 @@ import SwiftData
 /// This is the core model — everything else references recipes.
 @Model
 final class Recipe {
-    var name: String
-    var category: RecipeCategory
-    var servings: Int
-    var prepTimeMinutes: Int
+    var name: String = ""
+    var category: RecipeCategory = RecipeCategory.dinner
+    var servings: Int = 4
+    var prepTimeMinutes: Int = 30
     var cookTimeMinutes: Int = 0
-    var instructions: String
-    var dateCreated: Date
+    var instructions: String = ""
+    var dateCreated: Date = Date()
 
     // Where this recipe came from (cookbook, website, photo, etc.).
     // Optional — older or manually entered recipes may not have a source.

@@ -27,10 +27,25 @@ struct Family_Meal_PlannerApp: App {
         WindowGroup {
             ContentView()
         }
-        // This sets up the entire SwiftData stack:
-        // - Creates a SQLite database on device
-        // - Injects it into the SwiftUI environment
-        // - All child views can then use @Query and @Environment(\.modelContext)
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self])
+        // SwiftData + CloudKit: syncs recipes, ingredients, and meal plans
+        // across all family members via iCloud.
+        // Uses .automatic to pick up the CloudKit container from entitlements.
+        .modelContainer(sharedModelContainer)
     }
 }
+
+/// Shared model container configured for CloudKit syncing.
+/// Created once at launch — failure is unrecoverable so we fatalError.
+private let sharedModelContainer: ModelContainer = {
+    let schema = Schema([Recipe.self, Ingredient.self, MealPlan.self])
+    let config = ModelConfiguration(
+        "FamilyMealPlanner",
+        schema: schema,
+        cloudKitDatabase: .automatic
+    )
+    do {
+        return try ModelContainer(for: schema, configurations: [config])
+    } catch {
+        fatalError("Could not create ModelContainer: \(error)")
+    }
+}()
