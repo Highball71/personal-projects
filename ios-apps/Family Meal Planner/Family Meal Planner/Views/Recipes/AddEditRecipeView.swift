@@ -41,6 +41,11 @@ struct AddEditRecipeView: View {
     @State private var showingExtractionError = false
     @State private var showingExtractionSuccess = false
 
+    // URL import state
+    @State private var showingURLInput = false
+    @State private var importURLText = ""
+    @State private var isExtractingFromURL = false
+
     var isEditing: Bool { recipeToEdit != nil }
 
     /// Placeholder text that changes based on the selected source type
@@ -49,6 +54,7 @@ struct AddEditRecipeView: View {
         case .cookbook: "Book title, p. 42"
         case .website: "https://..."
         case .photo:   "Cookbook name"
+        case .url:     "https://..."
         case .other:   "Where is this from?"
         case nil:      ""
         }
@@ -66,6 +72,15 @@ struct AddEditRecipeView: View {
                         showingPhotoOptions = true
                     } label: {
                         Label("Scan from Photo", systemImage: "camera.fill")
+                    }
+                    .disabled(isExtractingRecipe)
+
+                    // Import a recipe from a webpage URL
+                    Button {
+                        importURLText = ""
+                        showingURLInput = true
+                    } label: {
+                        Label("Import from URL", systemImage: "link")
                     }
                     .disabled(isExtractingRecipe)
 
@@ -183,7 +198,7 @@ struct AddEditRecipeView: View {
                     selectedPhotoItem = nil
                 }
             }
-            // Loading overlay while Claude processes the image
+            // Loading overlay while Claude processes the image or URL
             .overlay {
                 if isExtractingRecipe {
                     ZStack {
@@ -192,7 +207,9 @@ struct AddEditRecipeView: View {
                         VStack(spacing: 16) {
                             ProgressView()
                                 .scaleEffect(1.5)
-                            Text("Reading recipe from photo...")
+                            Text(isExtractingFromURL
+                                 ? "Importing recipe from URL..."
+                                 : "Reading recipe from photo...")
                                 .font(.headline)
                             Text("This may take a few seconds")
                                 .font(.subheadline)
@@ -228,7 +245,19 @@ struct AddEditRecipeView: View {
             .alert("Couldn't Read Recipe", isPresented: $showingExtractionError) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Couldn't read this recipe \u{2014} try a clearer photo.")
+                Text(extractionError ?? "Something went wrong. Please try again.")
+            }
+            // URL input alert
+            .alert("Import from URL", isPresented: $showingURLInput) {
+                TextField("https://example.com/recipe", text: $importURLText)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                Button("Import") {
+                    Task { await extractRecipeFromURL() }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Paste a link to a recipe page")
             }
             .onAppear {
                 // If editing, populate the form with the existing recipe's data
@@ -278,10 +307,69 @@ struct AddEditRecipeView: View {
             // Show brief success confirmation
             withAnimation { showingExtractionSuccess = true }
         } catch {
+            extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
             showingExtractionError = true
         }
 
         isExtractingRecipe = false
+    }
+
+    /// Fetch a recipe webpage and populate form fields with the result.
+    @MainActor
+    private func extractRecipeFromURL() async {
+        // Normalize: add https:// if no scheme provided
+        var urlString = importURLText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !urlString.isEmpty && !urlString.contains("://") {
+            urlString = "https://" + urlString
+        }
+
+        guard let url = URL(string: urlString), url.scheme != nil, url.host != nil else {
+            print("[URLImport] Invalid URL entered: \"\(importURLText)\"")
+            extractionError = "That doesn't look like a valid URL. Check the link and try again."
+            showingExtractionError = true
+            return
+        }
+
+        print("[URLImport] User initiated import for: \(url.absoluteString)")
+        isExtractingRecipe = true
+        isExtractingFromURL = true
+        extractionError = nil
+
+        do {
+            let extracted = try await ClaudeAPIService.extractRecipe(fromURL: url)
+
+            // Populate form fields — same pattern as photo extraction
+            name = extracted.name
+            category = extracted.recipeCategory
+            servings = extracted.servingsInt
+            prepTimeMinutes = extracted.prepTimeMinutesInt
+            cookTimeMinutes = extracted.cookTimeMinutesInt
+            instructions = extracted.instructionsText
+            ingredientRows = extracted.ingredientFormRows
+
+            // Set source to .url and store the original URL
+            sourceType = .url
+            sourceDetail = url.absoluteString
+
+            print("[URLImport] Form pre-filled successfully with \"\(extracted.name)\"")
+            withAnimation { showingExtractionSuccess = true }
+        } catch {
+            // Nothing was saved or pre-filled — the form fields above are only
+            // set inside the do block, so on any throw the form stays untouched.
+            print("[URLImport] Import failed — no form data changed, nothing saved")
+            print("[URLImport] Error: \(error)")
+
+            if let apiError = error as? ClaudeAPIService.APIError,
+               case .noRecipeFound = apiError {
+                extractionError = "Couldn't find a recipe on that page."
+            } else {
+                extractionError = "Couldn't read a recipe from that page. Try a different URL."
+            }
+            showingExtractionError = true
+        }
+
+        isExtractingRecipe = false
+        isExtractingFromURL = false
     }
 
     private func saveRecipe() {
