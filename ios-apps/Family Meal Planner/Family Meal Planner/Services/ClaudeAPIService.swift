@@ -146,7 +146,12 @@ enum ClaudeAPIService {
         print("[URLImport] STEP 1: Fetching webpage...")
         let htmlText: String
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            var fetchRequest = URLRequest(url: url)
+            fetchRequest.setValue(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+                forHTTPHeaderField: "User-Agent"
+            )
+            let (data, response) = try await URLSession.shared.data(for: fetchRequest)
             let httpResponse = response as? HTTPURLResponse
             let statusCode = httpResponse?.statusCode ?? -1
             let finalURL = httpResponse?.url?.absoluteString ?? "unknown"
@@ -183,12 +188,21 @@ enum ClaudeAPIService {
             throw APIError.webpageEmpty
         }
 
+        print("[URLImport] STEP 1 OK: Fetched \(htmlText.count) chars")
+
+        // --- STEP 1.5: Try JSON-LD structured data first (free, no API call) ---
+        if let extracted = JSONLDRecipeParser.extractRecipe(from: htmlText) {
+            print("[URLImport] ======= URL import succeeded (via JSON-LD) =======")
+            return extracted
+        }
+
+        // --- Fall back to Claude API ---
         // Truncate to ~50 KB to keep token usage reasonable
         let maxChars = 50_000
         let trimmedHTML = htmlText.count > maxChars
             ? String(htmlText.prefix(maxChars))
             : htmlText
-        print("[URLImport] STEP 1 OK: Fetched \(htmlText.count) chars, sending \(trimmedHTML.count) chars to Claude")
+        print("[URLImport] Sending \(trimmedHTML.count) chars to Claude API...")
 
         // --- STEP 2: Get API key ---
         print("[URLImport] STEP 2: Getting API key...")

@@ -11,8 +11,12 @@ import SwiftData
 /// Read-only detail view showing a recipe's info, ingredients, and instructions.
 /// Has an Edit button that opens AddEditRecipeView in edit mode.
 struct RecipeDetailView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
     let recipe: Recipe
     @State private var showingEditSheet = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         List {
@@ -56,6 +60,13 @@ struct RecipeDetailView: View {
                     }
                 }
             }
+
+            Section {
+                Button("Delete Recipe", role: .destructive) {
+                    showingDeleteConfirmation = true
+                }
+                .frame(maxWidth: .infinity)
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle(recipe.name)
@@ -64,6 +75,15 @@ struct RecipeDetailView: View {
         }
         .sheet(isPresented: $showingEditSheet) {
             AddEditRecipeView(recipeToEdit: recipe)
+        }
+        .alert("Delete this recipe?", isPresented: $showingDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(recipe)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This can't be undone.")
         }
     }
 
