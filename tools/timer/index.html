@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Interval Timer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .setup-screen, .timer-screen {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        input[type="number"]::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .timer-display {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .time {
+            font-size: 72px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 20px;
+        }
+
+        .interval-info {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 30px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: white;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-control {
+            flex: 1;
+        }
+
+        .active-interval {
+            background: rgba(76, 217, 100, 0.3);
+        }
+
+        @media (max-width: 380px) {
+            .time {
+                font-size: 56px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Setup Screen -->
+        <div class="setup-screen" id="setupScreen">
+            <h1>Interval Timer</h1>
+            
+            <div class="input-group">
+                <label for="workTime">Work Interval (seconds)</label>
+                <input type="number" id="workTime" placeholder="45" min="1" value="45">
+            </div>
+
+            <div class="input-group">
+                <label for="restTime">Rest Interval (seconds)</label>
+                <input type="number" id="restTime" placeholder="15" min="1" value="15">
+            </div>
+
+            <div class="input-group">
+                <label for="rounds">Number of Rounds</label>
+                <input type="number" id="rounds" placeholder="5" min="1" value="5">
+            </div>
+
+            <div class="input-group">
+                <label style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>Voice Countdown</span>
+                    <input type="checkbox" id="voiceEnabled" checked style="width: auto; transform: scale(1.5);">
+                </label>
+                <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
+                    Announces every 10 seconds and final 5-second countdown
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="startTimer()" id="startBtn">Start Timer</button>
+            <button class="btn btn-secondary" onclick="toggleVoiceCommand()" id="voiceCommandBtn">🎤 Voice Start</button>
+            <div id="listeningIndicator" style="text-align: center; margin-top: 10px; font-size: 14px; opacity: 0.8; display: none;">
+                🎤 Listening... Say "start" or "go"
+            </div>
+        </div>
+
+        <!-- Timer Screen -->
+        <div class="timer-screen hidden" id="timerScreen">
+            <h1>Interval Timer</h1>
+            
+            <div class="timer-display">
+                <div class="time" id="timeDisplay">0:00</div>
+                <div class="interval-info" id="intervalType">WORK</div>
+                <div class="interval-info" id="roundInfo">Round 1 of 5</div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-secondary btn-control" onclick="pauseResume()" id="pauseBtn">Pause</button>
+                <button class="btn btn-secondary btn-control" onclick="reset()">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let workTime = 45;
+        let restTime = 15;
+        let totalRounds = 5;
+        let currentRound = 1;
+        let isWorkInterval = true;
+        let timeRemaining = 0;
+        let isPaused = false;
+        let timerInterval = null;
+        let audioContext = null;
+        let voiceEnabled = true;
+        let synth = window.speechSynthesis;
+        let recognition = null;
+        let isListening = false;
+
+        // Initialize speech recognition
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                alert('Voice commands are not supported in this browser. Please use Safari on iOS.');
+                return null;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript.toLowerCase().trim();
+                console.log('Heard:', transcript);
+                
+                if (transcript.includes('start') || transcript.includes('go') || transcript.includes('begin')) {
+                    speak('Starting timer');
+                    setTimeout(() => {
+                        startTimer();
+                    }, 500);
+                }
+                
+                stopListening();
+            };
+            
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error:', event.error);
+                stopListening();
+                
+                if (event.error === 'not-allowed') {
+                    alert('Microphone access denied. Please allow microphone access in your browser settings.');
+                }
+            };
+            
+            recognition.onend = function() {
+                if (isListening) {
+                    // Restart if still in listening mode
+                    recognition.start();
+                }
+            };
+            
+            return recognition;
+        }
+
+        function toggleVoiceCommand() {
+            if (!recognition) {
+                recognition = initSpeechRecognition();
+                if (!recognition) return;
+            }
+            
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            try {
+                recognition.start();
+                isListening = true;
+                document.getElementById('listeningIndicator').style.display = 'block';
+                document.getElementById('voiceCommandBtn').textContent = '🔴 Stop Listening';
+                document.getElementById('voiceCommandBtn').style.background = 'rgba(255, 59, 48, 0.8)';
+            } catch (error) {
+                console.error('Error starting recognition:', error);
+            }
+        }
+
+        function stopListening() {
+            if (recognition) {
+                recognition.stop();
+            }
+            isListening = false;
+            document.getElementById('listeningIndicator').style.display = 'none';
+            document.getElementById('voiceCommandBtn').textContent = '🎤 Voice Start';
+            document.getElementById('voiceCommandBtn').style.background = 'rgba(255, 255, 255, 0.2)';
+        }
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function speak(text) {
+            if (!voiceEnabled || isPaused) return;
+            
+            // Cancel any ongoing speech
+            synth.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            // Try to use a clear English voice
+            const voices = synth.getVoices();
+            const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+            if (englishVoice) {
+                utterance.voice = englishVoice;
+            }
+            
+            synth.speak(utterance);
+        }
+
+        function playBeep(frequency = 800, duration = 200) {
+            initAudio();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = frequency;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration / 1000);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            const workInput = parseInt(document.getElementById('workTime').value);
+            const restInput = parseInt(document.getElementById('restTime').value);
+            const roundsInput = parseInt(document.getElementById('rounds').value);
+            voiceEnabled = document.getElementById('voiceEnabled').checked;
+
+            if (!workInput || workInput < 1 || !restInput || restInput < 1 || !roundsInput || roundsInput < 1) {
+                alert('Please enter valid durations (1 or more seconds) and rounds');
+                return;
+            }
+
+            workTime = workInput;
+            restTime = restInput;
+            totalRounds = roundsInput;
+
+            initAudio();
+            
+            // Stop listening if active
+            stopListening();
+            
+            // Load voices if not already loaded
+            if (synth.getVoices().length === 0) {
+                synth.addEventListener('voiceschanged', () => {}, { once: true });
+            }
+            
+            document.getElementById('setupScreen').classList.add('hidden');
+            document.getElementById('timerScreen').classList.remove('hidden');
+            
+            currentRound = 1;
+            isWorkInterval = true;
+            loadInterval();
+            runTimer();
+        }
+
+        function loadInterval() {
+            timeRemaining = isWorkInterval ? workTime : restTime;
+            updateDisplay();
+            updateBackgroundColor();
+            
+            // Announce the interval type at start
+            if (voiceEnabled) {
+                const intervalType = isWorkInterval ? 'Work' : 'Rest';
+                speak(`${intervalType}`);
+            }
+        }
+
+        function updateBackgroundColor() {
+            const timerScreen = document.getElementById('timerScreen');
+            if (isWorkInterval) {
+                document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            } else {
+                document.body.style.background = 'linear-gradient(135deg, #56ab2f 0%, #a8e063 100%)';
+            }
+        }
+
+        function runTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const totalIntervals = totalRounds * 2;
+            let currentInterval = (currentRound - 1) * 2 + (isWorkInterval ? 1 : 2);
+            
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timeRemaining--;
+                    updateDisplay();
+                    
+                    // Voice announcements at specific times
+                    if (voiceEnabled) {
+                        // Announce at every multiple of 10 seconds
+                        if (timeRemaining > 0 && timeRemaining % 10 === 0) {
+                            speak(timeRemaining.toString());
+                        } 
+                        // Also announce final countdown
+                        else if (timeRemaining >= 1 && timeRemaining <= 5) {
+                            speak(timeRemaining.toString());
+                        }
+                    }
+                    
+                    // Update progress bar
+                    const intervalDuration = isWorkInterval ? workTime : restTime;
+                    const intervalProgress = ((intervalDuration - timeRemaining) / intervalDuration) * 100;
+                    document.getElementById('progressFill').style.width = intervalProgress + '%';
+                    
+                    if (timeRemaining === 0) {
+                        playBeep(1000, 300);
+                        
+                        if (isWorkInterval) {
+                            // Switch to rest
+                            isWorkInterval = false;
+                            loadInterval();
+                        } else {
+                            // End of rest, move to next round
+                            if (currentRound < totalRounds) {
+                                currentRound++;
+                                isWorkInterval = true;
+                                loadInterval();
+                            } else {
+                                // Timer complete
+                                clearInterval(timerInterval);
+                                playBeep(1200, 500);
+                                setTimeout(() => playBeep(1200, 500), 600);
+                                
+                                if (voiceEnabled) {
+                                    speak('Workout complete');
+                                }
+                                
+                                setTimeout(() => {
+                                    if (confirm('Timer complete! Start again?')) {
+                                        reset();
+                                    }
+                                }, 1000);
+                            }
+                        }
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateDisplay() {
+            document.getElementById('timeDisplay').textContent = formatTime(timeRemaining);
+            document.getElementById('intervalType').textContent = isWorkInterval ? 'WORK' : 'REST';
+            document.getElementById('intervalType').style.color = isWorkInterval ? '#ffeb3b' : '#4caf50';
+            document.getElementById('intervalType').style.fontWeight = '700';
+            document.getElementById('intervalType').style.fontSize = '24px';
+            document.getElementById('roundInfo').textContent = `Round ${currentRound} of ${totalRounds}`;
+        }
+
+        function pauseResume() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtn');
+            btn.textContent = isPaused ? 'Resume' : 'Pause';
+            
+            // Cancel any ongoing speech when pausing
+            if (isPaused) {
+                synth.cancel();
+            }
+        }
+
+        function reset() {
+            if (timerInterval) clearInterval(timerInterval);
+            synth.cancel();
+            stopListening();
+            isPaused = false;
+            currentRound = 1;
+            isWorkInterval = true;
+            
+            document.getElementById('setupScreen').classList.remove('hidden');
+            document.getElementById('timerScreen').classList.add('hidden');
+            document.getElementById('pauseBtn').textContent = 'Pause';
+            document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        }
+    </script>
+</body>
+</html>
