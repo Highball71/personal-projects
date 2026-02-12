@@ -85,7 +85,7 @@ struct RecipeRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(recipe.ingredients.count) ingredients")
+                Text("\(recipe.ingredientsList.count) ingredients")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

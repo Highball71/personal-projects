@@ -37,7 +37,7 @@ struct GroceryListView: View {
 
         for plan in thisWeekPlans {
             guard let recipe = plan.recipe else { continue }
-            for ingredient in recipe.ingredients {
+            for ingredient in recipe.ingredientsList {
                 let key = "\(ingredient.name.lowercased())|\(ingredient.unit.rawValue)"
 
                 if var existing = combined[key] {

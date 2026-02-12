@@ -36,7 +36,7 @@ enum SampleData {
             sourceType: .cookbook,
             sourceDetail: "The Joy of Cooking, p. 312"
         )
-        spaghetti.ingredients = [
+        spaghetti.ingredientsList = [
             Ingredient(name: "Spaghetti", quantity: 1, unit: .pound),
             Ingredient(name: "Ground beef", quantity: 1, unit: .pound),
             Ingredient(name: "Crushed tomatoes", quantity: 28, unit: .ounce),
@@ -60,7 +60,7 @@ enum SampleData {
             5. Season with salt and pepper.
             """
         )
-        eggs.ingredients = [
+        eggs.ingredientsList = [
             Ingredient(name: "Eggs", quantity: 4, unit: .piece),
             Ingredient(name: "Butter", quantity: 1, unit: .tablespoon),
             Ingredient(name: "Milk", quantity: 2, unit: .tablespoon),
@@ -84,7 +84,7 @@ enum SampleData {
             sourceType: .website,
             sourceDetail: "budgetbytes.com"
         )
-        salad.ingredients = [
+        salad.ingredientsList = [
             Ingredient(name: "Chicken breast", quantity: 1, unit: .pound),
             Ingredient(name: "Romaine lettuce", quantity: 1, unit: .whole),
             Ingredient(name: "Caesar dressing", quantity: 3, unit: .tablespoon),

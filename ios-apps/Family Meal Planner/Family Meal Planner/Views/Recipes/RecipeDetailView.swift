@@ -30,11 +30,11 @@ struct RecipeDetailView: View {
             }
 
             Section("Ingredients") {
-                if recipe.ingredients.isEmpty {
+                if recipe.ingredientsList.isEmpty {
                     Text("No ingredients added")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(recipe.ingredients) { ingredient in
+                    ForEach(recipe.ingredientsList) { ingredient in
                         HStack {
                             Text(formatQuantity(ingredient.quantity))
                                 .foregroundStyle(.secondary)

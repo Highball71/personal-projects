@@ -34,17 +34,33 @@ struct Family_Meal_PlannerApp: App {
     }
 }
 
-/// Shared model container configured for CloudKit syncing.
-/// Created once at launch — failure is unrecoverable so we fatalError.
+/// Shared model container — tries CloudKit first, falls back to local-only
+/// storage if CloudKit isn't available (e.g. Simulator, no iCloud account).
 private let sharedModelContainer: ModelContainer = {
     let schema = Schema([Recipe.self, Ingredient.self, MealPlan.self])
-    let config = ModelConfiguration(
-        "FamilyMealPlanner",
-        schema: schema,
-        cloudKitDatabase: .automatic
-    )
+
+    // Try CloudKit-enabled configuration first
     do {
-        return try ModelContainer(for: schema, configurations: [config])
+        let cloudConfig = ModelConfiguration(
+            "FamilyMealPlanner",
+            schema: schema,
+            cloudKitDatabase: .automatic
+        )
+        let container = try ModelContainer(for: schema, configurations: [cloudConfig])
+        print("[Sync] CloudKit sync enabled")
+        return container
+    } catch {
+        print("[Sync] CloudKit unavailable (\(error.localizedDescription)), falling back to local storage")
+    }
+
+    // Fall back to local-only storage so the app never crashes
+    do {
+        let localConfig = ModelConfiguration(
+            "FamilyMealPlanner",
+            schema: schema,
+            cloudKitDatabase: .none
+        )
+        return try ModelContainer(for: schema, configurations: [localConfig])
     } catch {
         fatalError("Could not create ModelContainer: \(error)")
     }

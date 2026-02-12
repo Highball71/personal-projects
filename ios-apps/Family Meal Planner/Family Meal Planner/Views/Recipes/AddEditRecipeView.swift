@@ -285,7 +285,7 @@ struct AddEditRecipeView: View {
                     prepTimeMinutes = recipe.prepTimeMinutes
                     cookTimeMinutes = recipe.cookTimeMinutes
                     instructions = recipe.instructions
-                    ingredientRows = recipe.ingredients.map { ingredient in
+                    ingredientRows = recipe.ingredientsList.map { ingredient in
                         IngredientFormData(
                             name: ingredient.name,
                             quantity: ingredient.quantity,
@@ -425,10 +425,10 @@ struct AddEditRecipeView: View {
             recipe.sourceDetail = sourceDetail.isEmpty ? nil : sourceDetail
 
             // Replace all ingredients: delete old, add new
-            for ingredient in recipe.ingredients {
+            for ingredient in recipe.ingredientsList {
                 modelContext.delete(ingredient)
             }
-            recipe.ingredients = validIngredients
+            recipe.ingredientsList = validIngredients
         } else {
             // Create brand new recipe
             let recipe = Recipe(

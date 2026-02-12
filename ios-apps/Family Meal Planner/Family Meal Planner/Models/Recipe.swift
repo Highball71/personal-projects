@@ -27,8 +27,16 @@ final class Recipe {
 
     // .cascade means: when you delete a recipe, its ingredients
     // are automatically deleted too. No orphaned data.
+    // Optional because CloudKit requires all relationships to be optional.
     @Relationship(deleteRule: .cascade, inverse: \Ingredient.recipe)
-    var ingredients: [Ingredient]
+    var ingredients: [Ingredient]?
+
+    /// Non-optional accessor — returns the ingredients array or empty if nil.
+    /// Use this throughout the app so we don't need nil checks everywhere.
+    var ingredientsList: [Ingredient] {
+        get { ingredients ?? [] }
+        set { ingredients = newValue }
+    }
 
     init(
         name: String,
