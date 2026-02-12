@@ -31,6 +31,12 @@ final class Recipe {
     @Relationship(deleteRule: .cascade, inverse: \Ingredient.recipe)
     var ingredients: [Ingredient]?
 
+    // Inverse of MealPlan.recipe — CloudKit requires all relationships
+    // to have an explicit inverse. .nullify means: if a recipe is deleted,
+    // the meal plan entries stay but their recipe becomes nil.
+    @Relationship(deleteRule: .nullify, inverse: \MealPlan.recipe)
+    var mealPlans: [MealPlan]?
+
     /// Non-optional accessor — returns the ingredients array or empty if nil.
     /// Use this throughout the app so we don't need nil checks everywhere.
     var ingredientsList: [Ingredient] {
