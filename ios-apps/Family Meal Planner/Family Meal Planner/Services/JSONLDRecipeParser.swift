@@ -100,11 +100,12 @@ enum JSONLDRecipeParser {
     // MARK: - Conversion to ExtractedRecipe
 
     private static func convertToExtractedRecipe(_ json: [String: Any]) -> ExtractedRecipe? {
-        guard let name = json["name"] as? String, !name.isEmpty else {
+        guard let rawName = json["name"] as? String, !rawName.isEmpty else {
             print("[URLImport] JSON-LD: Recipe object missing 'name' field")
             return nil
         }
 
+        let name = decodeHTMLEntities(rawName)
         let category = extractCategory(from: json)
         let servingSize = extractString(from: json["recipeYield"])
         let prepTime = parseISO8601Duration(extractString(from: json["prepTime"]))
@@ -187,7 +188,9 @@ enum JSONLDRecipeParser {
     /// Parse a single ingredient string like "1 1/2 cups all-purpose flour"
     /// into its component parts (amount, unit, name).
     private static func parseIngredientString(_ text: String) -> ExtractedIngredient {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        // Clean up HTML entities and price annotations before parsing
+        let trimmed = stripPriceInfo(decodeHTMLEntities(text))
+            .trimmingCharacters(in: .whitespaces)
 
         // Scan the leading amount: a number, optional fraction (like "1 1/2" or "1/2"),
         // or decimal (like "1.5"). Uses simple character scanning to avoid NSRegularExpression.
@@ -280,7 +283,7 @@ enum JSONLDRecipeParser {
     private static func extractInstructions(from json: [String: Any]) -> [String] {
         // Array of strings
         if let steps = json["recipeInstructions"] as? [String] {
-            return steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            return steps.map { decodeHTMLEntities($0).trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
         }
 
@@ -291,7 +294,7 @@ enum JSONLDRecipeParser {
 
         // Single string (split on newlines)
         if let text = json["recipeInstructions"] as? String {
-            return text.components(separatedBy: .newlines)
+            return decodeHTMLEntities(text).components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
         }
@@ -303,7 +306,7 @@ enum JSONLDRecipeParser {
     private static func extractStepText(from step: [String: Any]) -> [String] {
         // HowToStep — has a "text" field
         if let text = step["text"] as? String {
-            return [text.trimmingCharacters(in: .whitespacesAndNewlines)]
+            return [decodeHTMLEntities(text).trimmingCharacters(in: .whitespacesAndNewlines)]
         }
 
         // HowToSection — has "itemListElement" with nested steps
@@ -312,6 +315,63 @@ enum JSONLDRecipeParser {
         }
 
         return []
+    }
+
+    // MARK: - Text Cleanup
+
+    /// Decode common HTML entities: &amp; &lt; &gt; &quot; &#39; and numeric &#NNN; / &#xHH;
+    private static func decodeHTMLEntities(_ text: String) -> String {
+        var result = text
+        // Named entities
+        result = result.replacingOccurrences(of: "&amp;", with: "&")
+        result = result.replacingOccurrences(of: "&lt;", with: "<")
+        result = result.replacingOccurrences(of: "&gt;", with: ">")
+        result = result.replacingOccurrences(of: "&quot;", with: "\"")
+        result = result.replacingOccurrences(of: "&#39;", with: "'")
+        result = result.replacingOccurrences(of: "&apos;", with: "'")
+        result = result.replacingOccurrences(of: "&#x27;", with: "'")
+        result = result.replacingOccurrences(of: "&nbsp;", with: " ")
+        // Decimal numeric entities like &#8217; (right single quote)
+        while let range = result.range(of: #"&#(\d+);"#, options: .regularExpression) {
+            let entity = String(result[range])
+            let digits = entity.dropFirst(2).dropLast(1) // strip &# and ;
+            if let code = Int(digits), let scalar = Unicode.Scalar(code) {
+                result.replaceSubrange(range, with: String(scalar))
+            } else {
+                break
+            }
+        }
+        // Hex numeric entities like &#x2019;
+        while let range = result.range(of: #"&#[xX]([0-9a-fA-F]+);"#, options: .regularExpression) {
+            let entity = String(result[range])
+            let hex = entity.dropFirst(3).dropLast(1) // strip &#x and ;
+            if let code = UInt32(hex, radix: 16), let scalar = Unicode.Scalar(code) {
+                result.replaceSubrange(range, with: String(scalar))
+            } else {
+                break
+            }
+        }
+        return result
+    }
+
+    /// Strip parenthetical price info like "($0.20)" or "(about $1.50)" from ingredient strings.
+    private static func stripPriceInfo(_ text: String) -> String {
+        // Remove any (...$...) pattern — parenthetical text containing a dollar sign
+        var result = text
+        while let openParen = result.range(of: "("),
+              let closeParen = result[openParen.lowerBound...].range(of: ")") {
+            let parenContent = result[openParen.lowerBound...closeParen.lowerBound]
+            if parenContent.contains("$") {
+                // Remove the parenthetical and any trailing whitespace
+                let removeRange = openParen.lowerBound..<closeParen.upperBound
+                result.removeSubrange(removeRange)
+                result = result.trimmingCharacters(in: .whitespaces)
+            } else {
+                // Not a price — stop searching to avoid infinite loop
+                break
+            }
+        }
+        return result
     }
 
     // MARK: - ISO 8601 Duration

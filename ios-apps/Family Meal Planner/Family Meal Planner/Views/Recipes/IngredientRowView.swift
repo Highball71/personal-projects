@@ -36,7 +36,7 @@ struct IngredientRowView: View {
                 }
             }
             .labelsHidden()
-            .frame(width: 70)
+            .frame(width: 80)
 
             // Ingredient name — takes remaining space
             TextField("Ingredient name", text: $data.name)
