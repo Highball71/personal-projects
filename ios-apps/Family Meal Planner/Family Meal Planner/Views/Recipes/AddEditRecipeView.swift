@@ -46,6 +46,9 @@ struct AddEditRecipeView: View {
     @State private var importURLText = ""
     @State private var isExtractingFromURL = false
 
+    // Recipe search state
+    @State private var showingRecipeSearch = false
+
     var isEditing: Bool { recipeToEdit != nil }
 
     /// Placeholder text that changes based on the selected source type
@@ -81,6 +84,14 @@ struct AddEditRecipeView: View {
                         showingURLInput = true
                     } label: {
                         Label("Import from URL", systemImage: "link")
+                    }
+                    .disabled(isExtractingRecipe)
+
+                    // Search for a recipe online by name
+                    Button {
+                        showingRecipeSearch = true
+                    } label: {
+                        Label("Search Online", systemImage: "magnifyingglass")
                     }
                     .disabled(isExtractingRecipe)
 
@@ -259,6 +270,12 @@ struct AddEditRecipeView: View {
             } message: {
                 Text("Paste a link to a recipe page")
             }
+            // Recipe search sheet
+            .sheet(isPresented: $showingRecipeSearch) {
+                RecipeSearchView { extracted, url in
+                    populateForm(from: extracted, sourceURL: url)
+                }
+            }
             .onAppear {
                 // If editing, populate the form with the existing recipe's data
                 if let recipe = recipeToEdit {
@@ -370,6 +387,23 @@ struct AddEditRecipeView: View {
 
         isExtractingRecipe = false
         isExtractingFromURL = false
+    }
+
+    /// Populate form fields from an extracted recipe (used by search and URL import).
+    @MainActor
+    private func populateForm(from extracted: ExtractedRecipe, sourceURL: URL) {
+        name = extracted.name
+        category = extracted.recipeCategory
+        servings = extracted.servingsInt
+        prepTimeMinutes = extracted.prepTimeMinutesInt
+        cookTimeMinutes = extracted.cookTimeMinutesInt
+        instructions = extracted.instructionsText
+        ingredientRows = extracted.ingredientFormRows
+
+        sourceType = .url
+        sourceDetail = sourceURL.absoluteString
+
+        withAnimation { showingExtractionSuccess = true }
     }
 
     private func saveRecipe() {
