@@ -288,8 +288,10 @@ enum ClaudeAPIService {
             snack, dessert, side, drink), servingSize (string), prepTime (string), \
             cookTime (string), ingredients (array of objects with: name, amount, \
             unit), instructions (array of strings), and sourceDescription (string \
-            - describe what this appears to be, like 'Cookbook page' or 'Screenshot \
-            of recipe blog')
+            - if you can identify the cookbook or source name from the photo, such as \
+            headers, footers, watermarks, book titles, or author names, include it \
+            here, e.g. 'The Whole30 Cookbook' or 'Bon Appetit'. If you cannot \
+            identify a specific source, omit this field or set it to null)
             """
 
         let body: [String: Any] = [

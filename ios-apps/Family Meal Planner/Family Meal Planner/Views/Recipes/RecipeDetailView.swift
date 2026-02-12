@@ -46,12 +46,14 @@ struct RecipeDetailView: View {
                 }
             }
 
-            if let sourceType = recipe.sourceType {
-                Section("Source") {
-                    LabeledContent("Type", value: sourceType.rawValue)
-                    if let detail = recipe.sourceDetail, !detail.isEmpty {
-                        LabeledContent("Details", value: detail)
-                    }
+            // Subtle source attribution for imported recipes
+            if let sourceText = sourceAttribution {
+                Section {
+                    Text(sourceText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .listRowBackground(Color.clear)
                 }
             }
 
@@ -88,6 +90,39 @@ struct RecipeDetailView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This can't be undone.")
+        }
+    }
+
+    /// Build a subtle "From: ..." attribution string, or nil for manual recipes.
+    private var sourceAttribution: String? {
+        guard let sourceType = recipe.sourceType else { return nil }
+
+        switch sourceType {
+        case .photo:
+            // Photo scan — show cookbook name if Claude identified one
+            if let detail = recipe.sourceDetail, !detail.isEmpty {
+                return "From: \(detail)"
+            }
+            return nil
+        case .url:
+            // URL import or search — extract just the domain name
+            if let detail = recipe.sourceDetail, !detail.isEmpty,
+               let url = URL(string: detail), let host = url.host {
+                // Strip "www." prefix for cleaner display
+                let domain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+                return "From: \(domain)"
+            }
+            return nil
+        case .cookbook:
+            if let detail = recipe.sourceDetail, !detail.isEmpty {
+                return "From: \(detail)"
+            }
+            return nil
+        case .website, .other:
+            if let detail = recipe.sourceDetail, !detail.isEmpty {
+                return "From: \(detail)"
+            }
+            return nil
         }
     }
 
