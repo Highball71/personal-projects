@@ -38,13 +38,16 @@ struct CameraView: UIViewControllerRepresentable {
             didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
             let image = info[.originalImage] as? UIImage
+            print("[PhotoScan] Camera captured image: \(image != nil ? "yes" : "no")")
+            // Don't call picker.dismiss() — SwiftUI handles dismissal
+            // via the fullScreenCover's isPresented binding. Calling both
+            // causes a race condition that can swallow the callback.
             onImageCaptured(image)
-            picker.dismiss(animated: true)
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            print("[PhotoScan] Camera cancelled")
             onImageCaptured(nil)
-            picker.dismiss(animated: true)
         }
     }
 }

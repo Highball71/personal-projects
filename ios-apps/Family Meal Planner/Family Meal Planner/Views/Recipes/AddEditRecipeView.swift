@@ -188,9 +188,14 @@ struct AddEditRecipeView: View {
             // Camera (UIImagePickerController wrapper)
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView { image in
-                    showingCamera = false
                     if let image {
+                        print("[PhotoScan] Image received, size: \(Int(image.size.width))x\(Int(image.size.height))")
+                        // Dismiss camera first, then start extraction
+                        showingCamera = false
                         Task { await extractRecipeFromImage(image) }
+                    } else {
+                        print("[PhotoScan] No image received (cancelled or failed)")
+                        showingCamera = false
                     }
                 }
                 .ignoresSafeArea()
@@ -303,11 +308,14 @@ struct AddEditRecipeView: View {
     /// Send the image to Claude API and populate form fields with the result.
     @MainActor
     private func extractRecipeFromImage(_ image: UIImage) async {
+        print("[PhotoScan] Starting extraction, showing loading indicator...")
         isExtractingRecipe = true
         extractionError = nil
 
         do {
+            print("[PhotoScan] Sending to Claude API...")
             let extracted = try await ClaudeAPIService.extractRecipe(from: image)
+            print("[PhotoScan] Got response: \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
 
             // Populate form fields with extracted data
             name = extracted.name
@@ -325,11 +333,13 @@ struct AddEditRecipeView: View {
             // Show brief success confirmation
             withAnimation { showingExtractionSuccess = true }
         } catch {
+            print("[PhotoScan] Error: \(error)")
             extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
             showingExtractionError = true
         }
 
         isExtractingRecipe = false
+        print("[PhotoScan] Extraction complete, loading indicator hidden")
     }
 
     /// Fetch a recipe webpage and populate form fields with the result.
