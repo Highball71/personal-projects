@@ -29,19 +29,24 @@ struct GroceryItemRow: View {
                     .strikethrough(isChecked)
                     .foregroundStyle(isChecked ? .secondary : .primary)
 
-                Text("\(formatQuantity(item.totalQuantity)) \(item.unit.rawValue)")
+                Text(formatGroceryQuantity(item))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    /// Format quantity cleanly: "2" instead of "2.0", but keep "1.5"
-    private func formatQuantity(_ value: Double) -> String {
-        if value == value.rounded() && value < 1000 {
-            return String(format: "%.0f", value)
+    /// Format grocery quantity with fractions and human-readable units.
+    /// "to taste" items just show "to taste", "none" unit shows only the quantity.
+    private func formatGroceryQuantity(_ item: GroceryItem) -> String {
+        if item.unit == .toTaste {
+            return "to taste"
         }
-        return String(format: "%.1f", value)
+        let qty = FractionFormatter.formatAsFraction(item.totalQuantity)
+        if item.unit == .none {
+            return qty
+        }
+        return "\(qty) \(item.unit.displayName)"
     }
 }
 

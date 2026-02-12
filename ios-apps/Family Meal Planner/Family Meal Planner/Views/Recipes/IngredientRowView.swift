@@ -15,24 +15,34 @@ struct IngredientFormData: Identifiable {
     var name: String = ""
     var quantity: Double = 1.0
     var unit: IngredientUnit = .piece
+
+    /// Text representation of the quantity for the fraction-aware text field.
+    var quantityText: String = "1"
 }
 
 /// A single row in the ingredient editing form.
-/// Shows quantity, unit picker, and ingredient name in a compact layout.
+/// Shows quantity (as fraction text), unit picker, and ingredient name.
 struct IngredientRowView: View {
     @Binding var data: IngredientFormData
 
     var body: some View {
         HStack {
-            // Quantity — narrow field for numbers
-            TextField("Qty", value: $data.quantity, format: .number)
-                .keyboardType(.decimalPad)
-                .frame(width: 50)
+            if data.unit != .toTaste {
+                // Quantity — text field that accepts fractions like "1/2" or "1 1/2"
+                TextField("Qty", text: $data.quantityText)
+                    .keyboardType(.numbersAndPunctuation)
+                    .frame(width: 55)
+                    .onChange(of: data.quantityText) { _, newValue in
+                        if let parsed = FractionFormatter.parseFraction(newValue) {
+                            data.quantity = parsed
+                        }
+                    }
+            }
 
-            // Unit picker — compact menu style so it doesn't take much space
+            // Unit picker — compact menu style
             Picker("Unit", selection: $data.unit) {
-                ForEach(IngredientUnit.allCases) { unit in
-                    Text(unit.rawValue).tag(unit)
+                ForEach(IngredientUnit.pickerCases) { unit in
+                    Text(unit.displayName).tag(unit)
                 }
             }
             .labelsHidden()
@@ -45,7 +55,7 @@ struct IngredientRowView: View {
 }
 
 #Preview {
-    @Previewable @State var data = IngredientFormData(name: "Flour", quantity: 2.0, unit: .cup)
+    @Previewable @State var data = IngredientFormData(name: "Flour", quantity: 2.0, unit: .cup, quantityText: "2")
     IngredientRowView(data: $data)
         .padding()
 }

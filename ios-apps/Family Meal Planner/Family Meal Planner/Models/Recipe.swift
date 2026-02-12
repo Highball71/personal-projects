@@ -19,6 +19,7 @@ final class Recipe {
     var cookTimeMinutes: Int = 0
     var instructions: String = ""
     var dateCreated: Date = Date()
+    var isFavorite: Bool = false
 
     // Where this recipe came from (cookbook, website, photo, etc.).
     // Optional — older or manually entered recipes may not have a source.

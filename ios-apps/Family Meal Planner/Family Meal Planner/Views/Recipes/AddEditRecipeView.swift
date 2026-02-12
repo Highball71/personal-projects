@@ -289,7 +289,8 @@ struct AddEditRecipeView: View {
                         IngredientFormData(
                             name: ingredient.name,
                             quantity: ingredient.quantity,
-                            unit: ingredient.unit
+                            unit: ingredient.unit,
+                            quantityText: FractionFormatter.formatAsFraction(ingredient.quantity)
                         )
                     }
                     sourceType = recipe.sourceType

@@ -35,13 +35,7 @@ struct RecipeDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(recipe.ingredientsList) { ingredient in
-                        HStack {
-                            Text(formatQuantity(ingredient.quantity))
-                                .foregroundStyle(.secondary)
-                            Text(ingredient.unit.rawValue)
-                                .foregroundStyle(.secondary)
-                            Text(ingredient.name)
-                        }
+                        Text(formatIngredientDisplay(ingredient))
                     }
                 }
             }
@@ -71,7 +65,17 @@ struct RecipeDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(recipe.name)
         .toolbar {
-            Button("Edit") { showingEditSheet = true }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit") { showingEditSheet = true }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    recipe.isFavorite.toggle()
+                } label: {
+                    Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
+                        .foregroundStyle(recipe.isFavorite ? .red : .secondary)
+                }
+            }
         }
         .sheet(isPresented: $showingEditSheet) {
             AddEditRecipeView(recipeToEdit: recipe)
@@ -87,12 +91,19 @@ struct RecipeDetailView: View {
         }
     }
 
-    /// Format quantity to avoid ugly decimals: show "2" instead of "2.0"
-    private func formatQuantity(_ value: Double) -> String {
-        if value == value.rounded() && value < 1000 {
-            return String(format: "%.0f", value)
+    /// Format a single ingredient for display.
+    /// "to taste" items: "Salt, to taste"
+    /// "none" unit: "3 eggs"
+    /// Normal: "1 1/2 cups all-purpose flour"
+    private func formatIngredientDisplay(_ ingredient: Ingredient) -> String {
+        if ingredient.unit == .toTaste {
+            return "\(ingredient.name), to taste"
         }
-        return String(format: "%.1f", value)
+        let qty = FractionFormatter.formatAsFraction(ingredient.quantity)
+        if ingredient.unit == .none {
+            return "\(qty) \(ingredient.name)"
+        }
+        return "\(qty) \(ingredient.unit.displayName) \(ingredient.name)"
     }
 }
 

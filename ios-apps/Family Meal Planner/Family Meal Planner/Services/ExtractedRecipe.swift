@@ -80,7 +80,8 @@ struct ExtractedRecipe: Codable {
             IngredientFormData(
                 name: extracted.name,
                 quantity: extracted.quantityDouble,
-                unit: extracted.ingredientUnit
+                unit: extracted.ingredientUnit,
+                quantityText: FractionFormatter.formatAsFraction(extracted.quantityDouble)
             )
         }
     }
@@ -170,13 +171,25 @@ struct ExtractedIngredient: Codable {
             "pound": .pound, "pounds": .pound,
             "lbs": .pound,
             "gram": .gram, "grams": .gram,
+            "kilogram": .kilogram, "kilograms": .kilogram,
+            "kg": .kilogram,
             "liter": .liter, "liters": .liter,
             "l": .liter,
             "milliliter": .milliliter, "milliliters": .milliliter,
             "ml": .milliliter,
+            "fluid ounce": .fluidOunce, "fluid ounces": .fluidOunce,
+            "fl oz": .fluidOunce,
             "pinches": .pinch,
-            "each": .whole, "item": .whole, "items": .whole,
+            "clove": .clove, "cloves": .clove,
+            "can": .can, "cans": .can,
+            "package": .package, "packages": .package, "pkg": .package,
+            "bunch": .bunch, "bunches": .bunch,
+            "sprig": .sprig, "sprigs": .sprig,
+            "dash": .dash, "dashes": .dash,
+            "to taste": .toTaste,
+            "each": .piece, "item": .piece, "items": .piece,
             "pieces": .piece, "pcs": .piece,
+            "slice": .none, "slices": .none,
         ]
 
         return aliases[normalized] ?? .piece
