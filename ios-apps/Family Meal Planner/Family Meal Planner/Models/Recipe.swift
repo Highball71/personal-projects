@@ -29,13 +29,14 @@ final class Recipe {
     // .cascade means: when you delete a recipe, its ingredients
     // are automatically deleted too. No orphaned data.
     // Optional because CloudKit requires all relationships to be optional.
-    @Relationship(deleteRule: .cascade, inverse: \Ingredient.recipe)
+    // Inverse is declared on Ingredient.recipe.
+    @Relationship(deleteRule: .cascade)
     var ingredients: [Ingredient]?
 
-    // Inverse of MealPlan.recipe — CloudKit requires all relationships
-    // to have an explicit inverse. .nullify means: if a recipe is deleted,
-    // the meal plan entries stay but their recipe becomes nil.
-    @Relationship(deleteRule: .nullify, inverse: \MealPlan.recipe)
+    // .nullify means: if a recipe is deleted, the meal plan entries
+    // stay but their recipe becomes nil (an empty slot).
+    // Inverse is declared on MealPlan.recipe.
+    @Relationship(deleteRule: .nullify)
     var mealPlans: [MealPlan]?
 
     /// Non-optional accessor — returns the ingredients array or empty if nil.

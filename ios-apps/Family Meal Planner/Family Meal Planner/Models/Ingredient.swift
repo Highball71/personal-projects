@@ -16,8 +16,9 @@ final class Ingredient {
     var quantity: Double = 1.0
     var unit: IngredientUnit = IngredientUnit.piece
 
-    // SwiftData automatically creates this inverse relationship
-    // back to the Recipe that owns this ingredient.
+    // Explicit inverse of Recipe.ingredients — CloudKit requires
+    // every relationship to declare its inverse.
+    @Relationship(inverse: \Recipe.ingredients)
     var recipe: Recipe?
 
     init(name: String, quantity: Double, unit: IngredientUnit = .piece) {

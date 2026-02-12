@@ -15,8 +15,9 @@ final class MealPlan {
     var date: Date = Date()
     var mealType: MealType = MealType.dinner
 
-    // .nullify means: if the linked recipe is deleted, this meal plan
-    // entry stays but its recipe becomes nil (an empty slot).
+    // Explicit inverse of Recipe.mealPlans — CloudKit requires
+    // every relationship to declare its inverse.
+    @Relationship(inverse: \Recipe.mealPlans)
     var recipe: Recipe?
 
     init(date: Date, mealType: MealType, recipe: Recipe? = nil) {
