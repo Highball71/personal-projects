@@ -24,7 +24,12 @@ enum JSONLDRecipeParser {
         print("[URLImport] JSON-LD: Found \(jsonBlocks.count) ld+json script block(s)")
 
         for block in jsonBlocks {
-            guard let data = block.data(using: .utf8),
+            // Some CMSes HTML-encode "&" as "&amp;" inside script tags.
+            // Decode it before JSON parsing so strings like "Mac &amp; Cheese"
+            // become "Mac & Cheese" in the parsed JSON values.
+            // (We only decode &amp; here — decoding &quot; would break JSON.)
+            let cleanedBlock = block.replacingOccurrences(of: "&amp;", with: "&")
+            guard let data = cleanedBlock.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) else {
                 continue
             }
@@ -106,6 +111,11 @@ enum JSONLDRecipeParser {
         }
 
         let name = decodeHTMLEntities(rawName)
+        print("[JSONLDParser] Raw name from JSON: \"\(rawName)\"")
+        print("[JSONLDParser] Decoded name:       \"\(name)\"")
+        if rawName != name {
+            print("[JSONLDParser] HTML entities were decoded in recipe name")
+        }
         let category = extractCategory(from: json)
         let servingSize = extractString(from: json["recipeYield"])
         let prepTime = parseISO8601Duration(extractString(from: json["prepTime"]))
