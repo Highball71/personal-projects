@@ -10,8 +10,6 @@ import SwiftData
 
 /// The root view. TabView with three tabs matching the app's three features.
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-
     var body: some View {
         TabView {
             RecipeListView()
@@ -29,10 +27,8 @@ struct ContentView: View {
                     Label("Groceries", systemImage: "cart")
                 }
         }
-        .onAppear {
-            // Insert sample recipes on first launch so the app isn't empty
-            SampleData.insertIfNeeded(into: modelContext)
-        }
+        // No sample data seeding — with CloudKit sync, seeding on each
+        // device creates duplicates when the cloud copies sync down.
     }
 }
 
