@@ -102,14 +102,14 @@ struct RecipeListView: View {
             }
             .searchable(text: $searchText, prompt: "Search recipes")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { showingAddRecipe = true }) {
-                        Label("Add Recipe", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
                 }
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button(action: { showingSettings = true }) {
-                        Label("Settings", systemImage: "gearshape")
+                        Image(systemName: "gearshape")
                     }
                 }
             }
