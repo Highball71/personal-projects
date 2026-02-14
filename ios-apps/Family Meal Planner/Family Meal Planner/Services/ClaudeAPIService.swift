@@ -69,28 +69,8 @@ enum ClaudeAPIService {
         let base64String = imageData.base64EncodedString()
         print("[RecipeScan] Image data size: \(imageData.count) bytes (\(String(format: "%.1f", Double(imageData.count) / 1_000_000)) MB)")
 
-        // Get API key from Keychain (never hardcoded)
-        let apiKey: String
-        do {
-            apiKey = try KeychainHelper.getAnthropicAPIKey()
-            print("[RecipeScan] API key found in Keychain (\(apiKey.prefix(8))...)")
-        } catch {
-            #if DEBUG
-            // In the Simulator, the iOS Keychain is separate from macOS and won't
-            // have the key. Fall back to the ANTHROPIC_API_KEY environment variable
-            // (set in the Xcode scheme under Run > Arguments > Environment Variables).
-            if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
-                apiKey = envKey
-                print("[RecipeScan] Keychain unavailable, using ANTHROPIC_API_KEY env var (\(envKey.prefix(8))...)")
-            } else {
-                print("[RecipeScan] ERROR: Keychain lookup failed and ANTHROPIC_API_KEY env var not set — \(error)")
-                throw error
-            }
-            #else
-            print("[RecipeScan] ERROR: Keychain lookup failed — \(error)")
-            throw error
-            #endif
-        }
+        // Get API key: tries Keychain first, then env var
+        let apiKey = try getAPIKey(context: "RecipeScan")
 
         // Build and send the request
         let request = try buildRequest(apiKey: apiKey, base64Image: base64String)
@@ -206,24 +186,8 @@ enum ClaudeAPIService {
 
         // --- STEP 2: Get API key ---
         print("[URLImport] STEP 2: Getting API key...")
-        let apiKey: String
-        do {
-            apiKey = try KeychainHelper.getAnthropicAPIKey()
-            print("[URLImport] STEP 2 OK: API key found in Keychain (\(apiKey.prefix(8))...)")
-        } catch {
-            #if DEBUG
-            if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
-                apiKey = envKey
-                print("[URLImport] STEP 2 OK: Using ANTHROPIC_API_KEY env var (\(envKey.prefix(8))...)")
-            } else {
-                print("[URLImport] STEP 2 FAILED: No API key — Keychain: \(error)")
-                throw error
-            }
-            #else
-            print("[URLImport] STEP 2 FAILED: Keychain lookup failed — \(error)")
-            throw error
-            #endif
-        }
+        let apiKey = try getAPIKey(context: "URLImport")
+        print("[URLImport] STEP 2 OK")
 
         // --- STEP 3: Send to Claude API ---
         print("[URLImport] STEP 3: Sending HTML to Claude API (model: \(modelID))...")
@@ -262,6 +226,29 @@ enum ClaudeAPIService {
             print("[URLImport] STEP 4 FAILED: Could not parse recipe — \(error)")
             throw error
         }
+    }
+
+    // MARK: - API Key
+
+    /// Retrieve the API key, trying each source in order:
+    /// 1. Device Keychain (set via Settings screen — works on real devices)
+    /// 2. Environment variable ANTHROPIC_API_KEY (Simulator / Xcode scheme)
+    /// Logs which source was used.
+    private static func getAPIKey(context: String) throws -> String {
+        // 1. Device Keychain (Settings screen on real devices, or dev setup)
+        if let key = try? KeychainHelper.getAnthropicAPIKey(), !key.isEmpty {
+            print("[\(context)] API key found in Keychain")
+            return key
+        }
+
+        // 2. Environment variable (Simulator with Xcode scheme var)
+        if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
+            print("[\(context)] API key found in environment variable")
+            return envKey
+        }
+
+        print("[\(context)] ERROR: No API key — check Settings or Xcode scheme env var")
+        throw KeychainHelper.KeychainError.itemNotFound
     }
 
     // MARK: - Private

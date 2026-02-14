@@ -153,16 +153,23 @@ struct ExtractedIngredient: Codable {
     }
 
     /// Map the unit string to the app's IngredientUnit enum.
-    /// Tries exact rawValue match first, then fuzzy aliases.
+    /// Normalizes common API responses (e.g. "whole" → .piece, "cloves" → .clove)
+    /// before checking the rawValue or alias table.
     var ingredientUnit: IngredientUnit {
-        if let match = IngredientUnit(rawValue: unit) {
-            return match
-        }
-
         let normalized = unit.lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Check aliases first — this handles plural forms, long names,
+        // and remapping legacy units like "whole" to better picker values.
         let aliases: [String: IngredientUnit] = [
+            // Claude frequently returns these
+            "whole": .piece,
+            "medium": .piece,
+            "large": .piece,
+            "small": .piece,
+            "slice": .piece, "slices": .piece,
+
+            // Plural and long forms
             "cups": .cup,
             "tablespoon": .tablespoon, "tablespoons": .tablespoon,
             "tbs": .tablespoon,
@@ -189,10 +196,18 @@ struct ExtractedIngredient: Codable {
             "to taste": .toTaste,
             "each": .piece, "item": .piece, "items": .piece,
             "pieces": .piece, "pcs": .piece,
-            "slice": .none, "slices": .none,
         ]
 
-        return aliases[normalized] ?? .piece
+        if let match = aliases[normalized] {
+            return match
+        }
+
+        // Fall back to exact rawValue match (e.g. "tsp", "tbsp", "cup")
+        if let match = IngredientUnit(rawValue: unit) {
+            return match
+        }
+
+        return .piece
     }
 
     private func parseFraction(_ text: String) -> Double? {
