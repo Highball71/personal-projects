@@ -3,11 +3,16 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         TabView {
-            Tab("Scenarios", systemImage: "theatermasks") {
-                ScenarioView()
+            Tab("Home", systemImage: "house") {
+                HomeView()
             }
+
             Tab("Progress", systemImage: "chart.bar") {
-                StatsView()
+                ProgressTabView()
+            }
+
+            Tab("Words", systemImage: "text.book.closed") {
+                WordListView()
             }
         }
     }
@@ -15,5 +20,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: WordProgress.self, inMemory: true)
+        .modelContainer(for: [WordProgress.self, DailyActivity.self], inMemory: true)
 }
