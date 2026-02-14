@@ -7,6 +7,10 @@ struct ContentView: View {
                 HomeView()
             }
 
+            Tab("Deeper", systemImage: "eye.trianglebadge.exclamationmark") {
+                DeeperTabView()
+            }
+
             Tab("Progress", systemImage: "chart.bar") {
                 ProgressTabView()
             }
@@ -20,5 +24,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [WordProgress.self, DailyActivity.self], inMemory: true)
+        .modelContainer(for: [WordProgress.self, DailyActivity.self, EtymologyProgress.self], inMemory: true)
 }
