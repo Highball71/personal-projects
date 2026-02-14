@@ -328,7 +328,7 @@ struct AddEditRecipeView: View {
 
             // Auto-set source to "Photo" and use Claude's description
             sourceType = .photo
-            sourceDetail = extracted.sourceDescription ?? ""
+            sourceDetail = extracted.source ?? ""
 
             // Show brief success confirmation
             withAnimation { showingExtractionSuccess = true }

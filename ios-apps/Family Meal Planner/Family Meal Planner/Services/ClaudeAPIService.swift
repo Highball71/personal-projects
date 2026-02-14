@@ -274,11 +274,12 @@ enum ClaudeAPIService {
             name (string), category (string - one of: breakfast, lunch, dinner, \
             snack, dessert, side, drink), servingSize (string), prepTime (string), \
             cookTime (string), ingredients (array of objects with: name, amount, \
-            unit), instructions (array of strings), and sourceDescription (string \
-            - if you can identify the cookbook or source name from the photo, such as \
-            headers, footers, watermarks, book titles, or author names, include it \
-            here, e.g. 'The Whole30 Cookbook' or 'Bon Appetit'. If you cannot \
-            identify a specific source, omit this field or set it to null)
+            unit), instructions (array of strings), and source (string or null). \
+            Look carefully at the entire photo for any book title, cookbook name, \
+            website name, or source attribution — check headers, footers, margins, \
+            watermarks, and page edges. Include it in the JSON as "source" \
+            (e.g. "The Whole30 Slow Cooker"). If you can't find one, set source \
+            to null.
             """
 
         let body: [String: Any] = [
@@ -329,7 +330,7 @@ enum ClaudeAPIService {
             name (string), category (string - one of: breakfast, lunch, dinner, \
             snack, dessert, side, drink), servingSize (string), prepTime (string), \
             cookTime (string), ingredients (array of objects with: name, amount, \
-            unit), instructions (array of strings), and sourceDescription (string \
+            unit), instructions (array of strings), and source (string or null \
             - the name of the website or blog this recipe is from).
 
             If you cannot find a clear, complete recipe in this text, respond with \

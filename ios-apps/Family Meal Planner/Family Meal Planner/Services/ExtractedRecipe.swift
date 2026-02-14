@@ -16,7 +16,7 @@ struct ExtractedRecipe: Codable {
     let cookTime: String?
     let ingredients: [ExtractedIngredient]
     let instructions: [String]
-    let sourceDescription: String?
+    let source: String?
 
     /// Map Claude's category string to the app's RecipeCategory enum.
     /// Falls back to .dinner if no match.

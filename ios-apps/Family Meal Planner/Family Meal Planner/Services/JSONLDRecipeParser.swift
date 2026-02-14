@@ -122,7 +122,7 @@ enum JSONLDRecipeParser {
         let cookTime = parseISO8601Duration(extractString(from: json["cookTime"]))
         let ingredients = extractIngredients(from: json)
         let instructions = extractInstructions(from: json)
-        let sourceDescription = extractSourceDescription(from: json)
+        let source = extractSourceDescription(from: json)
 
         // A recipe should have at least ingredients or instructions to be useful
         guard !ingredients.isEmpty || !instructions.isEmpty else {
@@ -138,7 +138,7 @@ enum JSONLDRecipeParser {
             cookTime: cookTime,
             ingredients: ingredients,
             instructions: instructions,
-            sourceDescription: sourceDescription
+            source: source
         )
     }
 
