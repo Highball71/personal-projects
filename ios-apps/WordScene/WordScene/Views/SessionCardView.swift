@@ -30,15 +30,25 @@ struct SessionCardView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
 
-                    // The scenario text with the vocabulary word highlighted
-                    scenarioText
+                    // The scenario text — tap anywhere to reveal definition
+                    if !showingDefinition {
+                        Button {
+                            withAnimation(.spring(duration: 0.4)) {
+                                showingDefinition = true
+                            }
+                        } label: {
+                            scenarioText
+                        }
+                        .buttonStyle(.plain)
                         .padding(.horizontal, 24)
 
-                    if !showingDefinition && !hasRated {
-                        Text("Tap the highlighted word to reveal its meaning")
+                        Text("Tap the text to reveal its meaning")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 4)
+                    } else {
+                        scenarioText
+                            .padding(.horizontal, 24)
                     }
 
                     // Definition reveal section
@@ -103,12 +113,6 @@ struct SessionCardView: View {
             .lineSpacing(6)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onTapGesture {
-                guard !showingDefinition else { return }
-                withAnimation(.spring(duration: 0.4)) {
-                    showingDefinition = true
-                }
-            }
         } else {
             // Fallback if the word isn't found in the scenario
             Text(scenario)
