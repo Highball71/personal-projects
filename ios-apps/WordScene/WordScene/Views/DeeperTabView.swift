@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// The "Deeper Than You Knew" tab — reveals surprising etymologies of common English words.
+/// The "Word Origins" tab — reveals surprising etymologies of common English words.
 /// Shows session actions, progress stats, and a browsable word list.
 struct DeeperTabView: View {
     @Environment(\.modelContext) private var modelContext
@@ -139,7 +139,7 @@ struct DeeperTabView: View {
                     Spacer(minLength: 40)
                 }
             }
-            .navigationTitle("Deeper Than You Knew")
+            .navigationTitle("Word Origins")
             .background(Color(.systemGroupedBackground))
             .fullScreenCover(isPresented: $showingSession) {
                 EtymologySessionView(sessionType: sessionType)

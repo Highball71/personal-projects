@@ -7,7 +7,7 @@ struct ContentView: View {
                 HomeView()
             }
 
-            Tab("Deeper", systemImage: "eye.trianglebadge.exclamationmark") {
+            Tab("Deeper", systemImage: "book.pages") {
                 DeeperTabView()
             }
 

@@ -47,27 +47,28 @@ struct EtymologyCardView: View {
 
                     // Casual intro
                     if !showingOrigin {
+                        Text(card.word.casualIntro)
+                            .font(.body)
+                            .lineSpacing(5)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 24)
+
                         Button {
                             withAnimation(.spring(duration: 0.4)) {
                                 showingOrigin = true
                             }
                         } label: {
-                            VStack(spacing: 16) {
-                                Text(card.word.casualIntro)
-                                    .font(.body)
-                                    .lineSpacing(5)
-                                    .foregroundStyle(.primary)
-                                    .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
+                            Label("Reveal Origin", systemImage: "eye")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(.tint, in: .rect(cornerRadius: 14))
                         }
-                        .buttonStyle(.plain)
                         .padding(.horizontal, 24)
-
-                        Text("Tap to reveal the origin")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                        .padding(.top, 4)
                     } else {
                         // Show intro (non-tappable)
                         Text(card.word.casualIntro)
