@@ -7,19 +7,19 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		D1A0000100000000000A0001 /* WordScene.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WordScene.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C396A9492F392FFE0074F954 /* Hello World.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hello World.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D1A0000200000000000A0002 /* WordScene */ = {
+		C396A94B2F392FFE0074F954 /* Hello World */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WordScene;
+			path = "Hello World";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D1A0000300000000000A0003 /* Frameworks */ = {
+		C396A9462F392FFE0074F954 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -29,18 +29,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		D1A0000400000000000A0004 = {
+		C396A9402F392FFE0074F954 = {
 			isa = PBXGroup;
 			children = (
-				D1A0000200000000000A0002 /* WordScene */,
-				D1A0000500000000000A0005 /* Products */,
+				C396A94B2F392FFE0074F954 /* Hello World */,
+				C396A94A2F392FFE0074F954 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		D1A0000500000000000A0005 /* Products */ = {
+		C396A94A2F392FFE0074F954 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D1A0000100000000000A0001 /* WordScene.app */,
+				C396A9492F392FFE0074F954 /* Hello World.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,64 +48,64 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D1A0000600000000000A0006 /* WordScene */ = {
+		C396A9482F392FFE0074F954 /* Hello World */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D1A0000F00000000000A000F /* Build configuration list for PBXNativeTarget "WordScene" */;
+			buildConfigurationList = C396A9542F392FFF0074F954 /* Build configuration list for PBXNativeTarget "Hello World" */;
 			buildPhases = (
-				D1A0000800000000000A0008 /* Sources */,
-				D1A0000300000000000A0003 /* Frameworks */,
-				D1A0000700000000000A0007 /* Resources */,
+				C396A9452F392FFE0074F954 /* Sources */,
+				C396A9462F392FFE0074F954 /* Frameworks */,
+				C396A9472F392FFE0074F954 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				D1A0000200000000000A0002 /* WordScene */,
+				C396A94B2F392FFE0074F954 /* Hello World */,
 			);
-			name = WordScene;
+			name = "Hello World";
 			packageProductDependencies = (
 			);
-			productName = WordScene;
-			productReference = D1A0000100000000000A0001 /* WordScene.app */;
+			productName = "Hello World";
+			productReference = C396A9492F392FFE0074F954 /* Hello World.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		D1A0000900000000000A0009 /* Project object */ = {
+		C396A9412F392FFE0074F954 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
-					D1A0000600000000000A0006 = {
+					C396A9482F392FFE0074F954 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
-			buildConfigurationList = D1A0000E00000000000A000E /* Build configuration list for PBXProject "WordScene" */;
+			buildConfigurationList = C396A9442F392FFE0074F954 /* Build configuration list for PBXProject "Hello World" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = D1A0000400000000000A0004;
+			mainGroup = C396A9402F392FFE0074F954;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = D1A0000500000000000A0005 /* Products */;
+			productRefGroup = C396A94A2F392FFE0074F954 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D1A0000600000000000A0006 /* WordScene */,
+				C396A9482F392FFE0074F954 /* Hello World */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		D1A0000700000000000A0007 /* Resources */ = {
+		C396A9472F392FFE0074F954 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -115,7 +115,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D1A0000800000000000A0008 /* Sources */ = {
+		C396A9452F392FFE0074F954 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -125,7 +125,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		D1A0000A00000000000A000A /* Debug */ = {
+		C396A9522F392FFF0074F954 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -177,7 +177,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -188,7 +188,7 @@
 			};
 			name = Debug;
 		};
-		D1A0000B00000000000A000B /* Release */ = {
+		C396A9532F392FFF0074F954 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -234,7 +234,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -244,14 +244,13 @@
 			};
 			name = Release;
 		};
-		D1A0000C00000000000A000C /* Debug */ = {
+		C396A9552F392FFF0074F954 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A5DP57PZ7N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -264,23 +263,25 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.highball71.WordScene;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Hello-World";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		D1A0000D00000000000A000D /* Release */ = {
+		C396A9562F392FFF0074F954 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A5DP57PZ7N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -293,10 +294,13 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.highball71.WordScene;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Hello-World";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -305,25 +309,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D1A0000E00000000000A000E /* Build configuration list for PBXProject "WordScene" */ = {
+		C396A9442F392FFE0074F954 /* Build configuration list for PBXProject "Hello World" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D1A0000A00000000000A000A /* Debug */,
-				D1A0000B00000000000A000B /* Release */,
+				C396A9522F392FFF0074F954 /* Debug */,
+				C396A9532F392FFF0074F954 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		D1A0000F00000000000A000F /* Build configuration list for PBXNativeTarget "WordScene" */ = {
+		C396A9542F392FFF0074F954 /* Build configuration list for PBXNativeTarget "Hello World" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D1A0000C00000000000A000C /* Debug */,
-				D1A0000D00000000000A000D /* Release */,
+				C396A9552F392FFF0074F954 /* Debug */,
+				C396A9562F392FFF0074F954 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = D1A0000900000000000A0009 /* Project object */;
+	rootObject = C396A9412F392FFE0074F954 /* Project object */;
 }

@@ -27,7 +27,8 @@
       "Bash(/usr/bin/python3:*)",
       "Bash(swift -e:*)",
       "Bash(xcrun simctl:*)",
-      "Bash(sips:*)"
+      "Bash(sips:*)",
+      "Bash(pip3 install:*)"
     ],
     "deny": [
       "Read(.env)",
