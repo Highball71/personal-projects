@@ -30,6 +30,9 @@ struct MealPlanView: View {
     // so .sheet(item:) guarantees the data is available when the sheet renders
     @State private var selectedSlot: MealSlotSelection?
 
+    // State for the "Suggest Meals" sheet
+    @State private var showingSuggestMeals = false
+
     /// The 7 days of the currently displayed week
     var weekDays: [Date] {
         DateHelper.weekDays(startingFrom: weekStartDate)
@@ -57,9 +60,23 @@ struct MealPlanView: View {
                 .padding()
             }
             .navigationTitle("Meal Plan")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { showingSuggestMeals = true }) {
+                        Image(systemName: "die.face.5")
+                    }
+                }
+            }
             .sheet(item: $selectedSlot) { slot in
                 RecipePickerView { recipe in
                     assignRecipe(recipe, to: slot.date, for: slot.mealType)
+                }
+            }
+            .sheet(isPresented: $showingSuggestMeals) {
+                SuggestMealsView(weekStartDate: weekStartDate) { suggestions in
+                    for (date, recipe) in suggestions {
+                        assignRecipe(recipe, to: date, for: .dinner)
+                    }
                 }
             }
         }
