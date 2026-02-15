@@ -19,6 +19,7 @@ struct RecipeListView: View {
     @State private var searchText = ""
     @State private var showingAddRecipe = false
     @State private var showingSettings = false
+    @State private var showingIngredientSearch = false
     @State private var selectedCategory: RecipeCategory? = nil
     @State private var showFavoritesOnly = false
 
@@ -103,6 +104,11 @@ struct RecipeListView: View {
             .searchable(text: $searchText, prompt: "Search recipes")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { showingIngredientSearch = true }) {
+                        Image(systemName: "fork.knife")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { showingAddRecipe = true }) {
                         Image(systemName: "plus")
                     }
@@ -118,6 +124,9 @@ struct RecipeListView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showingIngredientSearch) {
+                IngredientSearchView()
             }
             // Show a helpful message when there are no recipes
             .overlay {
