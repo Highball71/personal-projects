@@ -19,7 +19,6 @@ DerivedData/
 # Swift Package Manager
 .build/
 Packages/
-*.xcodeproj
 
 # Personal notes
 *.local.md
