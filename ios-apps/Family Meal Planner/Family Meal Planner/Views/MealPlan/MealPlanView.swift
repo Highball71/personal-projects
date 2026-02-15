@@ -16,6 +16,30 @@ struct MealSlotSelection: Identifiable {
     let mealType: MealType
 }
 
+/// Tracks which sheet to present from the meal plan view.
+/// Using a single enum avoids conflicts from multiple .sheet modifiers.
+enum MealPlanSheet: Identifiable {
+    case pickRecipe(MealSlotSelection)
+    case surpriseMe(MealSlotSelection)
+    case suggestWeek
+
+    var id: String {
+        switch self {
+        case .pickRecipe(let s): return "pick-\(s.id)"
+        case .surpriseMe(let s): return "surprise-\(s.id)"
+        case .suggestWeek: return "suggest"
+        }
+    }
+
+    /// The slot this sheet action is targeting (nil for week-level suggestions)
+    var slot: MealSlotSelection? {
+        switch self {
+        case .pickRecipe(let s), .surpriseMe(let s): return s
+        case .suggestWeek: return nil
+        }
+    }
+}
+
 /// The weekly meal planning view. Shows 7 days in a vertical scroll,
 /// each with breakfast/lunch/dinner slots. Navigate between weeks
 /// with the arrow buttons at the top.
@@ -26,12 +50,12 @@ struct MealPlanView: View {
     // The first day of the currently displayed week
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
 
-    // State for the recipe picker sheet — using a single identifiable value
-    // so .sheet(item:) guarantees the data is available when the sheet renders
+    // The slot the user just tapped — drives the confirmation dialog
     @State private var selectedSlot: MealSlotSelection?
+    @State private var showingSlotOptions = false
 
-    // State for the "Suggest Meals" sheet
-    @State private var showingSuggestMeals = false
+    // Drives whichever sheet is currently presented
+    @State private var activeSheet: MealPlanSheet?
 
     /// The 7 days of the currently displayed week
     var weekDays: [Date] {
@@ -50,6 +74,7 @@ struct MealPlanView: View {
                             mealPlans: mealPlans(for: day),
                             onSlotTapped: { mealType in
                                 selectedSlot = MealSlotSelection(date: day, mealType: mealType)
+                                showingSlotOptions = true
                             },
                             onSlotCleared: { mealType in
                                 clearMealSlot(date: day, mealType: mealType)
@@ -62,20 +87,40 @@ struct MealPlanView: View {
             .navigationTitle("Meal Plan")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showingSuggestMeals = true }) {
+                    Button(action: { activeSheet = .suggestWeek }) {
                         Image(systemName: "die.face.5")
                     }
                 }
             }
-            .sheet(item: $selectedSlot) { slot in
-                RecipePickerView { recipe in
-                    assignRecipe(recipe, to: slot.date, for: slot.mealType)
+            // "Pick a Recipe" vs "Surprise Me" choice when tapping a slot
+            .confirmationDialog(
+                "",
+                isPresented: $showingSlotOptions,
+                presenting: selectedSlot
+            ) { slot in
+                Button("Pick a Recipe") {
+                    activeSheet = .pickRecipe(slot)
+                }
+                Button("Surprise Me") {
+                    activeSheet = .surpriseMe(slot)
                 }
             }
-            .sheet(isPresented: $showingSuggestMeals) {
-                SuggestMealsView(weekStartDate: weekStartDate) { suggestions in
-                    for (date, recipe) in suggestions {
-                        assignRecipe(recipe, to: date, for: .dinner)
+            // Single sheet modifier handles all presentation
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .pickRecipe(let slot):
+                    RecipePickerView { recipe in
+                        assignRecipe(recipe, to: slot.date, for: slot.mealType)
+                    }
+                case .surpriseMe(let slot):
+                    SurpriseMealView { recipe in
+                        assignRecipe(recipe, to: slot.date, for: slot.mealType)
+                    }
+                case .suggestWeek:
+                    SuggestMealsView(weekStartDate: weekStartDate) { suggestions in
+                        for (date, recipe) in suggestions {
+                            assignRecipe(recipe, to: date, for: .dinner)
+                        }
                     }
                 }
             }
