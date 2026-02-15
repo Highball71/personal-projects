@@ -22,3 +22,6 @@ Packages/
 
 # Personal notes
 *.local.md
+
+# Xcode user data
+xcuserdata/
