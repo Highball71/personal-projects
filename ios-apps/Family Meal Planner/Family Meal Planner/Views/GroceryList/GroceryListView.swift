@@ -14,12 +14,20 @@ import SwiftData
 /// you check items off while shopping.
 struct GroceryListView: View {
     @Query private var allMealPlans: [MealPlan]
-
-    // Track checked-off items. This is ephemeral — it resets when you
-    // leave the app. Good enough for MVP; could be persisted later.
-    @State private var checkedItems: Set<String> = []
+    @Query private var allGroceryChecks: [GroceryCheck]
+    @Environment(\.modelContext) private var modelContext
 
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
+
+    /// The set of checked item IDs for the current week.
+    private var checkedItems: Set<String> {
+        let weekStart = DateHelper.stripTime(from: weekStartDate)
+        return Set(
+            allGroceryChecks
+                .filter { DateHelper.stripTime(from: $0.weekStart) == weekStart }
+                .map(\.itemID)
+        )
+    }
 
     /// The main logic: gather ingredients from this week's meals and combine duplicates.
     var groceryItems: [GroceryItem] {
@@ -72,11 +80,7 @@ struct GroceryListView: View {
                                 item: item,
                                 isChecked: checkedItems.contains(item.id),
                                 onToggle: {
-                                    if checkedItems.contains(item.id) {
-                                        checkedItems.remove(item.id)
-                                    } else {
-                                        checkedItems.insert(item.id)
-                                    }
+                                    toggleCheck(for: item.id)
                                 }
                             )
                         }
@@ -87,11 +91,41 @@ struct GroceryListView: View {
             .toolbar {
                 if !groceryItems.isEmpty && !checkedItems.isEmpty {
                     Button("Clear Checks") {
-                        checkedItems.removeAll()
+                        clearChecks()
                     }
                 }
             }
         }
+    }
+
+    /// Toggle a grocery item's checked state by inserting or deleting a GroceryCheck.
+    private func toggleCheck(for itemID: String) {
+        let weekStart = DateHelper.stripTime(from: weekStartDate)
+
+        // Look for an existing check for this item + week
+        if let existing = allGroceryChecks.first(where: {
+            $0.itemID == itemID && DateHelper.stripTime(from: $0.weekStart) == weekStart
+        }) {
+            modelContext.delete(existing)
+        } else {
+            modelContext.insert(GroceryCheck(itemID: itemID, weekStart: weekStart))
+        }
+
+        // Save immediately so checks survive app close
+        try? modelContext.save()
+    }
+
+    /// Remove all checks for the current week.
+    private func clearChecks() {
+        let weekStart = DateHelper.stripTime(from: weekStartDate)
+        let thisWeekChecks = allGroceryChecks.filter {
+            DateHelper.stripTime(from: $0.weekStart) == weekStart
+        }
+        for check in thisWeekChecks {
+            modelContext.delete(check)
+        }
+
+        try? modelContext.save()
     }
 }
 
@@ -106,5 +140,5 @@ struct GroceryItem: Identifiable {
 
 #Preview {
     GroceryListView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, GroceryCheck.self], inMemory: true)
 }
