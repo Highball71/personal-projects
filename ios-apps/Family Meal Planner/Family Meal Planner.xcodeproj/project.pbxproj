@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		D4E1A0052F4B00AA0074F954 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C396A9582F393DEA0074F954 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C396A95F2F393DEA0074F954;
+			remoteInfo = "Family Meal Planner";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		C396A9602F393DEA0074F954 /* Family Meal Planner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Family Meal Planner.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Family Meal PlannerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = "Family Meal Planner";
 			sourceTree = "<group>";
 		};
+		D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Family Meal PlannerTests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		C396A95D2F393DEA0074F954 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D4E1A0032F4B00AA0074F954 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				C396A9622F393DEA0074F954 /* Family Meal Planner */,
+				D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */,
 				C396A9612F393DEA0074F954 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				C396A9602F393DEA0074F954 /* Family Meal Planner.app */,
+				D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,27 @@
 			productReference = C396A9602F393DEA0074F954 /* Family Meal Planner.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D4E1A0042F4B00AA0074F954 /* Family Meal PlannerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D4E1A00B2F4B00AA0074F954 /* Build configuration list for PBXNativeTarget "Family Meal PlannerTests" */;
+			buildPhases = (
+				D4E1A0072F4B00AA0074F954 /* Sources */,
+				D4E1A0032F4B00AA0074F954 /* Frameworks */,
+				D4E1A0082F4B00AA0074F954 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D4E1A0062F4B00AA0074F954 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */,
+			);
+			name = "Family Meal PlannerTests";
+			productName = "Family Meal PlannerTests";
+			productReference = D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +128,10 @@
 				TargetAttributes = {
 					C396A95F2F393DEA0074F954 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					D4E1A0042F4B00AA0074F954 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = C396A95F2F393DEA0074F954;
 					};
 				};
 			};
@@ -100,12 +150,20 @@
 			projectRoot = "";
 			targets = (
 				C396A95F2F393DEA0074F954 /* Family Meal Planner */,
+				D4E1A0042F4B00AA0074F954 /* Family Meal PlannerTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		C396A95E2F393DEA0074F954 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D4E1A0082F4B00AA0074F954 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +180,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D4E1A0072F4B00AA0074F954 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D4E1A0062F4B00AA0074F954 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C396A95F2F393DEA0074F954 /* Family Meal Planner */;
+			targetProxy = D4E1A0052F4B00AA0074F954 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		C396A9692F393DEB0074F954 /* Debug */ = {
@@ -316,6 +389,48 @@
 			};
 			name = Release;
 		};
+		D4E1A0092F4B00AA0074F954 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A5DP57PZ7N;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Family-Meal-PlannerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Family Meal Planner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Family Meal Planner";
+			};
+			name = Debug;
+		};
+		D4E1A00A2F4B00AA0074F954 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A5DP57PZ7N;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Family-Meal-PlannerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Family Meal Planner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Family Meal Planner";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -333,6 +448,15 @@
 			buildConfigurations = (
 				C396A96C2F393DEB0074F954 /* Debug */,
 				C396A96D2F393DEB0074F954 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D4E1A00B2F4B00AA0074F954 /* Build configuration list for PBXNativeTarget "Family Meal PlannerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4E1A0092F4B00AA0074F954 /* Debug */,
+				D4E1A00A2F4B00AA0074F954 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
