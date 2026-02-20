@@ -66,6 +66,7 @@ struct TimerView: View {
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.1), value: engine.timeRemaining)
+                    .accessibilityIdentifier("countdownLabel")
 
                 // Round indicator
                 if engine.currentPhase != .countdown {
@@ -102,6 +103,7 @@ struct TimerView: View {
             }
         }
         // Tap anywhere to toggle pause
+        .accessibilityIdentifier("timerTapArea")
         .contentShape(Rectangle())
         .onTapGesture {
             if engine.isRunning {
