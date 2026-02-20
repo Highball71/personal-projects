@@ -34,7 +34,7 @@ class TimerEngine {
     /// Called when the phase changes (work/rest/done). Includes round info.
     var onPhaseChange: ((TimerPhase, Int, Int) -> Void)?
 
-    /// Called for the last 3 seconds of each phase (value: 3, 2, 1).
+    /// Called at 10 seconds remaining and for 5-4-3-2-1 countdown.
     var onCountdown: ((Int) -> Void)?
 
     /// Called when the entire workout is complete.
@@ -166,12 +166,13 @@ class TimerEngine {
         if remaining != timeRemaining {
             timeRemaining = remaining
 
-            // Announce last 3 seconds of each phase
-            if timeRemaining <= 3 && timeRemaining > 0 {
-                if !announcedCountdowns.contains(timeRemaining) {
-                    announcedCountdowns.insert(timeRemaining)
-                    onCountdown?(timeRemaining)
-                }
+            // Announce "10 seconds" at 10, then spoken countdown 5-4-3-2-1.
+            // The announcedCountdowns set prevents repeats if multiple ticks
+            // land on the same second.
+            let triggers: Set<Int> = [10, 5, 4, 3, 2, 1]
+            if triggers.contains(timeRemaining) && !announcedCountdowns.contains(timeRemaining) {
+                announcedCountdowns.insert(timeRemaining)
+                onCountdown?(timeRemaining)
             }
         }
 

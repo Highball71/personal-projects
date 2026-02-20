@@ -32,9 +32,13 @@ class SpeechService {
         }
     }
 
-    /// Speak a countdown number ("3", "2", "1")
+    /// Speak countdown cues: "10 seconds" at 10, then "5"..."1" for final countdown.
     func announceCountdown(_ seconds: Int) {
-        speak("\(seconds)")
+        if seconds == 10 {
+            speak("10 seconds")
+        } else {
+            speak("\(seconds)")
+        }
     }
 
     func stopSpeaking() {
