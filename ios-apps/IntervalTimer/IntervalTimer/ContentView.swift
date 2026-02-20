@@ -73,6 +73,19 @@ struct ContentView: View {
                     rounds: preset.rounds
                 )
             }
+            .onAppear {
+                // Support launch arguments for testing: --start-preset tabata
+                let args = ProcessInfo.processInfo.arguments
+                if let idx = args.firstIndex(of: "--start-preset"),
+                   idx + 1 < args.count {
+                    let presetName = args[idx + 1]
+                    if let preset = TimerPreset.builtInPresets.first(where: {
+                        $0.name.lowercased() == presetName.lowercased()
+                    }) {
+                        activeWorkoutPreset = preset
+                    }
+                }
+            }
         }
     }
 }
