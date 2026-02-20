@@ -18,6 +18,7 @@ struct GroceryListView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
+    @State private var showClearConfirmation = false
 
     /// The set of checked item IDs for the current week.
     private var checkedItems: Set<String> {
@@ -88,10 +89,16 @@ struct GroceryListView: View {
                 }
             }
             .navigationTitle("Grocery List")
+            .alert("Clear all checked items?", isPresented: $showClearConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) {
+                    clearChecks()
+                }
+            }
             .toolbar {
                 if !groceryItems.isEmpty && !checkedItems.isEmpty {
                     Button("Clear Checks") {
-                        clearChecks()
+                        showClearConfirmation = true
                     }
                 }
             }
