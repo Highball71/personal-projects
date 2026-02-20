@@ -27,7 +27,12 @@ class TimerEngine {
     private var timer: Timer?
     private var phaseStartDate: Date?
     private var phaseDuration: Int = 0
-    private var elapsedBeforePause: TimeInterval = 0
+
+    // Total elapsed time is tracked independently from phase timing
+    // so that pause/resume doesn't double-count.
+    private var workoutStartDate: Date?
+    private var totalPausedDuration: TimeInterval = 0
+    private var lastPauseDate: Date?
 
     // MARK: - Callbacks
 
@@ -53,7 +58,9 @@ class TimerEngine {
         self.currentRound = 1
         self.roundsCompleted = 0
         self.totalElapsedTime = 0
-        self.elapsedBeforePause = 0
+        self.workoutStartDate = Date()
+        self.totalPausedDuration = 0
+        self.lastPauseDate = nil
         self.isRunning = true
         self.isPaused = false
 
@@ -63,16 +70,23 @@ class TimerEngine {
     func pause() {
         guard isRunning, !isPaused else { return }
         isPaused = true
-        // Save elapsed time so far
-        elapsedBeforePause = totalElapsedTime
+        lastPauseDate = Date()
         stopTimer()
     }
 
     func resume() {
         guard isRunning, isPaused else { return }
         isPaused = false
-        // Recalculate phaseStartDate so the remaining time stays correct
-        phaseStartDate = Date().addingTimeInterval(-Double(phaseDuration - timeRemaining))
+
+        // Track how long we were paused so totalElapsedTime stays accurate
+        if let pauseDate = lastPauseDate {
+            let pausedDuration = Date().timeIntervalSince(pauseDate)
+            totalPausedDuration += pausedDuration
+            // Shift phaseStartDate forward by the paused duration so the
+            // phase countdown picks up exactly where it left off
+            phaseStartDate = phaseStartDate?.addingTimeInterval(pausedDuration)
+        }
+        lastPauseDate = nil
         startTimer()
     }
 
@@ -139,6 +153,13 @@ class TimerEngine {
     // MARK: - Timer Tick
 
     private func startTimer() {
+        // Invalidate any existing timer first. Without this, phase transitions
+        // (which call beginPhase → startTimer) would orphan the old timer —
+        // it keeps firing because it's still on the run loop, but we've lost
+        // the reference to invalidate it. This was the root cause of the
+        // "countdown keeps running while paused" bug.
+        timer?.invalidate()
+
         timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             self?.tick()
         }
@@ -159,8 +180,10 @@ class TimerEngine {
         let elapsed = Date().timeIntervalSince(startDate)
         let remaining = max(0, phaseDuration - Int(elapsed))
 
-        // Update total elapsed time
-        totalElapsedTime = elapsedBeforePause + elapsed
+        // Update total elapsed time from workout start, excluding paused time
+        if let workoutStart = workoutStartDate {
+            totalElapsedTime = Date().timeIntervalSince(workoutStart) - totalPausedDuration
+        }
 
         // Only do work if the displayed second changed
         if remaining != timeRemaining {

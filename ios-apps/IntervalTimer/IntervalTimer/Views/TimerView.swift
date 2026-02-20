@@ -107,6 +107,8 @@ struct TimerView: View {
             if engine.isRunning {
                 engine.togglePause()
                 if engine.isPaused {
+                    // Stop any in-progress countdown speech before announcing pause
+                    speechService.stopSpeaking()
                     speechService.speak("Paused")
                 } else {
                     speechService.speak("Resume")
