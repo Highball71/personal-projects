@@ -143,6 +143,11 @@ struct DashboardView: View {
             .fullScreenCover(isPresented: $showingVoiceFlow) {
                 VoiceTripFlowView()
             }
+            .onAppear {
+                if ProcessInfo.processInfo.arguments.contains("--start-trip") {
+                    showingVoiceFlow = true
+                }
+            }
         }
     }
 }

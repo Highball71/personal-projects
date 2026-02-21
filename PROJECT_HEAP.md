@@ -27,17 +27,22 @@ Status tracker for all personal iOS projects. Updated 2026-02-21.
 - Multiple TestFlight builds shipped (build 8)
 - Bundle ID: `com.highball71.Family-Meal-Planner`
 
-## Mileage App #planned
+## MileageTracker #active
 **IRS-compliant mileage tracker for healthcare home office**
-- Full IRS deep dive completed — home office qualifies as principal place of business
-- All trips from home office to Pittsburgh office, Joey's house, and patient locations are deductible
-- 2026 rate: $0.725/mile
-- Voice-first design: app asks where you are, odometer, destination, purpose
-- GPS arrival detection for ending odometer prompt
+- Native iOS (SwiftUI + SwiftData, iOS 17+)
+- Home office qualifies as principal place of business — all work trips deductible
+- 2026 IRS rate: $0.725/mile
+- Voice-first trip logging: app speaks questions, user responds verbally (TTS + SFSpeechRecognizer)
+- 5-step conversational flow: Where are you? → Odometer? → Destination? → Purpose? → Confirm
+- Trip categories: Patient Care, Administrative, Supply Run, Continuing Education, Other
+- Saved locations with voice shortcuts and smart frequency learning
+- GPS arrival detection for ending odometer prompts (CoreLocation geofencing)
 - Start/end of year odometer photo capture
-- Quarterly + annual IRS-compliant PDF reports
-- Smart location learning over time
-- Second in rebuild queue (after IntervalTimer)
+- Quarterly + annual IRS-compliant PDF reports with trip detail, tolls, parking
+- Weekday reminder notifications
+- Dashboard with running tax savings estimate
+- Built and running in Simulator
+- Bundle ID: `com.highball71.MileageTracker`
 
 ## Tralfaz/HQ #planned
 **Home automation / personal dashboard**
