@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MileageTracker uses the microphone for voice-first trip logging so you can record trips hands-free while driving.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>MileageTracker uses speech recognition to understand your voice commands for logging trips hands-free.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MileageTracker uses your location to detect when you arrive at a destination so it can prompt you to log your ending odometer reading.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>MileageTracker monitors your location in the background to detect arrival at destinations and prompt for ending odometer readings.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MileageTracker uses the camera to photograph your odometer for start-of-year and end-of-year records.</string>
+</dict>
+</plist>
