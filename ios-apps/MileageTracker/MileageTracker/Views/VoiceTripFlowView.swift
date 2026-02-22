@@ -34,6 +34,11 @@ struct VoiceTripFlowView: View {
     // Tracks whether we've initiated the flow for a step (prevents re-triggering)
     @State private var stepInitiated = false
 
+    // Retry tracking — cap at 3 attempts per step before showing manual fallback
+    @State private var retryCount = 0
+    @State private var showManualFallback = false
+    private let maxRetries = 3
+
     enum FlowStep: CaseIterable {
         case startLocation
         case startOdometer
@@ -92,7 +97,15 @@ struct VoiceTripFlowView: View {
                 }
 
                 // Listening indicator
-                if isListeningForVoice {
+                if showManualFallback {
+                    HStack(spacing: 8) {
+                        Image(systemName: "keyboard")
+                            .foregroundStyle(.white)
+                        Text("Type your answer or tap the mic")
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .font(.subheadline)
+                } else if isListeningForVoice {
                     HStack(spacing: 8) {
                         Image(systemName: "mic.fill")
                             .foregroundStyle(.white)
@@ -187,6 +200,8 @@ struct VoiceTripFlowView: View {
         }
         .onChange(of: step) { _, _ in
             stepInitiated = false
+            retryCount = 0
+            showManualFallback = false
             beginStep()
         }
     }
@@ -434,6 +449,9 @@ struct VoiceTripFlowView: View {
                 handleRecognitionResult(text)
             }
         } else {
+            // Reset retry state so the user gets fresh attempts
+            retryCount = 0
+            showManualFallback = false
             configureForCurrentStep()
             startVoiceInput()
         }
@@ -567,7 +585,18 @@ struct VoiceTripFlowView: View {
     }
 
     /// If recognition came back empty or failed, say so and retry.
+    /// Caps at 3 retries per step, then falls back to manual input.
     private func retryCurrentStep() {
+        retryCount += 1
+
+        if retryCount >= maxRetries {
+            // Give up on voice — show manual input fallback
+            showRetryMessage = false
+            showManualFallback = true
+            speech.speak("Let's try typing instead.")
+            return
+        }
+
         showRetryMessage = true
         speech.speak("I didn't catch that. Try again.") {
             self.showRetryMessage = false
@@ -577,11 +606,12 @@ struct VoiceTripFlowView: View {
     }
 
     /// Speak back the recognized answer, then advance to the next step.
+    /// Mic is always killed before TTS to prevent feedback loop.
     private func speakAndAdvance(_ recognizedValue: String) {
-        if isListeningForVoice {
-            speech.stopListening()
-            isListeningForVoice = false
-        }
+        // Always stop listening before speaking — SpeechService.speak() also
+        // does this, but we track isListeningForVoice separately in the view.
+        speech.stopListening()
+        isListeningForVoice = false
 
         speech.speak(recognizedValue) {
             guard let nextStep = self.nextStep else { return }

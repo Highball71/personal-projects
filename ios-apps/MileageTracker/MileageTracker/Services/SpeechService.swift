@@ -73,7 +73,12 @@ class SpeechService: NSObject {
     // MARK: - Text-to-Speech (App Talks)
 
     /// Speak text aloud. Interrupts any current speech.
+    /// Always stops the mic first to prevent TTS feedback loop.
     func speak(_ text: String) {
+        // Kill the mic BEFORE speaking so TTS audio doesn't feed back
+        if isListening {
+            stopListening()
+        }
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
@@ -89,7 +94,14 @@ class SpeechService: NSObject {
 
     /// Speak text and call completion when done speaking.
     /// Uses AVSpeechSynthesizerDelegate for accurate timing.
+    /// Always stops the mic first to prevent TTS feedback loop.
+    /// Adds a brief delay after TTS finishes before calling completion,
+    /// so any residual speaker audio dissipates before the mic restarts.
     func speak(_ text: String, completion: @escaping () -> Void) {
+        // Kill the mic BEFORE speaking so TTS audio doesn't feed back
+        if isListening {
+            stopListening()
+        }
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
@@ -99,7 +111,12 @@ class SpeechService: NSObject {
         utterance.volume = 1.0
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
         isSpeaking = true
-        speechCompletionHandler = completion
+        // Wrap the completion with a small delay so speaker audio dissipates
+        speechCompletionHandler = {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                completion()
+            }
+        }
         synthesizer.speak(utterance)
     }
 
