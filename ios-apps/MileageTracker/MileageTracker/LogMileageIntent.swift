@@ -1,14 +1,17 @@
 import AppIntents
 import SwiftUI
 
-/// App Intent for "Hey Siri, log mileage" — opens the app directly into the
-/// voice-first trip logging flow.
+/// App Intent for "Hey Siri, log mileage in Clean Mile" — opens the app
+/// directly into the voice-first trip logging flow.
 ///
-/// This uses the iOS 17+ App Intents framework. Users can also add it as a
-/// Shortcuts action or create a custom Siri phrase.
+/// Uses the iOS 17+ App Intents framework with AppShortcutsProvider so the
+/// phrases are registered automatically — no manual Shortcuts setup needed.
 struct LogMileageIntent: AppIntent {
     static var title: LocalizedStringResource = "Log Mileage"
-    static var description: IntentDescription = "Start a voice-guided mileage log entry"
+    static var description: IntentDescription = IntentDescription(
+        "Start a voice-guided mileage log entry for IRS-compliant trip tracking.",
+        categoryName: "Tracking"
+    )
 
     /// Show the app when this runs — we need the voice flow UI.
     static var openAppWhenRun: Bool = true
@@ -26,15 +29,20 @@ struct LogMileageIntent: AppIntent {
     }
 }
 
-/// Provides the shortcut to Siri and the Shortcuts app.
+/// Registers shortcut phrases with Siri automatically on app install.
+/// The user can say any of these phrases without manually adding a shortcut.
+/// \(.applicationName) resolves to CFBundleDisplayName ("Clean Mile").
 struct MileageTrackerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: LogMileageIntent(),
             phrases: [
                 "Log mileage in \(.applicationName)",
-                "Start a trip in \(.applicationName)",
                 "Log a trip in \(.applicationName)",
+                "Start a trip in \(.applicationName)",
+                "Track mileage with \(.applicationName)",
+                "Record mileage in \(.applicationName)",
+                "Log miles in \(.applicationName)",
             ],
             shortTitle: "Log Mileage",
             systemImageName: "car.fill"
