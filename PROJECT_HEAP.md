@@ -1,6 +1,6 @@
 # PROJECT HEAP
 
-Status tracker for all personal iOS projects. Updated 2026-02-21.
+Status tracker for all personal iOS projects. Updated 2026-02-22.
 
 ---
 
@@ -34,6 +34,15 @@ Status tracker for all personal iOS projects. Updated 2026-02-21.
 - 2026 IRS rate: $0.725/mile
 - Voice-first trip logging: app speaks questions, user responds verbally (TTS + SFSpeechRecognizer)
 - 5-step conversational flow: Where are you? → Odometer? → Destination? → Purpose? → Confirm
+- Fully hands-free: auto-advances through steps, spoken readback, voice yes/no confirmation
+- Smart silence timer (4s) resets on each partial result — no more premature cutoffs
+- Minimum 4-digit validation for odometer readings keeps listening until complete
+- Keyword detection: say "done"/"save" to stop, "yes"/"no" to confirm/restart
+- Contextual strings feed location names to recognizer for better accuracy
+- Haptic pulse on each new recognition so user knows it's still listening
+- Delegate-based TTS completion (accurate timing, no estimated durations)
+- "I didn't catch that" auto-retry on failed recognition
+- Siri shortcut: "Hey Siri, log mileage" launches directly into voice flow (App Intents)
 - Trip categories: Patient Care, Administrative, Supply Run, Continuing Education, Other
 - Saved locations with voice shortcuts and smart frequency learning
 - GPS arrival detection for ending odometer prompts (CoreLocation geofencing)
@@ -42,7 +51,7 @@ Status tracker for all personal iOS projects. Updated 2026-02-21.
 - Weekday reminder notifications
 - Dashboard with running tax savings estimate
 - App icon (road/mile marker theme)
-- Build 1 uploaded to TestFlight
+- Build 2 uploaded to TestFlight (voice overhaul + Siri shortcut)
 - Bundle ID: `com.highball71.MileageTracker`
 
 ## Tralfaz/HQ #planned
