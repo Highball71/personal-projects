@@ -41,7 +41,8 @@ Status tracker for all personal iOS projects. Updated 2026-02-21.
 - Quarterly + annual IRS-compliant PDF reports with trip detail, tolls, parking
 - Weekday reminder notifications
 - Dashboard with running tax savings estimate
-- Built and running in Simulator
+- App icon (road/mile marker theme)
+- Build 1 uploaded to TestFlight
 - Bundle ID: `com.highball71.MileageTracker`
 
 ## Tralfaz/HQ #planned
