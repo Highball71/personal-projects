@@ -53,6 +53,76 @@ enum ClaudeAPIService {
 
     // MARK: - Public
 
+    /// Extract recipe data from multiple photos of cookbook pages.
+    /// Sends all images in a single API request so Claude can combine
+    /// content across pages into one unified recipe.
+    ///
+    /// - Parameter images: One or more UIImages from the camera
+    /// - Returns: An ExtractedRecipe with parsed fields
+    /// - Throws: APIError or KeychainHelper.KeychainError
+    static func extractRecipe(from images: [UIImage]) async throws -> ExtractedRecipe {
+        guard !images.isEmpty else { throw APIError.imageConversionFailed }
+
+        // Single image: use the standard single-photo flow
+        if images.count == 1 {
+            return try await extractRecipe(from: images[0])
+        }
+
+        print("[RecipeScan] Starting multi-page extraction (\(images.count) pages)...")
+
+        // Convert all images to base64 content blocks
+        var imageContents: [[String: Any]] = []
+        for (index, image) in images.enumerated() {
+            guard let data = image.jpegData(compressionQuality: 0.8) else {
+                print("[RecipeScan] ERROR: Failed to convert page \(index + 1) to JPEG")
+                throw APIError.imageConversionFailed
+            }
+            print("[RecipeScan] Page \(index + 1): \(data.count) bytes (\(String(format: "%.1f", Double(data.count) / 1_000_000)) MB)")
+            imageContents.append([
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": data.base64EncodedString()
+                ]
+            ])
+        }
+
+        let apiKey = try getAPIKey(context: "RecipeScan")
+        let request = try buildMultiImageRequest(apiKey: apiKey, imageContents: imageContents)
+        print("[RecipeScan] Sending multi-page request to \(endpoint) (model: \(modelID))...")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            print("[RecipeScan] ERROR: Network request failed — \(error)")
+            throw error
+        }
+
+        if let httpResponse = response as? HTTPURLResponse {
+            print("[RecipeScan] HTTP status: \(httpResponse.statusCode)")
+            if !(200...299).contains(httpResponse.statusCode) {
+                let body = String(data: data, encoding: .utf8) ?? "No response body"
+                print("[RecipeScan] ERROR: API returned error — \(body)")
+                throw APIError.httpError(statusCode: httpResponse.statusCode, message: body)
+            }
+        }
+
+        let rawBody = String(data: data, encoding: .utf8) ?? "<unreadable>"
+        print("[RecipeScan] Raw response body:\n\(rawBody)")
+
+        do {
+            let recipe = try parseRecipeFromResponse(data: data)
+            print("[RecipeScan] Successfully parsed multi-page recipe: \"\(recipe.name)\"")
+            return recipe
+        } catch {
+            print("[RecipeScan] ERROR: Failed to parse response — \(error)")
+            throw error
+        }
+    }
+
     /// Extract recipe data from a photo of a cookbook page.
     ///
     /// - Parameter image: A UIImage from the camera or photo library
@@ -303,6 +373,57 @@ enum ClaudeAPIService {
                             "text": userPrompt
                         ]
                     ]
+                ]
+            ]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
+
+    /// Build a URLRequest with multiple vision images for multi-page recipe extraction.
+    private static func buildMultiImageRequest(apiKey: String, imageContents: [[String: Any]]) throws -> URLRequest {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.timeoutInterval = 90 // Longer timeout for multi-image
+
+        let systemPrompt = """
+            You are a recipe extraction assistant. Return ONLY valid JSON \
+            (no markdown, no code fences, no extra text).
+            """
+
+        let userPrompt = """
+            These are photos of consecutive pages from a single recipe. \
+            Combine them into one complete recipe. If content overlaps \
+            between pages, deduplicate intelligently. Return the unified \
+            recipe with JSON fields: name (string), category (string - \
+            one of: breakfast, lunch, dinner, snack, dessert, side, drink), \
+            servingSize (string), prepTime (string), cookTime (string), \
+            ingredients (array of objects with: name, amount, unit), \
+            instructions (array of strings), and source (string or null). \
+            Look carefully at all photos for any book title, cookbook name, \
+            website name, or source attribution — check headers, footers, \
+            margins, watermarks, and page edges. Include it in the JSON \
+            as "source". If you can't find one, set source to null.
+            """
+
+        var messageContent: [[String: Any]] = imageContents
+        messageContent.append([
+            "type": "text",
+            "text": userPrompt
+        ])
+
+        let body: [String: Any] = [
+            "model": modelID,
+            "max_tokens": maxTokens,
+            "system": systemPrompt,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": messageContent
                 ]
             ]
         ]

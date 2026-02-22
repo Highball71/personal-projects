@@ -35,6 +35,9 @@ struct AddEditRecipeView: View {
     @State private var showingPhotoOptions = false
     @State private var showingCamera = false
     @State private var showingPhotoLibrary = false
+    @State private var showingPhotoScan = false
+    @State private var scannedPages: [UIImage] = []
+    @State private var scanPageCount = 0
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isExtractingRecipe = false
     @State private var extractionError: String?
@@ -186,19 +189,36 @@ struct AddEditRecipeView: View {
             // Photo library picker
             .photosPicker(isPresented: $showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
             // Camera (UIImagePickerController wrapper)
+            // After capturing the first photo, hand off to PhotoScanView
+            // so the user can add more pages before extracting.
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView { image in
                     if let image {
-                        print("[PhotoScan] Image received, size: \(Int(image.size.width))x\(Int(image.size.height))")
-                        // Dismiss camera first, then start extraction
+                        print("[PhotoScan] First page captured, size: \(Int(image.size.width))x\(Int(image.size.height))")
+                        scannedPages = [image]
                         showingCamera = false
-                        Task { await extractRecipeFromImage(image) }
+                        showingPhotoScan = true
                     } else {
-                        print("[PhotoScan] No image received (cancelled or failed)")
+                        print("[PhotoScan] Camera cancelled")
                         showingCamera = false
                     }
                 }
                 .ignoresSafeArea()
+            }
+            // Multi-page scan review — user can add pages, remove bad ones,
+            // then tap "Done Scanning" to send all pages to the API.
+            .sheet(isPresented: $showingPhotoScan) {
+                PhotoScanView(
+                    initialPages: scannedPages,
+                    onDone: { images in
+                        showingPhotoScan = false
+                        Task { await extractRecipeFromImages(images) }
+                    },
+                    onCancel: {
+                        showingPhotoScan = false
+                        scannedPages = []
+                    }
+                )
             }
             // When a photo is picked from the library, load it and extract
             .onChange(of: selectedPhotoItem) { _, newItem in
@@ -225,9 +245,13 @@ struct AddEditRecipeView: View {
                                 .scaleEffect(1.5)
                             Text(isExtractingFromURL
                                  ? "Importing recipe from URL..."
-                                 : "Reading recipe from photo...")
+                                 : scanPageCount > 1
+                                   ? "Reading recipe from \(scanPageCount) pages..."
+                                   : "Reading recipe from photo...")
                                 .font(.headline)
-                            Text("This may take a few seconds")
+                            Text(scanPageCount > 1
+                                 ? "Combining pages — this may take a few extra seconds"
+                                 : "This may take a few seconds")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -305,16 +329,20 @@ struct AddEditRecipeView: View {
         }
     }
 
-    /// Send the image to Claude API and populate form fields with the result.
+    /// Send one or more images to Claude API and populate form fields with the result.
+    /// For a single image, uses the standard prompt. For multiple images, uses the
+    /// multi-page prompt that tells Claude to combine pages into one recipe.
     @MainActor
-    private func extractRecipeFromImage(_ image: UIImage) async {
-        print("[PhotoScan] Starting extraction, showing loading indicator...")
+    private func extractRecipeFromImages(_ images: [UIImage]) async {
+        let pageCount = images.count
+        print("[PhotoScan] Starting extraction of \(pageCount) page(s)...")
         isExtractingRecipe = true
         extractionError = nil
+        scanPageCount = pageCount
 
         do {
-            print("[PhotoScan] Sending to Claude API...")
-            let extracted = try await ClaudeAPIService.extractRecipe(from: image)
+            print("[PhotoScan] Sending \(pageCount) page(s) to Claude API...")
+            let extracted = try await ClaudeAPIService.extractRecipe(from: images)
             print("[PhotoScan] Got response: \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
 
             // Populate form fields with extracted data
@@ -339,7 +367,15 @@ struct AddEditRecipeView: View {
         }
 
         isExtractingRecipe = false
+        scanPageCount = 0
+        scannedPages = []
         print("[PhotoScan] Extraction complete, loading indicator hidden")
+    }
+
+    /// Send a single image to Claude API (used by photo library picker).
+    @MainActor
+    private func extractRecipeFromImage(_ image: UIImage) async {
+        await extractRecipeFromImages([image])
     }
 
     /// Fetch a recipe webpage and populate form fields with the result.
