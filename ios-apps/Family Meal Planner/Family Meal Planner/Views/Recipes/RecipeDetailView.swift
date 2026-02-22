@@ -18,6 +18,9 @@ struct RecipeDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
 
+    // Remembers the user's name so they don't re-enter it each time
+    @AppStorage("raterName") private var raterName: String = ""
+
     var body: some View {
         List {
             Section("Details") {
@@ -54,6 +57,42 @@ struct RecipeDetailView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
+                }
+            }
+
+            // MARK: - Ratings
+            Section("Ratings") {
+                // Your Rating — name field + tappable stars
+                HStack {
+                    TextField("Your name", text: $raterName)
+                        .textContentType(.name)
+                        .frame(maxWidth: 120)
+                    Spacer()
+                    StarRatingView(rating: currentUserRating) { newRating in
+                        setRating(newRating)
+                    }
+                }
+
+                // Household average
+                if let avg = recipe.averageRating {
+                    HStack {
+                        Text("Household Average")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        StarDisplayView(rating: avg)
+                        Text(String(format: "%.1f", avg))
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+
+                // Individual ratings from other household members
+                ForEach(recipe.ratingsList.sorted(by: { $0.raterName < $1.raterName })) { rating in
+                    HStack {
+                        Text(rating.raterName)
+                        Spacer()
+                        StarDisplayView(rating: Double(rating.rating))
+                    }
                 }
             }
 
@@ -126,6 +165,34 @@ struct RecipeDetailView: View {
         }
     }
 
+    /// The current user's rating for this recipe, or 0 if they haven't rated yet.
+    private var currentUserRating: Int {
+        guard !raterName.isEmpty else { return 0 }
+        return recipe.ratingsList
+            .first { $0.raterName.lowercased() == raterName.lowercased() }?
+            .rating ?? 0
+    }
+
+    /// Creates or updates the current user's rating for this recipe.
+    private func setRating(_ newRating: Int) {
+        guard !raterName.isEmpty else { return }
+
+        // Look for an existing rating from this person
+        if let existing = recipe.ratingsList.first(where: {
+            $0.raterName.lowercased() == raterName.lowercased()
+        }) {
+            existing.rating = newRating
+            existing.dateRated = Date()
+        } else {
+            let newRatingObj = RecipeRating(
+                raterName: raterName,
+                rating: newRating,
+                recipe: recipe
+            )
+            modelContext.insert(newRatingObj)
+        }
+    }
+
     /// Format a single ingredient for display.
     /// "to taste" items: "Salt, to taste"
     /// "none" unit: "3 eggs"
@@ -139,6 +206,52 @@ struct RecipeDetailView: View {
             return "\(qty) \(ingredient.name)"
         }
         return "\(qty) \(ingredient.unit.displayName) \(ingredient.name)"
+    }
+}
+
+// MARK: - Star Views
+
+/// Tappable 1–5 star input. Shows filled stars up to the current rating.
+/// Pass rating = 0 to show all empty stars (no rating yet).
+private struct StarRatingView: View {
+    let rating: Int
+    let onRate: (Int) -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(1...5, id: \.self) { star in
+                Image(systemName: star <= rating ? "star.fill" : "star")
+                    .foregroundStyle(.orange)
+                    .font(.title3)
+                    .onTapGesture { onRate(star) }
+            }
+        }
+    }
+}
+
+/// Read-only star display showing a fractional average (e.g. 3.7 fills 3 full + 1 half).
+private struct StarDisplayView: View {
+    let rating: Double
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ForEach(1...5, id: \.self) { star in
+                let starValue = Double(star)
+                Image(systemName: starIcon(for: starValue))
+                    .foregroundStyle(.orange)
+                    .font(.caption2)
+            }
+        }
+    }
+
+    private func starIcon(for starValue: Double) -> String {
+        if rating >= starValue {
+            return "star.fill"
+        } else if rating >= starValue - 0.5 {
+            return "star.leadinghalf.filled"
+        } else {
+            return "star"
+        }
     }
 }
 

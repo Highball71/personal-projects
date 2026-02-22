@@ -200,10 +200,28 @@ struct RecipeRowView: View {
                 Text(recipe.category.rawValue)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let avg = recipe.averageRating {
+                    RecipeRowStarView(rating: avg)
+                }
                 Spacer()
                 Text("\(recipe.ingredientsList.count) ingredients")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// Small inline star display for recipe list rows.
+private struct RecipeRowStarView: View {
+    let rating: Double
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ForEach(1...5, id: \.self) { star in
+                Image(systemName: Double(star) <= rating ? "star.fill" : "star")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
             }
         }
     }

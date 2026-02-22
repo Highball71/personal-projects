@@ -242,8 +242,10 @@ struct SurpriseMealView: View {
         pickRandomRecipe()
     }
 
-    /// Picks a random recipe from currentPool, trying to avoid repeating
-    /// the one currently shown.
+    /// Picks a random recipe from currentPool using rating-weighted selection.
+    /// - Recipes rated 4+ average get 3x weight (family favorites)
+    /// - Recipes rated 2.5–3.9 or unrated get 1x weight (neutral)
+    /// - Recipes rated below 2.5 are excluded (disliked)
     private func pickRandomRecipe() {
         guard !allRecipes.isEmpty else {
             suggestedRecipe = nil
@@ -251,14 +253,29 @@ struct SurpriseMealView: View {
             return
         }
 
-        if currentPool.count > 1, let current = suggestedRecipe {
+        // Build a weighted pool: exclude low-rated, boost high-rated
+        let weightedPool = currentPool.flatMap { recipe -> [Recipe] in
+            let avg = recipe.averageRating
+            if let avg, avg < 2.5 {
+                return []              // excluded — disliked
+            } else if let avg, avg >= 4.0 {
+                return [recipe, recipe, recipe]  // 3x weight — family favorite
+            } else {
+                return [recipe]        // 1x weight — neutral or unrated
+            }
+        }
+
+        // Fall back to the unweighted pool if everything got filtered out
+        let pool = weightedPool.isEmpty ? currentPool : weightedPool
+
+        if pool.count > 1, let current = suggestedRecipe {
             // Avoid showing the same recipe twice in a row
-            let others = currentPool.filter {
+            let others = pool.filter {
                 $0.persistentModelID != current.persistentModelID
             }
-            suggestedRecipe = others.randomElement() ?? currentPool.randomElement()
+            suggestedRecipe = others.randomElement() ?? pool.randomElement()
         } else {
-            suggestedRecipe = currentPool.randomElement()
+            suggestedRecipe = pool.randomElement()
         }
 
         showingSuggestion = true

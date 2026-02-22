@@ -39,11 +39,29 @@ final class Recipe {
     @Relationship(deleteRule: .nullify)
     var mealPlans: [MealPlan]?
 
+    // Per-person star ratings (1-5). Cascade deletes ratings when recipe is deleted.
+    // Inverse is declared on RecipeRating.recipe.
+    @Relationship(deleteRule: .cascade)
+    var ratings: [RecipeRating]?
+
     /// Non-optional accessor — returns the ingredients array or empty if nil.
     /// Use this throughout the app so we don't need nil checks everywhere.
     var ingredientsList: [Ingredient] {
         get { ingredients ?? [] }
         set { ingredients = newValue }
+    }
+
+    /// Non-optional accessor for ratings, same pattern as ingredientsList.
+    var ratingsList: [RecipeRating] {
+        get { ratings ?? [] }
+        set { ratings = newValue }
+    }
+
+    /// Average star rating across all household members, or nil if no one has rated yet.
+    var averageRating: Double? {
+        guard !ratingsList.isEmpty else { return nil }
+        let sum = ratingsList.reduce(0) { $0 + $1.rating }
+        return Double(sum) / Double(ratingsList.count)
     }
 
     init(
