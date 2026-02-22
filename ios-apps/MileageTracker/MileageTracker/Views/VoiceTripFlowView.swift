@@ -44,6 +44,11 @@ struct VoiceTripFlowView: View {
     // an old generation are ignored.
     @State private var stepGeneration = 0
 
+    // Set to true once handleRecognitionResult processes a valid result
+    // for the current step. Prevents a second callback (e.g. from the
+    // recognition task firing after the silence timer) from triggering retry.
+    @State private var resultAccepted = false
+
     enum FlowStep: CaseIterable {
         case startLocation
         case startOdometer
@@ -193,6 +198,7 @@ struct VoiceTripFlowView: View {
                                 retryCount = 0
                                 showManualFallback = false
                                 showRetryMessage = false
+                                resultAccepted = true  // block any pending callbacks
                                 advanceStep()
                             }
                         }
@@ -215,6 +221,7 @@ struct VoiceTripFlowView: View {
             retryCount = 0
             showManualFallback = false
             showRetryMessage = false
+            resultAccepted = false
             isListeningForVoice = false
             beginStep()
         }
@@ -385,14 +392,17 @@ struct VoiceTripFlowView: View {
 
     /// Reinstall the onListeningStopped callback with the current step generation.
     /// Called each time a new step begins so stale callbacks are ignored.
+    /// Also checks `resultAccepted` — if a valid result was already processed
+    /// for this step, ignore any further callbacks (prevents double-fire from
+    /// silence timer + recognition task both calling finishListening).
     private func installStepCallbacks() {
         let gen = stepGeneration
         speech.onListeningStopped = { [self] finalText in
-            guard gen == self.stepGeneration else { return }
+            guard gen == self.stepGeneration, !self.resultAccepted else { return }
             handleRecognitionResult(finalText)
         }
         speech.onKeywordDetected = { [self] keyword in
-            guard gen == self.stepGeneration else { return }
+            guard gen == self.stepGeneration, !self.resultAccepted else { return }
             handleKeyword(keyword)
         }
     }
@@ -478,6 +488,7 @@ struct VoiceTripFlowView: View {
             // Reset retry state so the user gets fresh attempts
             retryCount = 0
             showManualFallback = false
+            resultAccepted = false
             configureForCurrentStep()
             startVoiceInput()
         }
@@ -494,6 +505,11 @@ struct VoiceTripFlowView: View {
             retryCurrentStep()
             return
         }
+
+        // Mark that we've accepted a valid result for this step.
+        // Any further callbacks (e.g. recognition task firing after
+        // the silence timer) will be ignored by installStepCallbacks guard.
+        resultAccepted = true
 
         switch step {
         case .startLocation:
@@ -666,6 +682,7 @@ struct VoiceTripFlowView: View {
         retryCount = 0
         showManualFallback = false
         showRetryMessage = false
+        resultAccepted = false
 
         guard let nextStep else { return }
         withAnimation {

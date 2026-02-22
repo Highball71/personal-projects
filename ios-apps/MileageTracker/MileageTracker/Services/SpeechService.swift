@@ -248,7 +248,11 @@ class SpeechService: NSObject {
 
     /// Stop listening and fire the callback with the final text.
     /// Called by the silence timer or when recognition produces a final result.
+    /// Guarded by `isListening` so it only fires the callback once — the silence
+    /// timer and recognition callback can both try to call this.
     private func finishListening() {
+        guard isListening else { return }
+
         let finalText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // If we haven't met the minimum length, keep listening
