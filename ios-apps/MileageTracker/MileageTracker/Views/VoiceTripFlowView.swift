@@ -39,6 +39,11 @@ struct VoiceTripFlowView: View {
     @State private var showManualFallback = false
     private let maxRetries = 3
 
+    // Guards against stale recognition callbacks from a previous step.
+    // Incremented every time the step changes; callbacks that captured
+    // an old generation are ignored.
+    @State private var stepGeneration = 0
+
     enum FlowStep: CaseIterable {
         case startLocation
         case startOdometer
@@ -181,6 +186,13 @@ struct VoiceTripFlowView: View {
                         .keyboardType(step == .startOdometer ? .decimalPad : .default)
                         .onSubmit {
                             if !currentAnswer.isEmpty {
+                                // Clear all voice/retry state before advancing
+                                speech.stopListening()
+                                speech.stopSpeaking()
+                                isListeningForVoice = false
+                                retryCount = 0
+                                showManualFallback = false
+                                showRetryMessage = false
                                 advanceStep()
                             }
                         }
@@ -202,6 +214,8 @@ struct VoiceTripFlowView: View {
             stepInitiated = false
             retryCount = 0
             showManualFallback = false
+            showRetryMessage = false
+            isListeningForVoice = false
             beginStep()
         }
     }
@@ -365,13 +379,20 @@ struct VoiceTripFlowView: View {
         // Add purpose keywords
         speech.contextualStrings += TripCategory.allCases.map(\.rawValue)
 
-        // Set up the callback for when listening auto-stops
+        // Callbacks are installed per-step via installStepCallbacks()
+        // so stale callbacks from a previous step are automatically ignored.
+    }
+
+    /// Reinstall the onListeningStopped callback with the current step generation.
+    /// Called each time a new step begins so stale callbacks are ignored.
+    private func installStepCallbacks() {
+        let gen = stepGeneration
         speech.onListeningStopped = { [self] finalText in
+            guard gen == self.stepGeneration else { return }
             handleRecognitionResult(finalText)
         }
-
-        // Set up keyword detection
         speech.onKeywordDetected = { [self] keyword in
+            guard gen == self.stepGeneration else { return }
             handleKeyword(keyword)
         }
     }
@@ -383,6 +404,11 @@ struct VoiceTripFlowView: View {
         guard !stepInitiated else { return }
         stepInitiated = true
         showRetryMessage = false
+
+        // Bump generation and install fresh callbacks so any lingering
+        // recognition results from the previous step are ignored.
+        stepGeneration += 1
+        installStepCallbacks()
 
         if step == .confirm {
             speakSummaryAndListen()
@@ -634,10 +660,12 @@ struct VoiceTripFlowView: View {
     }
 
     private func advanceStep() {
-        if isListeningForVoice {
-            speech.stopListening()
-            isListeningForVoice = false
-        }
+        speech.stopListening()
+        speech.stopSpeaking()
+        isListeningForVoice = false
+        retryCount = 0
+        showManualFallback = false
+        showRetryMessage = false
 
         guard let nextStep else { return }
         withAnimation {
