@@ -11,23 +11,22 @@ import SwiftUI
 /// Checked items get a strikethrough and dimmed appearance.
 struct GroceryItemRow: View {
     let item: GroceryItem
-    let isChecked: Bool
     let onToggle: () -> Void
 
     var body: some View {
         HStack {
             // Tappable checkmark circle
             Button(action: onToggle) {
-                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isChecked ? .green : .secondary)
+                Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(item.isChecked ? .green : .secondary)
                     .imageScale(.large)
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading) {
                 Text(item.name)
-                    .strikethrough(isChecked)
-                    .foregroundStyle(isChecked ? .secondary : .primary)
+                    .strikethrough(item.isChecked)
+                    .foregroundStyle(item.isChecked ? .secondary : .primary)
 
                 Text(formatGroceryQuantity(item))
                     .font(.caption)
@@ -53,13 +52,15 @@ struct GroceryItemRow: View {
 #Preview {
     List {
         GroceryItemRow(
-            item: GroceryItem(name: "Flour", totalQuantity: 2, unit: .cup),
-            isChecked: false,
+            item: GroceryItem(itemID: "flour|cup", name: "Flour", totalQuantity: 2, unit: .cup, weekStart: Date()),
             onToggle: {}
         )
         GroceryItemRow(
-            item: GroceryItem(name: "Eggs", totalQuantity: 4, unit: .piece),
-            isChecked: true,
+            item: {
+                let item = GroceryItem(itemID: "eggs|piece", name: "Eggs", totalQuantity: 4, unit: .piece, weekStart: Date())
+                item.isChecked = true
+                return item
+            }(),
             onToggle: {}
         )
     }

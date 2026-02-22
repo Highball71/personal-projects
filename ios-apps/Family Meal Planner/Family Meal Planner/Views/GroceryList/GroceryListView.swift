@@ -8,67 +8,36 @@
 import SwiftUI
 import SwiftData
 
-/// Auto-generated grocery list based on the current week's meal plan.
-/// Collects all ingredients from planned recipes, combines duplicates
-/// (e.g., two recipes needing flour → one combined entry), and lets
-/// you check items off while shopping.
+/// Grocery list based on the current week's meal plan.
+/// Items are persisted in SwiftData so checked state survives app relaunches.
+/// The list is generated from the meal plan once per week and only refreshed
+/// when the user explicitly asks or the meal plan changes.
 struct GroceryListView: View {
+    @Query private var allGroceryItems: [GroceryItem]
     @Query private var allMealPlans: [MealPlan]
-    @Query private var allGroceryChecks: [GroceryCheck]
     @Environment(\.modelContext) private var modelContext
 
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
     @State private var showClearConfirmation = false
+    @State private var showUncheckConfirmation = false
 
-    /// The set of checked item IDs for the current week.
-    private var checkedItems: Set<String> {
+    /// Persisted grocery items for the current week, sorted alphabetically.
+    private var currentWeekItems: [GroceryItem] {
         let weekStart = DateHelper.stripTime(from: weekStartDate)
-        return Set(
-            allGroceryChecks
-                .filter { DateHelper.stripTime(from: $0.weekStart) == weekStart }
-                .map(\.itemID)
-        )
+        return allGroceryItems
+            .filter { DateHelper.stripTime(from: $0.weekStart) == weekStart }
+            .sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 
-    /// The main logic: gather ingredients from this week's meals and combine duplicates.
-    var groceryItems: [GroceryItem] {
-        let weekDays = DateHelper.weekDays(startingFrom: weekStartDate)
-        let dayStarts = Set(weekDays.map { DateHelper.stripTime(from: $0) })
-
-        // Filter to just this week's meal plans
-        let thisWeekPlans = allMealPlans.filter { plan in
-            dayStarts.contains(DateHelper.stripTime(from: plan.date))
-        }
-
-        // Combine ingredients: same name + same unit = summed quantity
-        // Key example: "flour|cup" combines, but "flour|lb" stays separate
-        var combined: [String: GroceryItem] = [:]
-
-        for plan in thisWeekPlans {
-            guard let recipe = plan.recipe else { continue }
-            for ingredient in recipe.ingredientsList {
-                let key = "\(ingredient.name.lowercased())|\(ingredient.unit.rawValue)"
-
-                if var existing = combined[key] {
-                    existing.totalQuantity += ingredient.quantity
-                    combined[key] = existing
-                } else {
-                    combined[key] = GroceryItem(
-                        name: ingredient.name,
-                        totalQuantity: ingredient.quantity,
-                        unit: ingredient.unit
-                    )
-                }
-            }
-        }
-
-        return combined.values.sorted { $0.name.lowercased() < $1.name.lowercased() }
+    /// Whether any items are currently checked off.
+    private var hasCheckedItems: Bool {
+        currentWeekItems.contains { $0.isChecked }
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if groceryItems.isEmpty {
+                if currentWeekItems.isEmpty {
                     ContentUnavailableView(
                         "No Groceries Needed",
                         systemImage: "cart",
@@ -76,76 +45,140 @@ struct GroceryListView: View {
                     )
                 } else {
                     List {
-                        ForEach(groceryItems) { item in
-                            GroceryItemRow(
-                                item: item,
-                                isChecked: checkedItems.contains(item.id),
-                                onToggle: {
-                                    toggleCheck(for: item.id)
-                                }
-                            )
+                        ForEach(currentWeekItems) { item in
+                            GroceryItemRow(item: item) {
+                                toggleCheck(for: item)
+                            }
                         }
                     }
                 }
             }
             .navigationTitle("Grocery List")
-            .alert("Clear all checked items?", isPresented: $showClearConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Clear", role: .destructive) {
-                    clearChecks()
-                }
-            }
+            .onAppear { generateIfNeeded() }
             .toolbar {
-                if !groceryItems.isEmpty && !checkedItems.isEmpty {
-                    Button("Clear Checks") {
-                        showClearConfirmation = true
+                if !currentWeekItems.isEmpty {
+                    Menu {
+                        Button("Refresh from Meal Plan", systemImage: "arrow.clockwise") {
+                            regenerateFromMealPlan()
+                        }
+
+                        if hasCheckedItems {
+                            Divider()
+
+                            Button("Uncheck All", systemImage: "arrow.uturn.backward") {
+                                showUncheckConfirmation = true
+                            }
+
+                            Button("Clear Checked Items", systemImage: "trash", role: .destructive) {
+                                showClearConfirmation = true
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
+            .alert("Clear checked items?", isPresented: $showClearConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) { clearCheckedItems() }
+            } message: {
+                Text("This will remove all checked items from the list.")
+            }
+            .alert("Uncheck all items?", isPresented: $showUncheckConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Uncheck All", role: .destructive) { uncheckAll() }
+            } message: {
+                Text("This will uncheck all items so you can start a fresh shopping trip.")
+            }
         }
     }
 
-    /// Toggle a grocery item's checked state by inserting or deleting a GroceryCheck.
-    private func toggleCheck(for itemID: String) {
-        let weekStart = DateHelper.stripTime(from: weekStartDate)
+    // MARK: - Generation
 
-        // Look for an existing check for this item + week
-        if let existing = allGroceryChecks.first(where: {
-            $0.itemID == itemID && DateHelper.stripTime(from: $0.weekStart) == weekStart
-        }) {
-            modelContext.delete(existing)
-        } else {
-            modelContext.insert(GroceryCheck(itemID: itemID, weekStart: weekStart))
+    /// Generate the grocery list from the meal plan if no items exist for this week.
+    private func generateIfNeeded() {
+        if currentWeekItems.isEmpty {
+            regenerateFromMealPlan()
+        }
+    }
+
+    /// (Re)generate grocery items from the current week's meal plan.
+    /// Preserves checked state for items that still exist.
+    private func regenerateFromMealPlan() {
+        let weekStart = DateHelper.stripTime(from: weekStartDate)
+        let weekDays = DateHelper.weekDays(startingFrom: weekStartDate)
+        let dayStarts = Set(weekDays.map { DateHelper.stripTime(from: $0) })
+
+        // Gather this week's meal plan ingredients
+        let thisWeekPlans = allMealPlans.filter { plan in
+            dayStarts.contains(DateHelper.stripTime(from: plan.date))
         }
 
-        // Save immediately so checks survive app close
+        // Combine duplicates: same name + same unit = summed quantity
+        var combined: [String: (name: String, qty: Double, unit: IngredientUnit)] = [:]
+        for plan in thisWeekPlans {
+            guard let recipe = plan.recipe else { continue }
+            for ingredient in recipe.ingredientsList {
+                let key = "\(ingredient.name.lowercased())|\(ingredient.unit.rawValue)"
+                if var existing = combined[key] {
+                    existing.qty += ingredient.quantity
+                    combined[key] = existing
+                } else {
+                    combined[key] = (name: ingredient.name, qty: ingredient.quantity, unit: ingredient.unit)
+                }
+            }
+        }
+
+        // Remember which items were checked so we can preserve their state
+        let previouslyChecked = Set(currentWeekItems.filter(\.isChecked).map(\.itemID))
+
+        // Delete old items for this week
+        for item in currentWeekItems {
+            modelContext.delete(item)
+        }
+
+        // Insert fresh items, restoring checked state where applicable
+        for (key, value) in combined {
+            let item = GroceryItem(
+                itemID: key,
+                name: value.name,
+                totalQuantity: value.qty,
+                unit: value.unit,
+                weekStart: weekStart
+            )
+            item.isChecked = previouslyChecked.contains(key)
+            modelContext.insert(item)
+        }
+
         try? modelContext.save()
     }
 
-    /// Remove all checks for the current week.
-    private func clearChecks() {
-        let weekStart = DateHelper.stripTime(from: weekStartDate)
-        let thisWeekChecks = allGroceryChecks.filter {
-            DateHelper.stripTime(from: $0.weekStart) == weekStart
-        }
-        for check in thisWeekChecks {
-            modelContext.delete(check)
-        }
+    // MARK: - Actions
 
+    /// Toggle a single item's checked state.
+    private func toggleCheck(for item: GroceryItem) {
+        item.isChecked.toggle()
         try? modelContext.save()
     }
-}
 
-/// A computed grocery item — NOT a SwiftData model.
-/// This is a value type that exists only for display.
-struct GroceryItem: Identifiable {
-    var id: String { "\(name.lowercased())|\(unit.rawValue)" }
-    let name: String
-    var totalQuantity: Double
-    let unit: IngredientUnit
+    /// Remove all checked items from the list.
+    private func clearCheckedItems() {
+        for item in currentWeekItems where item.isChecked {
+            modelContext.delete(item)
+        }
+        try? modelContext.save()
+    }
+
+    /// Reset all items to unchecked for a fresh shopping trip.
+    private func uncheckAll() {
+        for item in currentWeekItems {
+            item.isChecked = false
+        }
+        try? modelContext.save()
+    }
 }
 
 #Preview {
     GroceryListView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, GroceryCheck.self], inMemory: true)
+        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, GroceryItem.self], inMemory: true)
 }
