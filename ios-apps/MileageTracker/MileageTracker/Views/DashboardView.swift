@@ -9,6 +9,7 @@ struct DashboardView: View {
     @Query private var settings: [YearlySettings]
 
     @State private var showingVoiceFlow = false
+    @AppStorage("launchIntoVoiceFlow") private var launchIntoVoiceFlow = false
 
     private var currentSettings: YearlySettings? {
         let year = Calendar.current.component(.year, from: Date())
@@ -144,12 +145,18 @@ struct DashboardView: View {
                 VoiceTripFlowView()
             }
             .onAppear {
-                if ProcessInfo.processInfo.arguments.contains("--start-trip") {
+                if launchIntoVoiceFlow {
+                    launchIntoVoiceFlow = false
                     showingVoiceFlow = true
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .startVoiceTripFlow)) { _ in
-                showingVoiceFlow = true
+            .onChange(of: launchIntoVoiceFlow) { _, shouldLaunch in
+                // Catches the flag being set while the dashboard is already visible
+                // (app was backgrounded, Siri sets the flag, app foregrounds)
+                if shouldLaunch {
+                    launchIntoVoiceFlow = false
+                    showingVoiceFlow = true
+                }
             }
         }
     }

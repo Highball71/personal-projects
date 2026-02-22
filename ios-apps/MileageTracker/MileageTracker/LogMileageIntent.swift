@@ -17,14 +17,9 @@ struct LogMileageIntent: AppIntent {
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
-        // Post a notification that the app should open the voice flow.
-        // The DashboardView listens for this and opens VoiceTripFlowView.
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: .startVoiceTripFlow,
-                object: nil
-            )
-        }
+        // Set a UserDefaults flag that DashboardView checks on appear.
+        // Works for both cold launch and backgrounded-app scenarios.
+        UserDefaults.standard.set(true, forKey: "launchIntoVoiceFlow")
         return .result()
     }
 }
@@ -50,8 +45,3 @@ struct MileageTrackerShortcuts: AppShortcutsProvider {
     }
 }
 
-// MARK: - Notification Name
-
-extension Notification.Name {
-    static let startVoiceTripFlow = Notification.Name("startVoiceTripFlow")
-}
