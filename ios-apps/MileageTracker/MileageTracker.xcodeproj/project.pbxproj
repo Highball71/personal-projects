@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B20000160000000000000016 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		B20000160000000000000016 /* Exceptions for "MileageTracker" folder in "MileageTracker" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,7 +24,7 @@
 		B20000020000000000000002 /* MileageTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B20000160000000000000016 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				B20000160000000000000016 /* Exceptions for "MileageTracker" folder in "MileageTracker" target */,
 			);
 			path = MileageTracker;
 			sourceTree = "<group>";

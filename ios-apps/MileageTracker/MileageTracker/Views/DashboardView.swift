@@ -148,6 +148,9 @@ struct DashboardView: View {
                     showingVoiceFlow = true
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .startVoiceTripFlow)) { _ in
+                showingVoiceFlow = true
+            }
         }
     }
 }
