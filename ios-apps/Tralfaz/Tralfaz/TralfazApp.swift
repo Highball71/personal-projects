@@ -10,6 +10,12 @@ import SwiftData
 
 @main
 struct TralfazApp: App {
+    init() {
+        // Seed sample data on first launch
+        let context = sharedModelContainer.mainContext
+        SampleData.seedIfNeeded(context: context)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
