@@ -10,6 +10,7 @@ import SwiftUI
 /// A single row in the tasks list with a tappable checkbox, title,
 /// priority indicator, and optional due date.
 struct TaskRowView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var task: CRMTask
 
     var body: some View {
@@ -18,6 +19,7 @@ struct TaskRowView: View {
             Button {
                 task.isCompleted.toggle()
                 task.completedAt = task.isCompleted ? Date() : nil
+                NotificationScheduler.rescheduleAll(modelContext: modelContext)
             } label: {
                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.title3)

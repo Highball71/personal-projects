@@ -38,6 +38,7 @@ struct TaskDetailView: View {
         .alert("Delete this task?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 modelContext.delete(task)
+                NotificationScheduler.rescheduleAll(modelContext: modelContext)
                 dismiss()
             }
             Button("Cancel", role: .cancel) { }
@@ -97,6 +98,8 @@ struct TaskDetailView: View {
             Button {
                 task.isCompleted.toggle()
                 task.completedAt = task.isCompleted ? Date() : nil
+                // Completing a task may clear an overdue nudge
+                NotificationScheduler.rescheduleAll(modelContext: modelContext)
             } label: {
                 Label(
                     task.isCompleted ? "Mark Incomplete" : "Mark Complete",

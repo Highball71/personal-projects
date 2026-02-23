@@ -145,6 +145,9 @@ struct AddEditTaskView: View {
             modelContext.insert(task)
         }
 
+        // Reschedule notifications to pick up the new/changed task
+        NotificationScheduler.rescheduleAll(modelContext: modelContext)
+
         dismiss()
     }
 }

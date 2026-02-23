@@ -39,6 +39,7 @@ struct AppointmentDetailView: View {
         .alert("Delete this appointment?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 modelContext.delete(appointment)
+                NotificationScheduler.rescheduleAll(modelContext: modelContext)
                 dismiss()
             }
             Button("Cancel", role: .cancel) { }
