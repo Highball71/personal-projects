@@ -12,7 +12,7 @@ import SwiftData
 struct TralfazApp: App {
     init() {
         // Seed sample data on first launch
-        let context = sharedModelContainer.mainContext
+        let context = SharedModelContainer.instance.mainContext
         SampleData.seedIfNeeded(context: context)
     }
 
@@ -20,28 +20,31 @@ struct TralfazApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(SharedModelContainer.instance)
     }
 }
 
 /// Local-only SwiftData container for the personal CRM.
-private let sharedModelContainer: ModelContainer = {
-    let schema = Schema([
-        Contact.self,
-        CRMTask.self,
-        Appointment.self,
-        CRMProject.self
-    ])
+/// Shared so that both the app and App Intents can access the same store.
+enum SharedModelContainer {
+    static let instance: ModelContainer = {
+        let schema = Schema([
+            Contact.self,
+            CRMTask.self,
+            Appointment.self,
+            CRMProject.self
+        ])
 
-    let config = ModelConfiguration(
-        "Tralfaz",
-        schema: schema,
-        cloudKitDatabase: .none
-    )
+        let config = ModelConfiguration(
+            "Tralfaz",
+            schema: schema,
+            cloudKitDatabase: .none
+        )
 
-    do {
-        return try ModelContainer(for: schema, configurations: [config])
-    } catch {
-        fatalError("Could not create ModelContainer: \(error)")
-    }
-}()
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }()
+}
