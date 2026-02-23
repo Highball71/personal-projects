@@ -25,11 +25,18 @@ M4 iMac is the development hub. iPhone/iPad used for planning.
 - Use meaningful variable and function names
 
 ## Current Projects
-- HelloWorld (proof of life - complete)
-- Family Meal Planner (next up)
+- IntervalTimer (VoxTimer) — active, TestFlight Build 1
+- Family Meal Planner — active, TestFlight Build 8, Claude API integration
+- MileageTracker (Clean Mile) — active, TestFlight Build 2, voice-first with Siri shortcut
+- WordScene — complete
+- CareLog — inactive, mileage portion superseded by MileageTracker
+- Tralfaz/HQ — planned, personal dashboard rebuild
+- Hello World — complete
 
 ## How I Work
 - Plan features on iPhone/iPad using Apple Notes
 - Execute on M4 iMac using Claude Code + Xcode
 - Commit and push at end of each session
 - Review code on GitHub mobile app
+- Use git worktrees for parallel Claude Code sessions
+- See PROJECT_HEAP.md for detailed per-app status
