@@ -141,6 +141,9 @@ struct AddEditAppointmentView: View {
             modelContext.insert(appointment)
         }
 
+        // Reschedule notifications to pick up the new/changed appointment
+        NotificationScheduler.rescheduleAll(modelContext: modelContext)
+
         dismiss()
     }
 }

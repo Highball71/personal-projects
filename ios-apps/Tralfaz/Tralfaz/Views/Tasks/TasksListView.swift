@@ -127,6 +127,7 @@ struct TasksListView: View {
         for index in offsets {
             modelContext.delete(list[index])
         }
+        NotificationScheduler.rescheduleAll(modelContext: modelContext)
     }
 }
 
