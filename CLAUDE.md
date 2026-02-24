@@ -26,7 +26,7 @@ M4 iMac is the development hub. iPhone/iPad used for planning.
 
 ## Current Projects
 - IntervalTimer (VoxTimer) — active, TestFlight Build 1
-- Family Meal Planner — active, TestFlight Build 8, Claude API integration
+- Family Meal Planner — active, TestFlight Build 9, Claude API integration
 - MileageTracker (Clean Mile) — active, TestFlight Build 2, voice-first with Siri shortcut
 - WordScene — complete
 - CareLog — inactive, mileage portion superseded by MileageTracker
