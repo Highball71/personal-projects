@@ -24,7 +24,7 @@ Status tracker for all personal iOS projects. Updated 2026-02-22.
 - Recipe search with JSON-LD parsing
 - Meal planning, grocery list generation
 - 35 production files, 6 test files
-- Multiple TestFlight builds shipped (build 8)
+- Multiple TestFlight builds shipped (build 9)
 - Bundle ID: `com.highball71.Family-Meal-Planner`
 
 ## MileageTracker #active
