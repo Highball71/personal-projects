@@ -43,9 +43,18 @@ enum MealPlanSheet: Identifiable {
 /// The weekly meal planning view. Shows 7 days in a vertical scroll,
 /// each with breakfast/lunch/dinner slots. Navigate between weeks
 /// with the arrow buttons at the top.
+///
+/// When a Head Cook is set, non-Head-Cook users create suggestions
+/// instead of directly filling meal slots. The Head Cook sees
+/// approve/reject controls next to each suggestion.
 struct MealPlanView: View {
     @Query private var allMealPlans: [MealPlan]
+    @Query private var allSuggestions: [MealSuggestion]
+    @Query private var members: [HouseholdMember]
     @Environment(\.modelContext) private var modelContext
+
+    // Device-local identity — matches the "You are" picker in Settings
+    @AppStorage("currentUserName") private var currentUserName: String = ""
 
     // The first day of the currently displayed week
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
@@ -62,6 +71,23 @@ struct MealPlanView: View {
         DateHelper.weekDays(startingFrom: weekStartDate)
     }
 
+    /// The designated Head Cook, if one is set
+    private var headCook: HouseholdMember? {
+        members.first(where: { $0.isHeadCook })
+    }
+
+    /// Whether the current device user is the Head Cook
+    private var isCurrentUserHeadCook: Bool {
+        guard let headCook else { return false }
+        return !currentUserName.isEmpty
+            && headCook.name.lowercased() == currentUserName.lowercased()
+    }
+
+    /// Whether the approval flow is active (Head Cook is set)
+    private var approvalFlowActive: Bool {
+        headCook != nil
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -72,12 +98,21 @@ struct MealPlanView: View {
                         DayColumnView(
                             date: day,
                             mealPlans: mealPlans(for: day),
+                            suggestions: suggestions(for: day),
+                            isHeadCook: isCurrentUserHeadCook,
+                            approvalFlowActive: approvalFlowActive,
                             onSlotTapped: { mealType in
                                 selectedSlot = MealSlotSelection(date: day, mealType: mealType)
                                 showingSlotOptions = true
                             },
                             onSlotCleared: { mealType in
                                 clearMealSlot(date: day, mealType: mealType)
+                            },
+                            onApproveSuggestion: { suggestion in
+                                approveSuggestion(suggestion)
+                            },
+                            onRejectSuggestion: { suggestion in
+                                rejectSuggestion(suggestion)
                             }
                         )
                     }
@@ -110,16 +145,17 @@ struct MealPlanView: View {
                 switch sheet {
                 case .pickRecipe(let slot):
                     RecipePickerView { recipe in
-                        assignRecipe(recipe, to: slot.date, for: slot.mealType)
+                        handleRecipeSelection(recipe, for: slot)
                     }
                 case .surpriseMe(let slot):
                     SurpriseMealView { recipe in
-                        assignRecipe(recipe, to: slot.date, for: slot.mealType)
+                        handleRecipeSelection(recipe, for: slot)
                     }
                 case .suggestWeek:
                     SuggestMealsView(weekStartDate: weekStartDate) { suggestions in
                         for (date, recipe) in suggestions {
-                            assignRecipe(recipe, to: date, for: .dinner)
+                            let slot = MealSlotSelection(date: date, mealType: .dinner)
+                            handleRecipeSelection(recipe, for: slot)
                         }
                     }
                 }
@@ -176,6 +212,26 @@ struct MealPlanView: View {
         return allMealPlans.filter { DateHelper.stripTime(from: $0.date) == dayStart }
     }
 
+    /// Get pending suggestions for a specific day
+    private func suggestions(for date: Date) -> [MealSuggestion] {
+        let dayStart = DateHelper.stripTime(from: date)
+        return allSuggestions.filter { DateHelper.stripTime(from: $0.date) == dayStart }
+    }
+
+    // MARK: - Recipe Selection Logic
+
+    /// Decides whether to assign directly or create a suggestion based on
+    /// whether a Head Cook is set and who the current user is.
+    private func handleRecipeSelection(_ recipe: Recipe, for slot: MealSlotSelection) {
+        if approvalFlowActive && !isCurrentUserHeadCook {
+            // Non-Head-Cook user: create a suggestion for the Head Cook to review
+            createSuggestion(recipe, for: slot)
+        } else {
+            // No Head Cook set, or current user IS the Head Cook: assign directly
+            assignRecipe(recipe, to: slot.date, for: slot.mealType)
+        }
+    }
+
     /// Assign a recipe to a specific day and meal type.
     /// If a slot already has a recipe, it gets replaced.
     private func assignRecipe(_ recipe: Recipe, to date: Date, for mealType: MealType) {
@@ -192,6 +248,30 @@ struct MealPlanView: View {
         }
     }
 
+    /// Create a suggestion instead of directly assigning.
+    private func createSuggestion(_ recipe: Recipe, for slot: MealSlotSelection) {
+        let dayStart = DateHelper.stripTime(from: slot.date)
+        let suggestion = MealSuggestion(
+            date: dayStart,
+            mealType: slot.mealType,
+            suggestedBy: currentUserName,
+            recipe: recipe
+        )
+        modelContext.insert(suggestion)
+    }
+
+    /// Head Cook approves a suggestion: promotes it to a MealPlan entry.
+    private func approveSuggestion(_ suggestion: MealSuggestion) {
+        guard let recipe = suggestion.recipe else { return }
+        assignRecipe(recipe, to: suggestion.date, for: suggestion.mealType)
+        modelContext.delete(suggestion)
+    }
+
+    /// Head Cook rejects a suggestion: removes it.
+    private func rejectSuggestion(_ suggestion: MealSuggestion) {
+        modelContext.delete(suggestion)
+    }
+
     /// Remove the recipe from a meal slot
     private func clearMealSlot(date: Date, mealType: MealType) {
         let dayStart = DateHelper.stripTime(from: date)
@@ -205,5 +285,5 @@ struct MealPlanView: View {
 
 #Preview {
     MealPlanView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, MealSuggestion.self, HouseholdMember.self], inMemory: true)
 }

@@ -37,7 +37,7 @@ struct Family_Meal_PlannerApp: App {
 /// Shared model container — tries CloudKit first, falls back to local-only
 /// storage if CloudKit isn't available (e.g. Simulator, no iCloud account).
 private let sharedModelContainer: ModelContainer = {
-    let schema = Schema([Recipe.self, Ingredient.self, MealPlan.self, GroceryItem.self, RecipeRating.self])
+    let schema = Schema([Recipe.self, Ingredient.self, MealPlan.self, GroceryItem.self, RecipeRating.self, HouseholdMember.self, MealSuggestion.self])
 
     // Try CloudKit-enabled configuration first
     do {

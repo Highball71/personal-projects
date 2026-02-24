@@ -44,6 +44,12 @@ final class Recipe {
     @Relationship(deleteRule: .cascade)
     var ratings: [RecipeRating]?
 
+    // Pending meal suggestions from household members. Cascade deletes
+    // suggestions when recipe is deleted.
+    // Inverse is declared on MealSuggestion.recipe.
+    @Relationship(deleteRule: .cascade)
+    var suggestions: [MealSuggestion]?
+
     /// Non-optional accessor — returns the ingredients array or empty if nil.
     /// Use this throughout the app so we don't need nil checks everywhere.
     var ingredientsList: [Ingredient] {
