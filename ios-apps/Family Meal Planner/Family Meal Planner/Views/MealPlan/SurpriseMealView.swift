@@ -245,7 +245,7 @@ struct SurpriseMealView: View {
     /// Picks a random recipe from currentPool using rating-weighted selection.
     /// - Recipes rated 4+ average get 3x weight (family favorites)
     /// - Recipes rated 2.5–3.9 or unrated get 1x weight (neutral)
-    /// - Recipes rated below 2.5 are excluded (disliked)
+    /// - Recipes rated 2 or below by ANY member are excluded
     private func pickRandomRecipe() {
         guard !allRecipes.isEmpty else {
             suggestedRecipe = nil
@@ -255,10 +255,14 @@ struct SurpriseMealView: View {
 
         // Build a weighted pool: exclude low-rated, boost high-rated
         let weightedPool = currentPool.flatMap { recipe -> [Recipe] in
+            // Exclude if anyone rated it 2 or below
+            let hasLowRating = recipe.ratingsList.contains { $0.rating <= 2 }
+            if hasLowRating {
+                return []              // excluded — someone dislikes it
+            }
+
             let avg = recipe.averageRating
-            if let avg, avg < 2.5 {
-                return []              // excluded — disliked
-            } else if let avg, avg >= 4.0 {
+            if let avg, avg >= 4.0 {
                 return [recipe, recipe, recipe]  // 3x weight — family favorite
             } else {
                 return [recipe]        // 1x weight — neutral or unrated

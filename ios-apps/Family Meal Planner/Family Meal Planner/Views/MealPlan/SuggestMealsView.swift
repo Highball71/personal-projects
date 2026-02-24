@@ -273,12 +273,32 @@ struct SuggestMealsView: View {
             pool = matching
         }
 
-        var selected = pool.shuffled()
+        // Apply rating-based weighting:
+        // - Exclude recipes rated 2 or below by anyone
+        // - Give 3x weight to recipes rated 4+ average (family favorites)
+        let weightedPool = pool.flatMap { recipe -> [Recipe] in
+            let hasLowRating = recipe.ratingsList.contains { $0.rating <= 2 }
+            if hasLowRating { return [] }
 
-        if selected.count >= 7 {
-            // Plenty of matches — just take 7
-            selected = Array(selected.prefix(7))
-        } else {
+            if let avg = recipe.averageRating, avg >= 4.0 {
+                return [recipe, recipe, recipe]
+            }
+            return [recipe]
+        }
+
+        // Fall back to unweighted pool if all recipes got excluded
+        let effectivePool = weightedPool.isEmpty ? pool : weightedPool
+
+        // Shuffle and deduplicate (weighted entries may repeat)
+        var selected: [Recipe] = []
+        for recipe in effectivePool.shuffled() {
+            if !selected.contains(where: { $0.persistentModelID == recipe.persistentModelID }) {
+                selected.append(recipe)
+            }
+            if selected.count >= 7 { break }
+        }
+
+        if selected.count < 7 {
             // Not enough matches — fill remaining slots from all recipes
             let usedIDs = Set(selected.map { $0.persistentModelID })
             let extras = allRecipes

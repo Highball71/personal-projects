@@ -13,13 +13,14 @@ import SwiftData
 struct RecipeDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \HouseholdMember.name) private var members: [HouseholdMember]
 
     let recipe: Recipe
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
 
-    // Remembers the user's name so they don't re-enter it each time
-    @AppStorage("raterName") private var raterName: String = ""
+    // Device-local identity — matches the "You are" picker in Settings
+    @AppStorage("currentUserName") private var currentUserName: String = ""
 
     var body: some View {
         List {
@@ -62,15 +63,30 @@ struct RecipeDetailView: View {
 
             // MARK: - Ratings
             Section("Ratings") {
-                // Your Rating — name field + tappable stars
-                HStack {
-                    TextField("Your name", text: $raterName)
-                        .textContentType(.name)
-                        .frame(maxWidth: 120)
-                    Spacer()
-                    StarRatingView(rating: currentUserRating) { newRating in
-                        setRating(newRating)
+                if members.isEmpty {
+                    // Solo mode — no household members, just show stars
+                    HStack {
+                        Text("Your Rating")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        StarRatingView(rating: currentUserRating) { newRating in
+                            setRating(newRating)
+                        }
                     }
+                } else if !currentUserName.isEmpty {
+                    // Household mode with identity set — show "Your Rating" with name
+                    HStack {
+                        Text(currentUserName)
+                        Spacer()
+                        StarRatingView(rating: currentUserRating) { newRating in
+                            setRating(newRating)
+                        }
+                    }
+                } else {
+                    // Household exists but no identity set
+                    Text("Set \"You are\" in Settings to rate recipes")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 // Household average
@@ -87,7 +103,14 @@ struct RecipeDetailView: View {
                 }
 
                 // Individual ratings from other household members
-                ForEach(recipe.ratingsList.sorted(by: { $0.raterName < $1.raterName })) { rating in
+                // Hides: the current user's own rating, and the _solo placeholder
+                let otherRatings = recipe.ratingsList
+                    .filter {
+                        $0.raterName != "_solo"
+                        && $0.raterName.lowercased() != effectiveRaterName.lowercased()
+                    }
+                    .sorted { $0.raterName < $1.raterName }
+                ForEach(otherRatings) { rating in
                     HStack {
                         Text(rating.raterName)
                         Spacer()
@@ -165,27 +188,38 @@ struct RecipeDetailView: View {
         }
     }
 
+    /// The name used for storing ratings — uses the device identity if set,
+    /// or a fixed solo label when no household members exist.
+    private var effectiveRaterName: String {
+        if !currentUserName.isEmpty {
+            return currentUserName
+        }
+        // Solo mode: no household, use a fixed key so it persists
+        return members.isEmpty ? "_solo" : ""
+    }
+
     /// The current user's rating for this recipe, or 0 if they haven't rated yet.
     private var currentUserRating: Int {
-        guard !raterName.isEmpty else { return 0 }
+        guard !effectiveRaterName.isEmpty else { return 0 }
         return recipe.ratingsList
-            .first { $0.raterName.lowercased() == raterName.lowercased() }?
+            .first { $0.raterName.lowercased() == effectiveRaterName.lowercased() }?
             .rating ?? 0
     }
 
     /// Creates or updates the current user's rating for this recipe.
     private func setRating(_ newRating: Int) {
-        guard !raterName.isEmpty else { return }
+        let name = effectiveRaterName
+        guard !name.isEmpty else { return }
 
         // Look for an existing rating from this person
         if let existing = recipe.ratingsList.first(where: {
-            $0.raterName.lowercased() == raterName.lowercased()
+            $0.raterName.lowercased() == name.lowercased()
         }) {
             existing.rating = newRating
             existing.dateRated = Date()
         } else {
             let newRatingObj = RecipeRating(
-                raterName: raterName,
+                raterName: name,
                 rating: newRating,
                 recipe: recipe
             )
