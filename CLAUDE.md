@@ -33,6 +33,12 @@ M4 iMac is the development hub. iPhone/iPad used for planning.
 - Tralfaz/HQ — planned, personal dashboard rebuild
 - Hello World — complete
 
+## Dev Environment
+- SSH key (Ed25519) at `~/.ssh/id_ed25519`, added to GitHub, persists via macOS Keychain
+- Git: David Albert <david@highball71.com>
+- GitHub CLI (`gh`) installed via Homebrew, authenticated as Highball71
+- Repo remote uses SSH: `git@github.com:Highball71/personal-projects.git`
+
 ## How I Work
 - Plan features on iPhone/iPad using Apple Notes
 - Execute on M4 iMac using Claude Code + Xcode
