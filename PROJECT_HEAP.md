@@ -54,10 +54,11 @@ Status tracker for all personal iOS projects. Updated 2026-02-22.
 - Build 2 uploaded to TestFlight (voice overhaul + Siri shortcut)
 - Bundle ID: `com.highball71.MileageTracker`
 
-## Tralfaz/HQ #planned
-**Home automation / personal dashboard**
-- Third in rebuild queue
-- Details TBD
+## Tralfaz/HQ #active
+**Personal command center / dashboard**
+- Web-based prototype lives in `tools/crm/` (single-page `index.html`)
+- PWA-ready (apple-mobile-web-app-capable, touch icon)
+- Third in iOS rebuild queue
 
 ## WordScene #complete
 **Vocabulary learning app with spaced repetition**
