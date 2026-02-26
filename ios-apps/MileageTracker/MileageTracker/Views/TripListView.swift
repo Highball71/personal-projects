@@ -76,7 +76,7 @@ struct TripListView: View {
                 TripDetailView(trip: trip)
             }
             .fullScreenCover(isPresented: $showingVoiceFlow) {
-                VoiceTripFlowView()
+                VoiceTripFlowView(mode: .startTrip)
             }
         }
     }

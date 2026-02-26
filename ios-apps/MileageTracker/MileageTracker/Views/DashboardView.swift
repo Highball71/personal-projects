@@ -3,13 +3,22 @@ import SwiftData
 
 /// The main screen — shows tax savings at a glance and a big "Start Trip" button.
 /// Designed to be glanceable while driving (large text, high contrast).
+///
+/// Supports two Siri flows:
+/// - "Start a trip" → launches Start Trip voice flow
+/// - "End trip" → finds most recent in-progress trip and launches End Trip voice flow
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Trip.date, order: .reverse) private var trips: [Trip]
     @Query private var settings: [YearlySettings]
 
     @State private var showingVoiceFlow = false
+    @State private var showingEndTripFlow = false
+    @State private var tripToEnd: Trip?
+    @State private var showNoTripAlert = false
+
     @AppStorage("launchIntoVoiceFlow") private var launchIntoVoiceFlow = false
+    @AppStorage("launchIntoEndTripFlow") private var launchIntoEndTripFlow = false
 
     private var currentSettings: YearlySettings? {
         let year = Calendar.current.component(.year, from: Date())
@@ -38,6 +47,11 @@ struct DashboardView: View {
 
     private var todayTrips: [Trip] {
         yearTrips.filter { Calendar.current.isDateInToday($0.date) }
+    }
+
+    /// In-progress trips, most recent first (already sorted by query).
+    private var incompleteTrips: [Trip] {
+        trips.filter { !$0.isComplete }
     }
 
     var body: some View {
@@ -117,23 +131,39 @@ struct DashboardView: View {
                         )
                     }
 
-                    // Incomplete trips (started but not finished)
-                    let incomplete = trips.filter { !$0.isComplete }
-                    if !incomplete.isEmpty {
+                    // In-progress trips with "End Trip" buttons
+                    if !incompleteTrips.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("In Progress")
                                 .font(.headline)
-                            ForEach(incomplete) { trip in
-                                HStack {
-                                    Image(systemName: "exclamationmark.circle.fill")
-                                        .foregroundStyle(.orange)
-                                    Text("\(trip.startLocationName) → ?")
-                                    Spacer()
-                                    Text(trip.date.formatted(date: .omitted, time: .shortened))
-                                        .foregroundStyle(.secondary)
+                            ForEach(incompleteTrips) { trip in
+                                Button {
+                                    tripToEnd = trip
+                                    showingEndTripFlow = true
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "flag.checkered")
+                                            .foregroundStyle(.orange)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("\(trip.startLocationName) → ?")
+                                                .font(.subheadline.bold())
+                                                .foregroundStyle(.primary)
+                                            Text(trip.date.formatted(date: .omitted, time: .shortened))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Text("End Trip")
+                                            .font(.subheadline.bold())
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(.orange.gradient, in: Capsule())
+                                    }
+                                    .padding(12)
+                                    .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                                 }
-                                .padding(12)
-                                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -142,22 +172,63 @@ struct DashboardView: View {
             }
             .navigationTitle("MileageTracker")
             .fullScreenCover(isPresented: $showingVoiceFlow) {
-                VoiceTripFlowView()
+                VoiceTripFlowView(mode: .startTrip)
             }
-            .onAppear {
-                if launchIntoVoiceFlow {
-                    launchIntoVoiceFlow = false
-                    showingVoiceFlow = true
+            .fullScreenCover(isPresented: $showingEndTripFlow) {
+                if let trip = tripToEnd {
+                    VoiceTripFlowView(mode: .endTrip(trip))
                 }
             }
+            .alert("No Trip in Progress", isPresented: $showNoTripAlert) {
+                Button("Start a Trip") {
+                    showingVoiceFlow = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You don't have any trips in progress. Would you like to start one?")
+            }
+            .onAppear {
+                handleSiriFlags()
+            }
             .onChange(of: launchIntoVoiceFlow) { _, shouldLaunch in
-                // Catches the flag being set while the dashboard is already visible
-                // (app was backgrounded, Siri sets the flag, app foregrounds)
                 if shouldLaunch {
                     launchIntoVoiceFlow = false
                     showingVoiceFlow = true
                 }
             }
+            .onChange(of: launchIntoEndTripFlow) { _, shouldLaunch in
+                if shouldLaunch {
+                    launchIntoEndTripFlow = false
+                    launchEndTripFromSiri()
+                }
+            }
+        }
+    }
+
+    // MARK: - Siri Handling
+
+    /// Check both Siri flags on appear (handles cold launch).
+    private func handleSiriFlags() {
+        if launchIntoVoiceFlow {
+            launchIntoVoiceFlow = false
+            showingVoiceFlow = true
+        }
+        if launchIntoEndTripFlow {
+            launchIntoEndTripFlow = false
+            launchEndTripFromSiri()
+        }
+    }
+
+    /// Launch the End Trip flow from a Siri command.
+    /// - If 1 in-progress trip: end it directly
+    /// - If multiple: pick the most recent (query is already sorted by date desc)
+    /// - If none: show alert offering to start one
+    private func launchEndTripFromSiri() {
+        if let mostRecent = incompleteTrips.first {
+            tripToEnd = mostRecent
+            showingEndTripFlow = true
+        } else {
+            showNoTripAlert = true
         }
     }
 }

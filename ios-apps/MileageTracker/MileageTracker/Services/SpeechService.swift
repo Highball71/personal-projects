@@ -37,8 +37,8 @@ class SpeechService: NSObject {
     // MARK: - Configuration
 
     /// How long to wait after the last partial result before auto-stopping.
-    /// Default is 4 seconds — generous enough for pauses between digits.
-    var silenceTimeout: TimeInterval = 4.0
+    /// Default is 5 seconds — generous enough for pauses between digits.
+    var silenceTimeout: TimeInterval = 5.0
 
     /// Minimum character count required before the silence timer is allowed to stop.
     /// If the recognized text is shorter than this, keep listening even past the timeout.
@@ -63,7 +63,43 @@ class SpeechService: NSObject {
     /// Location names to provide as contextual strings for better recognition.
     var contextualStrings: [String] = []
 
+    /// Premium Siri voice with graceful fallback chain:
+    /// 1. Zoe premium (en-US)
+    /// 2. Any premium quality en-US voice
+    /// 3. Any enhanced quality en-US voice
+    /// 4. Default en-US voice
+    ///
+    /// Resolved once at init time and cached for the lifetime of the service.
+    private let premiumVoice: AVSpeechSynthesisVoice?
+
+    /// Build a consistent utterance with the premium voice and standard settings.
+    private func makeUtterance(_ text: String) -> AVSpeechUtterance {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
+        utterance.volume = 1.0
+        utterance.voice = premiumVoice
+        return utterance
+    }
+
     override init() {
+        // Resolve premium voice before calling super.init()
+        if let zoe = AVSpeechSynthesisVoice(identifier: "com.apple.voice.premium.en-US.Zoe") {
+            premiumVoice = zoe
+        } else {
+            let allVoices = AVSpeechSynthesisVoice.speechVoices()
+            if let premium = allVoices.first(where: {
+                $0.language.hasPrefix("en-US") && $0.quality == .premium
+            }) {
+                premiumVoice = premium
+            } else if let enhanced = allVoices.first(where: {
+                $0.language.hasPrefix("en-US") && $0.quality == .enhanced
+            }) {
+                premiumVoice = enhanced
+            } else {
+                premiumVoice = AVSpeechSynthesisVoice(language: "en-US")
+            }
+        }
+
         super.init()
         isAvailable = speechRecognizer?.isAvailable ?? false
         synthesizer.delegate = self
@@ -83,13 +119,9 @@ class SpeechService: NSObject {
             synthesizer.stopSpeaking(at: .immediate)
         }
 
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
-        utterance.volume = 1.0
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
         isSpeaking = true
         speechCompletionHandler = nil
-        synthesizer.speak(utterance)
+        synthesizer.speak(makeUtterance(text))
     }
 
     /// Speak text and call completion when done speaking.
@@ -106,10 +138,6 @@ class SpeechService: NSObject {
             synthesizer.stopSpeaking(at: .immediate)
         }
 
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
-        utterance.volume = 1.0
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
         isSpeaking = true
         // Wrap the completion with a small delay so speaker audio dissipates
         speechCompletionHandler = {
@@ -117,7 +145,7 @@ class SpeechService: NSObject {
                 completion()
             }
         }
-        synthesizer.speak(utterance)
+        synthesizer.speak(makeUtterance(text))
     }
 
     func stopSpeaking() {

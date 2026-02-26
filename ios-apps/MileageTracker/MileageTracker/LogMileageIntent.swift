@@ -1,8 +1,8 @@
 import AppIntents
 import SwiftUI
 
-/// App Intent for "Hey Siri, log mileage in Clean Mile" — opens the app
-/// directly into the voice-first trip logging flow.
+/// App Intent for "Hey Siri, start a trip in Clean Mile" — opens the app
+/// directly into the voice-first Start Trip flow.
 ///
 /// Uses the iOS 17+ App Intents framework with AppShortcutsProvider so the
 /// phrases are registered automatically — no manual Shortcuts setup needed.
@@ -20,6 +20,23 @@ struct LogMileageIntent: AppIntent {
         // Set a UserDefaults flag that DashboardView checks on appear.
         // Works for both cold launch and backgrounded-app scenarios.
         UserDefaults.standard.set(true, forKey: "launchIntoVoiceFlow")
+        return .result()
+    }
+}
+
+/// App Intent for "Hey Siri, end trip in Clean Mile" — opens the app
+/// directly into the End Trip flow for the most recent in-progress trip.
+struct EndTripIntent: AppIntent {
+    static var title: LocalizedStringResource = "End Trip"
+    static var description: IntentDescription = IntentDescription(
+        "End an in-progress trip with voice-guided destination, odometer, and purpose logging.",
+        categoryName: "Tracking"
+    )
+
+    static var openAppWhenRun: Bool = true
+
+    func perform() async throws -> some IntentResult {
+        UserDefaults.standard.set(true, forKey: "launchIntoEndTripFlow")
         return .result()
     }
 }
@@ -42,6 +59,19 @@ struct MileageTrackerShortcuts: AppShortcutsProvider {
             shortTitle: "Log Mileage",
             systemImageName: "car.fill"
         )
+
+        AppShortcut(
+            intent: EndTripIntent(),
+            phrases: [
+                "End trip in \(.applicationName)",
+                "Finish trip in \(.applicationName)",
+                "End my trip in \(.applicationName)",
+                "Complete trip in \(.applicationName)",
+                "Stop trip in \(.applicationName)",
+                "Finish my trip in \(.applicationName)",
+            ],
+            shortTitle: "End Trip",
+            systemImageName: "flag.checkered"
+        )
     }
 }
-

@@ -9,14 +9,18 @@ IRS-compliant mileage tracker for healthcare home office.
 
 ## Key Features
 - Voice-first trip logging: app speaks questions, user responds verbally (TTS + SFSpeechRecognizer)
-- 5-step conversational flow: Where are you? → Odometer? → Destination? → Purpose? → Confirm
+- Two-phase trip flow mirroring actual driving:
+  - **Start Trip** (2 questions + auto-confirm): Where are you starting from? → Odometer? → saves in-progress trip
+  - **End Trip** (3 questions + voice confirm): Where did you end up? → Ending odometer? → Purpose? → Confirm
+- Premium Siri voice TTS with fallback chain (Zoe premium → any premium → enhanced → default)
+- Smart odometer parsing: handles spoken digits, English number words, and digit-by-digit dictation (OdometerParser)
 - Fully hands-free: auto-advances, spoken readback, voice yes/no confirmation
-- Siri shortcut: "Hey Siri, log mileage" launches directly into voice flow (App Intents)
+- Siri shortcuts: "Hey Siri, start a trip" and "Hey Siri, end trip" (App Intents)
 - Trip categories: Patient Care, Administrative, Supply Run, Continuing Education, Other
 - Saved locations with voice shortcuts and smart frequency learning
 - GPS arrival detection for ending odometer prompts (CoreLocation geofencing)
 - Quarterly + annual IRS-compliant PDF reports
-- Dashboard with running tax savings estimate (2026 IRS rate: $0.725/mile)
+- Dashboard with running tax savings estimate, in-progress trips with "End Trip" buttons (2026 IRS rate: $0.725/mile)
 
 ## Dev Environment
 - SSH key (Ed25519) at `~/.ssh/id_ed25519`, added to GitHub, persists via macOS Keychain

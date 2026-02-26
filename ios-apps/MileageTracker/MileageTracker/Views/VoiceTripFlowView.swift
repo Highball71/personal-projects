@@ -2,14 +2,32 @@ import SwiftUI
 import SwiftData
 import Speech
 
-/// The voice-first conversational trip logging flow.
-/// Steps through: Start Location → Start Odometer → Destination → Purpose → Confirm.
+/// Determines which phase of the trip the voice flow handles.
+enum TripFlowMode {
+    /// Start a new trip: asks location + odometer, then auto-confirms.
+    case startTrip
+    /// End an existing in-progress trip: asks destination + odometer + purpose, then confirms.
+    case endTrip(Trip)
+}
+
+/// The voice-first conversational trip logging flow, split into two phases:
+///
+/// **Start Trip** (2 questions + auto-confirm):
+/// 1. "Where are you starting from?" → location match
+/// 2. "What's your odometer reading?" → OdometerParser
+/// 3. Auto-confirm: speaks summary, saves in-progress trip, dismisses
+///
+/// **End Trip** (3 questions + voice confirm):
+/// 1. "Where did you end up?" → location match
+/// 2. "What's your ending odometer?" → OdometerParser, validates > start odometer
+/// 3. "What was the purpose of this trip?" → category match
+/// 4. Confirm: summary + yes/no voice confirmation
 ///
 /// Fully hands-free: the app speaks each question aloud, listens for the verbal
 /// response, reads it back for confirmation, and auto-advances to the next step.
-/// The screen shows a glanceable display of the current step and recognized text
-/// but never requires a touch.
 struct VoiceTripFlowView: View {
+    let mode: TripFlowMode
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SavedLocation.usageCount, order: .reverse) private var locations: [SavedLocation]
@@ -23,6 +41,7 @@ struct VoiceTripFlowView: View {
     @State private var startLocationName = ""
     @State private var endLocationName = ""
     @State private var startOdometer = ""
+    @State private var endOdometer = ""
     @State private var businessPurpose = ""
     @State private var category: TripCategory = .patientCare
     @State private var isBusiness = true
@@ -40,21 +59,26 @@ struct VoiceTripFlowView: View {
     private let maxRetries = 3
 
     // Guards against stale recognition callbacks from a previous step.
-    // Incremented every time the step changes; callbacks that captured
-    // an old generation are ignored.
     @State private var stepGeneration = 0
 
-    // Set to true once handleRecognitionResult processes a valid result
-    // for the current step. Prevents a second callback (e.g. from the
-    // recognition task firing after the silence timer) from triggering retry.
+    // Prevents double-fire from silence timer + recognition task
     @State private var resultAccepted = false
 
-    enum FlowStep: CaseIterable {
+    enum FlowStep {
+        // Start Trip steps
         case startLocation
         case startOdometer
-        case destination
-        case purpose
-        case confirm
+        case startConfirm
+        // End Trip steps
+        case endDestination
+        case endOdometer
+        case endPurpose
+        case endConfirm
+    }
+
+    init(mode: TripFlowMode = .startTrip) {
+        self.mode = mode
+        // Set initial step based on mode — @State defaults are overridden in onAppear
     }
 
     var body: some View {
@@ -76,7 +100,7 @@ struct VoiceTripFlowView: View {
                         .font(.subheadline.bold())
                         .foregroundStyle(.white.opacity(0.7))
                     Spacer()
-                    Text("\(stepNumber)/5")
+                    Text("\(stepNumber)/\(totalSteps)")
                         .font(.subheadline.bold())
                         .foregroundStyle(.white.opacity(0.7))
                 }
@@ -92,8 +116,10 @@ struct VoiceTripFlowView: View {
                     .padding(.horizontal, 20)
 
                 // Current answer display
-                if step == .confirm {
-                    confirmationView
+                if step == .endConfirm {
+                    endConfirmationView
+                } else if step == .startConfirm {
+                    startConfirmationView
                 } else {
                     Text(displayText)
                         .font(.system(size: 48, weight: .bold, design: .rounded))
@@ -137,15 +163,35 @@ struct VoiceTripFlowView: View {
                 Spacer()
 
                 // Quick-pick buttons — still available as a fallback
-                if step == .startLocation || step == .destination {
+                if step == .startLocation || step == .endDestination {
                     locationButtons
-                } else if step == .purpose {
+                } else if step == .endPurpose {
                     purposeButtons
                 }
 
                 // Minimal action area — voice mic toggle only (for manual override)
                 HStack(spacing: 16) {
-                    if step != .confirm {
+                    if step == .startConfirm {
+                        // Start Trip auto-confirm — just a manual save button as backup
+                        Button { saveStartTrip() } label: {
+                            Text("Save & Go")
+                                .font(.title2.bold())
+                                .foregroundStyle(stepColor)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        }
+                    } else if step == .endConfirm {
+                        // End Trip confirm: save or redo buttons
+                        Button { saveEndTrip() } label: {
+                            Text("Save Trip")
+                                .font(.title2.bold())
+                                .foregroundStyle(stepColor)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        }
+                    } else {
                         Button {
                             toggleVoiceInput()
                         } label: {
@@ -167,38 +213,27 @@ struct VoiceTripFlowView: View {
                                     .background(.white, in: RoundedRectangle(cornerRadius: 16))
                             }
                         }
-                    } else {
-                        // Confirm step: save or redo buttons
-                        Button { saveTrip() } label: {
-                            Text("Save Trip")
-                                .font(.title2.bold())
-                                .foregroundStyle(stepColor)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(.white, in: RoundedRectangle(cornerRadius: 16))
-                        }
                     }
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 8)
 
                 // Manual text input — still available as fallback
-                if step != .confirm {
+                if step != .startConfirm && step != .endConfirm {
                     TextField("Or type here...", text: currentAnswerBinding)
                         .textFieldStyle(.roundedBorder)
                         .padding(.horizontal)
                         .padding(.bottom)
-                        .keyboardType(step == .startOdometer ? .decimalPad : .default)
+                        .keyboardType(isOdometerStep ? .decimalPad : .default)
                         .onSubmit {
                             if !currentAnswer.isEmpty {
-                                // Clear all voice/retry state before advancing
                                 speech.stopListening()
                                 speech.stopSpeaking()
                                 isListeningForVoice = false
                                 retryCount = 0
                                 showManualFallback = false
                                 showRetryMessage = false
-                                resultAccepted = true  // block any pending callbacks
+                                resultAccepted = true
                                 advanceStep()
                             }
                         }
@@ -207,6 +242,17 @@ struct VoiceTripFlowView: View {
             .padding()
         }
         .onAppear {
+            // Set initial step based on mode
+            switch mode {
+            case .startTrip:
+                step = .startLocation
+            case .endTrip(let trip):
+                step = .endDestination
+                // Pre-fill start data from the existing trip
+                startLocationName = trip.startLocationName
+                startOdometer = trip.startOdometer > 0 ? String(Int(trip.startOdometer)) : ""
+                matchedStartLocation = trip.startLocation
+            }
             configureSpeechService()
             speech.activateAudioSession()
             beginStep()
@@ -227,14 +273,24 @@ struct VoiceTripFlowView: View {
         }
     }
 
+    // MARK: - Computed Helpers
+
+    private var isOdometerStep: Bool {
+        step == .startOdometer || step == .endOdometer
+    }
+
+    private var totalSteps: Int {
+        switch mode {
+        case .startTrip: return 2
+        case .endTrip: return 3
+        }
+    }
+
     // MARK: - Display
 
-    /// What to show in the big text area — live partial results while listening,
-    /// or the captured answer once done.
     private var displayText: String {
         if isListeningForVoice && !speech.recognizedText.isEmpty {
-            // Show live partial results while listening
-            if step == .startOdometer {
+            if isOdometerStep {
                 return speech.recognizedText.filter { $0.isNumber || $0 == "." }
             }
             return speech.recognizedText
@@ -248,9 +304,11 @@ struct VoiceTripFlowView: View {
         switch step {
         case .startLocation: return .blue
         case .startOdometer: return .indigo
-        case .destination: return .teal
-        case .purpose: return .orange
-        case .confirm: return .green
+        case .startConfirm: return .green
+        case .endDestination: return .teal
+        case .endOdometer: return .indigo
+        case .endPurpose: return .orange
+        case .endConfirm: return .green
         }
     }
 
@@ -258,9 +316,11 @@ struct VoiceTripFlowView: View {
         switch step {
         case .startLocation: return "START LOCATION"
         case .startOdometer: return "ODOMETER"
-        case .destination: return "DESTINATION"
-        case .purpose: return "PURPOSE"
-        case .confirm: return "CONFIRM"
+        case .startConfirm: return "CONFIRM"
+        case .endDestination: return "DESTINATION"
+        case .endOdometer: return "ODOMETER"
+        case .endPurpose: return "PURPOSE"
+        case .endConfirm: return "CONFIRM"
         }
     }
 
@@ -268,19 +328,23 @@ struct VoiceTripFlowView: View {
         switch step {
         case .startLocation: return 1
         case .startOdometer: return 2
-        case .destination: return 3
-        case .purpose: return 4
-        case .confirm: return 5
+        case .startConfirm: return 2 // auto-confirm doesn't count as a user step
+        case .endDestination: return 1
+        case .endOdometer: return 2
+        case .endPurpose: return 3
+        case .endConfirm: return 3 // confirm doesn't count as a user step
         }
     }
 
     private var questionText: String {
         switch step {
-        case .startLocation: return "Where are you?"
+        case .startLocation: return "Where are you starting from?"
         case .startOdometer: return "What's your odometer reading?"
-        case .destination: return "Where are you heading?"
-        case .purpose: return "What's the purpose of this trip?"
-        case .confirm: return "Does this look right?"
+        case .startConfirm: return "You're all set!"
+        case .endDestination: return "Where did you end up?"
+        case .endOdometer: return "What's your ending odometer?"
+        case .endPurpose: return "What was the purpose of this trip?"
+        case .endConfirm: return "Does this look right?"
         }
     }
 
@@ -288,9 +352,11 @@ struct VoiceTripFlowView: View {
         switch step {
         case .startLocation: return startLocationName
         case .startOdometer: return startOdometer
-        case .destination: return endLocationName
-        case .purpose: return businessPurpose
-        case .confirm: return ""
+        case .startConfirm: return ""
+        case .endDestination: return endLocationName
+        case .endOdometer: return endOdometer
+        case .endPurpose: return businessPurpose
+        case .endConfirm: return ""
         }
     }
 
@@ -298,9 +364,11 @@ struct VoiceTripFlowView: View {
         switch step {
         case .startLocation: return $startLocationName
         case .startOdometer: return $startOdometer
-        case .destination: return $endLocationName
-        case .purpose: return $businessPurpose
-        case .confirm: return .constant("")
+        case .startConfirm: return .constant("")
+        case .endDestination: return $endLocationName
+        case .endOdometer: return $endOdometer
+        case .endPurpose: return $businessPurpose
+        case .endConfirm: return .constant("")
         }
     }
 
@@ -312,7 +380,6 @@ struct VoiceTripFlowView: View {
                 ForEach(locations.prefix(6)) { location in
                     Button {
                         selectLocation(location)
-                        // Auto-advance after quick-pick
                         speakAndAdvance(location.voiceName)
                     } label: {
                         Text(location.voiceName)
@@ -350,17 +417,35 @@ struct VoiceTripFlowView: View {
         }
     }
 
-    private var confirmationView: some View {
+    private var startConfirmationView: some View {
         VStack(alignment: .leading, spacing: 12) {
             confirmRow("From", startLocationName)
             confirmRow("Odometer", formatOdometer(startOdometer))
+        }
+        .padding(20)
+        .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
+    }
+
+    private var endConfirmationView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            confirmRow("From", startLocationName)
             confirmRow("To", endLocationName)
+            confirmRow("Miles", computedMilesString)
             confirmRow("Purpose", businessPurpose)
             confirmRow("Category", category.rawValue)
         }
         .padding(20)
         .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal)
+    }
+
+    /// Computed miles for the end-trip confirmation display.
+    private var computedMilesString: String {
+        let start = Double(startOdometer) ?? 0
+        let end = Double(endOdometer) ?? 0
+        let miles = end - start
+        return miles > 0 ? String(format: "%.0f", miles) : "—"
     }
 
     private func confirmRow(_ label: String, _ value: String) -> some View {
@@ -379,22 +464,12 @@ struct VoiceTripFlowView: View {
     // MARK: - Speech Service Configuration
 
     private func configureSpeechService() {
-        // Feed location names as contextual strings to improve recognition accuracy
         speech.contextualStrings = locations.flatMap { loc in
             [loc.name, loc.shortName].filter { !$0.isEmpty }
         }
-        // Add purpose keywords
         speech.contextualStrings += TripCategory.allCases.map(\.rawValue)
-
-        // Callbacks are installed per-step via installStepCallbacks()
-        // so stale callbacks from a previous step are automatically ignored.
     }
 
-    /// Reinstall the onListeningStopped callback with the current step generation.
-    /// Called each time a new step begins so stale callbacks are ignored.
-    /// Also checks `resultAccepted` — if a valid result was already processed
-    /// for this step, ignore any further callbacks (prevents double-fire from
-    /// silence timer + recognition task both calling finishListening).
     private func installStepCallbacks() {
         let gen = stepGeneration
         speech.onListeningStopped = { [self] finalText in
@@ -409,54 +484,61 @@ struct VoiceTripFlowView: View {
 
     // MARK: - Flow Control
 
-    /// Begin a new step: speak the question, then start listening.
     private func beginStep() {
         guard !stepInitiated else { return }
         stepInitiated = true
         showRetryMessage = false
 
-        // Bump generation and install fresh callbacks so any lingering
-        // recognition results from the previous step are ignored.
         stepGeneration += 1
         installStepCallbacks()
 
-        if step == .confirm {
-            speakSummaryAndListen()
+        if step == .startConfirm {
+            // Auto-confirm for Start Trip: speak summary and save immediately
+            speakStartSummaryAndSave()
+        } else if step == .endConfirm {
+            speakEndSummaryAndListen()
         } else {
-            // Configure speech for this step
             configureForCurrentStep()
-
             speech.speak(questionText) {
                 startVoiceInput()
             }
         }
     }
 
-    /// Configure recognition parameters based on the current step.
     private func configureForCurrentStep() {
         switch step {
-        case .startOdometer:
-            // Odometer readings are 5-6 digits; don't stop until we have at least 4
+        case .startOdometer, .endOdometer:
             speech.minimumLength = 4
-            speech.silenceTimeout = 4.0
-        case .startLocation, .destination:
+            speech.silenceTimeout = 5.0
+        case .startLocation, .endDestination:
             speech.minimumLength = 0
             speech.silenceTimeout = 3.0
-        case .purpose:
+        case .endPurpose:
             speech.minimumLength = 0
             speech.silenceTimeout = 3.0
-        case .confirm:
+        case .startConfirm, .endConfirm:
             speech.minimumLength = 0
             speech.silenceTimeout = 3.0
         }
     }
 
-    /// Speak the full summary aloud and listen for yes/no confirmation.
-    private func speakSummaryAndListen() {
+    /// Start Trip auto-confirm: speak summary, save, dismiss.
+    private func speakStartSummaryAndSave() {
         let odo = formatOdometer(startOdometer)
-        let summary = "\(odo) miles on odometer, from \(startLocationName) to \(endLocationName), \(businessPurpose). Save this trip?"
+        let summary = "Starting from \(startLocationName), odometer \(odo). Drive safe!"
 
-        // For the confirm step, listen for yes/no keywords
+        speech.speak(summary) {
+            self.saveStartTrip()
+        }
+    }
+
+    /// End Trip confirm: speak summary and listen for yes/no.
+    private func speakEndSummaryAndListen() {
+        let start = Double(startOdometer) ?? 0
+        let end = Double(endOdometer) ?? 0
+        let miles = Int(end - start)
+        let summary = "\(startLocationName) to \(endLocationName), \(miles) miles, \(businessPurpose). Save this trip?"
+
         speech.minimumLength = 0
         speech.silenceTimeout = 5.0
 
@@ -477,7 +559,6 @@ struct VoiceTripFlowView: View {
 
     private func toggleVoiceInput() {
         if isListeningForVoice {
-            // Manual stop — capture what we have
             isListeningForVoice = false
             speech.stopListening()
             let text = speech.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -485,7 +566,6 @@ struct VoiceTripFlowView: View {
                 handleRecognitionResult(text)
             }
         } else {
-            // Reset retry state so the user gets fresh attempts
             retryCount = 0
             showManualFallback = false
             resultAccepted = false
@@ -496,8 +576,6 @@ struct VoiceTripFlowView: View {
 
     // MARK: - Recognition Handling
 
-    /// Process the recognized text for the current step.
-    /// Called when the silence timer fires or a keyword triggers.
     private func handleRecognitionResult(_ text: String) {
         isListeningForVoice = false
 
@@ -506,9 +584,6 @@ struct VoiceTripFlowView: View {
             return
         }
 
-        // Mark that we've accepted a valid result for this step.
-        // Any further callbacks (e.g. recognition task firing after
-        // the silence timer) will be ignored by installStepCallbacks guard.
         resultAccepted = true
 
         switch step {
@@ -522,19 +597,18 @@ struct VoiceTripFlowView: View {
             }
 
         case .startOdometer:
-            let digits = text.filter { $0.isNumber || $0 == "." }
-            guard digits.count >= 4 else {
-                // Not enough digits — tell the user and retry
+            guard let parsed = OdometerParser.parse(text) else {
+                resultAccepted = false
                 speech.speak("I heard \(text), but that seems too short for an odometer reading. Try again.") {
                     self.configureForCurrentStep()
                     self.startVoiceInput()
                 }
                 return
             }
-            startOdometer = digits
-            speakAndAdvance(formatOdometer(digits))
+            startOdometer = parsed
+            speakAndAdvance(formatOdometer(parsed))
 
-        case .destination:
+        case .endDestination:
             if let match = matchLocation(text) {
                 selectLocation(match)
                 speakAndAdvance(match.voiceName)
@@ -543,9 +617,32 @@ struct VoiceTripFlowView: View {
                 speakAndAdvance(text)
             }
 
-        case .purpose:
+        case .endOdometer:
+            guard let parsed = OdometerParser.parse(text) else {
+                resultAccepted = false
+                speech.speak("I heard \(text), but that seems too short for an odometer reading. Try again.") {
+                    self.configureForCurrentStep()
+                    self.startVoiceInput()
+                }
+                return
+            }
+            // Validate end odometer > start odometer
+            let startValue = Double(startOdometer) ?? 0
+            let endValue = Double(parsed) ?? 0
+            if endValue <= startValue {
+                resultAccepted = false
+                let startFormatted = formatOdometer(startOdometer)
+                speech.speak("Your ending odometer needs to be higher than \(startFormatted). Try again.") {
+                    self.configureForCurrentStep()
+                    self.startVoiceInput()
+                }
+                return
+            }
+            endOdometer = parsed
+            speakAndAdvance(formatOdometer(parsed))
+
+        case .endPurpose:
             businessPurpose = text
-            // Try to match a category from spoken text
             for cat in TripCategory.allCases {
                 if text.localizedCaseInsensitiveContains(cat.rawValue) {
                     category = cat
@@ -554,47 +651,45 @@ struct VoiceTripFlowView: View {
             }
             speakAndAdvance(businessPurpose)
 
-        case .confirm:
-            handleConfirmation(text)
+        case .startConfirm:
+            // Auto-confirm — shouldn't get recognition results here
+            break
+
+        case .endConfirm:
+            handleEndConfirmation(text)
         }
     }
 
-    /// Handle a detected keyword.
     private func handleKeyword(_ keyword: String) {
         switch keyword {
         case "done", "save":
-            if step == .confirm {
-                // "Save" on confirm step = save the trip
+            if step == .endConfirm {
                 isListeningForVoice = false
                 speech.stopListening()
-                saveTrip()
+                saveEndTrip()
             } else {
-                // "Done" on any other step = stop listening and process
                 isListeningForVoice = false
                 speech.stopListening()
                 let text = speech.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
-                // Remove the keyword from the end of the text
                 let cleaned = removeTrailingKeyword(text, keyword: keyword)
                 handleRecognitionResult(cleaned)
             }
         case "yes", "correct":
-            if step == .confirm {
+            if step == .endConfirm {
                 isListeningForVoice = false
                 speech.stopListening()
-                saveTrip()
+                saveEndTrip()
             }
         case "no", "cancel":
-            if step == .confirm {
+            if step == .endConfirm {
                 isListeningForVoice = false
                 speech.stopListening()
-                // Go back to step 1 so they can redo
                 speech.speak("OK, let's start over.") {
                     withAnimation {
-                        self.step = .startLocation
+                        self.step = .endDestination
                     }
-                    self.startLocationName = ""
                     self.endLocationName = ""
-                    self.startOdometer = ""
+                    self.endOdometer = ""
                     self.businessPurpose = ""
                 }
             }
@@ -603,36 +698,30 @@ struct VoiceTripFlowView: View {
         }
     }
 
-    /// Handle yes/no confirmation at the final step.
-    private func handleConfirmation(_ text: String) {
+    private func handleEndConfirmation(_ text: String) {
         let lowered = text.lowercased()
         if lowered.contains("yes") || lowered.contains("save") || lowered.contains("correct") {
-            saveTrip()
+            saveEndTrip()
         } else if lowered.contains("no") || lowered.contains("cancel") || lowered.contains("redo") {
             speech.speak("OK, let's start over.") {
                 withAnimation {
-                    self.step = .startLocation
+                    self.step = .endDestination
                 }
-                self.startLocationName = ""
                 self.endLocationName = ""
-                self.startOdometer = ""
+                self.endOdometer = ""
                 self.businessPurpose = ""
             }
         } else {
-            // Didn't understand — ask again
             speech.speak("Sorry, say yes to save or no to start over.") {
                 self.startVoiceInput(taskHint: .confirmation)
             }
         }
     }
 
-    /// If recognition came back empty or failed, say so and retry.
-    /// Caps at 3 retries per step, then falls back to manual input.
     private func retryCurrentStep() {
         retryCount += 1
 
         if retryCount >= maxRetries {
-            // Give up on voice — show manual input fallback
             showRetryMessage = false
             showManualFallback = true
             speech.speak("Let's try typing instead.")
@@ -647,11 +736,7 @@ struct VoiceTripFlowView: View {
         }
     }
 
-    /// Speak back the recognized answer, then advance to the next step.
-    /// Mic is always killed before TTS to prevent feedback loop.
     private func speakAndAdvance(_ recognizedValue: String) {
-        // Always stop listening before speaking — SpeechService.speak() also
-        // does this, but we track isListeningForVoice separately in the view.
         speech.stopListening()
         isListeningForVoice = false
 
@@ -666,12 +751,15 @@ struct VoiceTripFlowView: View {
     // MARK: - Helpers
 
     private func selectLocation(_ location: SavedLocation) {
-        if step == .startLocation {
+        switch step {
+        case .startLocation:
             startLocationName = location.name
             matchedStartLocation = location
-        } else {
+        case .endDestination:
             endLocationName = location.name
             matchedEndLocation = location
+        default:
+            break
         }
     }
 
@@ -692,15 +780,18 @@ struct VoiceTripFlowView: View {
 
     private var nextStep: FlowStep? {
         switch step {
+        // Start Trip flow
         case .startLocation: return .startOdometer
-        case .startOdometer: return .destination
-        case .destination: return .purpose
-        case .purpose: return .confirm
-        case .confirm: return nil
+        case .startOdometer: return .startConfirm
+        case .startConfirm: return nil
+        // End Trip flow
+        case .endDestination: return .endOdometer
+        case .endOdometer: return .endPurpose
+        case .endPurpose: return .endConfirm
+        case .endConfirm: return nil
         }
     }
 
-    /// Try to match spoken text to a saved location by name or shortName.
     private func matchLocation(_ text: String) -> SavedLocation? {
         let lowered = text.lowercased()
         return locations.first { location in
@@ -711,7 +802,6 @@ struct VoiceTripFlowView: View {
         }
     }
 
-    /// Format an odometer string with comma separators for readability.
     private func formatOdometer(_ value: String) -> String {
         if let number = Double(value) {
             let formatter = NumberFormatter()
@@ -722,8 +812,6 @@ struct VoiceTripFlowView: View {
         return value
     }
 
-    /// Remove a trailing keyword from recognized text.
-    /// e.g., "twelve thousand done" → "twelve thousand"
     private func removeTrailingKeyword(_ text: String, keyword: String) -> String {
         let lowered = text.lowercased()
         if lowered.hasSuffix(keyword) {
@@ -734,7 +822,11 @@ struct VoiceTripFlowView: View {
         return text
     }
 
-    private func saveTrip() {
+    // MARK: - Save Logic
+
+    /// Save a new in-progress trip (Start Trip flow).
+    /// Sets start location + odometer, leaves end fields empty, isComplete = false.
+    private func saveStartTrip() {
         if isListeningForVoice {
             speech.stopListening()
             isListeningForVoice = false
@@ -743,21 +835,37 @@ struct VoiceTripFlowView: View {
         let trip = Trip(
             startLocationName: startLocationName,
             startOdometer: Double(startOdometer) ?? 0,
-            endLocationName: endLocationName,
-            businessPurpose: businessPurpose,
-            category: category,
             isBusiness: isBusiness,
             isComplete: false
         )
         trip.startLocation = matchedStartLocation
-        trip.endLocation = matchedEndLocation
-
         matchedStartLocation?.recordUsage()
-        matchedEndLocation?.recordUsage()
 
         modelContext.insert(trip)
+        dismiss()
+    }
 
-        speech.speak("Trip saved. Drive safe!") {
+    /// Complete an existing in-progress trip (End Trip flow).
+    /// Fills in destination, end odometer, purpose, category, and marks complete.
+    private func saveEndTrip() {
+        if isListeningForVoice {
+            speech.stopListening()
+            isListeningForVoice = false
+        }
+
+        guard case .endTrip(let trip) = mode else { return }
+
+        trip.endLocationName = endLocationName
+        trip.endOdometer = Double(endOdometer) ?? 0
+        trip.businessPurpose = businessPurpose
+        trip.category = category
+        trip.isBusiness = isBusiness
+        trip.endLocation = matchedEndLocation
+        trip.isComplete = true
+
+        matchedEndLocation?.recordUsage()
+
+        speech.speak("Trip saved!") {
             dismiss()
         }
     }
