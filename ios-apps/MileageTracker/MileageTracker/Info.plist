@@ -19,5 +19,7 @@
 	<string>MileageTracker monitors your location in the background to detect arrival at destinations and prompt for ending odometer readings.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>MileageTracker uses the camera to photograph your odometer for start-of-year and end-of-year records.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

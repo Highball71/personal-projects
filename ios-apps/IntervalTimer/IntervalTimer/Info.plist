@@ -10,5 +10,7 @@
 	<string>IntervalTimer uses the microphone for voice commands like "pause", "resume", and "stop" during workouts.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>IntervalTimer uses speech recognition for hands-free voice commands during workouts.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
