@@ -5,9 +5,13 @@ Run this interactively in a terminal — it opens a browser for consent
 and saves the refresh token for the bot to use.
 """
 
+import os
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-from config import GOOGLE_CLIENT_SECRET_PATH, GOOGLE_CREDENTIALS_PATH
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GOOGLE_CLIENT_SECRET_PATH = os.path.join(_SCRIPT_DIR, "client_secret.json")
+GOOGLE_CREDENTIALS_PATH = os.path.join(_SCRIPT_DIR, "google_credentials.json")
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
