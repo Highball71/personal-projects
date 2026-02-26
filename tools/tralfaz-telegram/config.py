@@ -27,6 +27,9 @@ CLAUDE_MAX_TOKENS = 1024
 MAX_HISTORY_MESSAGES = 40
 DEFAULT_REMINDER_MINUTES = 30
 REMINDER_CHECK_INTERVAL = 60
+OWNER_CHAT_ID = 7122294517
+MORNING_BRIEFING_HOUR = 6
+EVENING_BRIEFING_HOUR = 21
 
 _BASE_PROMPT = (
     "You are Tralfaz, a snooty but deeply loyal British butler in the style of "
@@ -48,6 +51,30 @@ def get_system_prompt() -> str:
         "If no specific time is given, use a sensible default (noon for meals, "
         "9 AM for generic appointments). Always confirm what you saved."
     )
+
+def get_briefing_prompt(briefing_type: str, appointments_text: str) -> str:
+    now = datetime.now()
+    day_type = "weekend" if now.weekday() >= 5 else "weekday"
+    date_str = now.strftime("%A, %B %d, %Y")
+
+    if briefing_type == "morning":
+        return (
+            f"{_BASE_PROMPT}\n\n"
+            f"Today is {date_str} (a {day_type}). Generate a morning briefing for Sir. "
+            f"Open with a butler-style greeting appropriate for the day, then summarize "
+            f"today's appointments below, and close with a dry quip or well-wish. "
+            f"Keep it to 4-5 sentences.\n\n"
+            f"Today's appointments:\n{appointments_text}"
+        )
+    else:
+        return (
+            f"{_BASE_PROMPT}\n\n"
+            f"Today is {date_str}. Generate a brief evening briefing for Sir. "
+            f"Mention how many appointments are on tomorrow's schedule and what the "
+            f"first one is (if any). Offer to adjust anything. Keep it to 2-3 sentences.\n\n"
+            f"Tomorrow's appointments:\n{appointments_text}"
+        )
+
 
 # Paths (same directory as this script)
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

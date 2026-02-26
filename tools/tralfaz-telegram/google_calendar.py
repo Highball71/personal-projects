@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -44,7 +45,7 @@ def _get_service():
         return None
 
 
-def create_event(title: str, dt_iso: str, reminder_minutes: int = 30) -> str | None:
+def create_event(title: str, dt_iso: str, reminder_minutes: int = 30) -> Optional[str]:
     """Create a 1-hour calendar event. Returns event ID or None on failure."""
     service = _get_service()
     if service is None:

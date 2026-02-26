@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 
 import claude_client
 import database
+from briefings import _generate_briefing
 from voice import transcribe_voice, synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -35,9 +36,30 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+_TOMORROW_KEYWORDS = ["what's tomorrow", "whats tomorrow", "tomorrow's schedule", "tomorrows schedule"]
+_BRIEFING_KEYWORDS = [
+    "morning briefing", "what's my day", "whats my day", "daily briefing",
+    "briefing", "today's schedule", "todays schedule",
+]
+
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_text = update.message.text
+
+    text_lower = user_text.lower()
+    briefing_type = None
+    if any(kw in text_lower for kw in _TOMORROW_KEYWORDS):
+        briefing_type = "evening"
+    elif any(kw in text_lower for kw in _BRIEFING_KEYWORDS):
+        briefing_type = "morning"
+
+    if briefing_type:
+        database.store_message(chat_id, "user", user_text)
+        reply = await asyncio.to_thread(_generate_briefing, briefing_type, chat_id)
+        database.store_message(chat_id, "assistant", reply)
+        await _send_reply(update.message, reply)
+        return
 
     database.store_message(chat_id, "user", user_text)
     history = database.get_history(chat_id)

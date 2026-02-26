@@ -92,6 +92,19 @@ def _execute_tool(name: str, tool_input: dict, chat_id: int) -> str:
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 
+def get_response_with_system(system: str, messages: list[dict]) -> str:
+    response = _client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=CLAUDE_MAX_TOKENS,
+        system=system,
+        messages=messages,
+    )
+    for block in response.content:
+        if hasattr(block, "text"):
+            return block.text
+    return ""
+
+
 def get_response(history: list[dict], chat_id: int = None) -> str:
     system = get_system_prompt()
     kwargs = dict(

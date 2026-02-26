@@ -1,4 +1,6 @@
 import sqlite3
+from typing import Optional
+
 from config import DB_PATH, MAX_HISTORY_MESSAGES, DEFAULT_REMINDER_MINUTES
 
 
@@ -106,6 +108,38 @@ def list_appointments(chat_id: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def get_todays_appointments(chat_id: int) -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """
+        SELECT id, title, datetime, reminder_minutes_before
+        FROM appointments
+        WHERE chat_id = ? AND date(datetime) = date('now', 'localtime')
+        ORDER BY datetime ASC
+        """,
+        (chat_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_tomorrows_appointments(chat_id: int) -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """
+        SELECT id, title, datetime, reminder_minutes_before
+        FROM appointments
+        WHERE chat_id = ? AND date(datetime) = date('now', 'localtime', '+1 day')
+        ORDER BY datetime ASC
+        """,
+        (chat_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
 def cancel_appointment(chat_id: int, appointment_id: int) -> bool:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.execute(
@@ -118,7 +152,7 @@ def cancel_appointment(chat_id: int, appointment_id: int) -> bool:
     return deleted
 
 
-def get_appointment(appointment_id: int, chat_id: int) -> dict | None:
+def get_appointment(appointment_id: int, chat_id: int) -> Optional[dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     row = conn.execute(

@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import database
 from config import TELEGRAM_BOT_TOKEN
 from handlers import start_command, clear_command, schedule_command, handle_text, handle_voice
+from briefings import start_briefings
 from reminders import start_reminders
 
 logging.basicConfig(
@@ -14,10 +15,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _post_init(app):
+    await start_reminders(app)
+    await start_briefings(app)
+
+
 def main():
     database.init_db()
 
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(start_reminders).build()
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(_post_init).build()
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("clear", clear_command))
