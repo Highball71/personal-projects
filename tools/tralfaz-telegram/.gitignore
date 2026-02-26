@@ -1,0 +1,7 @@
+venv/
+logs/
+conversations.db
+__pycache__/
+client_secret.json
+google_credentials.json
+com.highball71.tralfaz-telegram.plist
