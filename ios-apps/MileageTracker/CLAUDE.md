@@ -5,7 +5,7 @@ IRS-compliant mileage tracker for healthcare home office.
 ## App Details
 - Bundle ID: `com.highball71.MileageTracker`
 - Native iOS (SwiftUI + SwiftData, iOS 17+)
-- TestFlight Build 2
+- TestFlight Build 8
 
 ## Key Features
 - Voice-first trip logging: app speaks questions, user responds verbally (TTS + SFSpeechRecognizer)
