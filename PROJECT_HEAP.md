@@ -1,6 +1,6 @@
 # PROJECT HEAP
 
-Status tracker for all personal iOS projects. Updated 2026-02-22.
+Status tracker for all personal iOS projects. Updated 2026-02-26.
 
 ---
 
@@ -33,25 +33,29 @@ Status tracker for all personal iOS projects. Updated 2026-02-22.
 - Home office qualifies as principal place of business — all work trips deductible
 - 2026 IRS rate: $0.725/mile
 - Voice-first trip logging: app speaks questions, user responds verbally (TTS + SFSpeechRecognizer)
-- 5-step conversational flow: Where are you? → Odometer? → Destination? → Purpose? → Confirm
+- Two-phase trip flow: Start Trip (location + odometer → auto-confirm) and End Trip (destination + odometer + purpose → voice confirm)
+- Premium Siri voice TTS with fallback chain (Zoe premium → any premium → enhanced → default)
+- Smart odometer parsing: digits, English number words, digit-by-digit dictation (OdometerParser)
 - Fully hands-free: auto-advances through steps, spoken readback, voice yes/no confirmation
-- Smart silence timer (4s) resets on each partial result — no more premature cutoffs
+- Smart silence timer (5s for odometer, 3s for other steps) resets on each partial result
 - Minimum 4-digit validation for odometer readings keeps listening until complete
+- End odometer validation (must be > start odometer)
 - Keyword detection: say "done"/"save" to stop, "yes"/"no" to confirm/restart
 - Contextual strings feed location names to recognizer for better accuracy
 - Haptic pulse on each new recognition so user knows it's still listening
 - Delegate-based TTS completion (accurate timing, no estimated durations)
 - "I didn't catch that" auto-retry on failed recognition
-- Siri shortcut: "Hey Siri, log mileage" launches directly into voice flow (App Intents)
+- Siri shortcuts: "Hey Siri, start a trip" and "Hey Siri, end trip" (App Intents)
 - Trip categories: Patient Care, Administrative, Supply Run, Continuing Education, Other
 - Saved locations with voice shortcuts and smart frequency learning
 - GPS arrival detection for ending odometer prompts (CoreLocation geofencing)
+- Dashboard with "End Trip" buttons for in-progress trips
 - Start/end of year odometer photo capture
 - Quarterly + annual IRS-compliant PDF reports with trip detail, tolls, parking
 - Weekday reminder notifications
 - Dashboard with running tax savings estimate
 - App icon (road/mile marker theme)
-- Build 2 uploaded to TestFlight (voice overhaul + Siri shortcut)
+- Build 8 uploaded to TestFlight (two-phase voice flow + premium voice + End Trip Siri shortcut)
 - Bundle ID: `com.highball71.MileageTracker`
 
 ## Tralfaz/HQ #active
