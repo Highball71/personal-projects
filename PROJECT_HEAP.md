@@ -60,6 +60,15 @@ Status tracker for all personal iOS projects. Updated 2026-02-22.
 - PWA-ready (apple-mobile-web-app-capable, touch icon)
 - Third in iOS rebuild queue
 
+## AutoCompare #complete
+**Car insurance cost comparison calculator**
+- Web tool in `tools/autocompare/` (single-page `index.html`)
+
+## Timer #complete
+**Web-based interval timer**
+- Web tool in `tools/timer/` (single-page `index.html`)
+- PWA-ready
+
 ## WordScene #complete
 **Vocabulary learning app with spaced repetition**
 - SM2 spaced repetition engine
