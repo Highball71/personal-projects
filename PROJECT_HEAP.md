@@ -1,6 +1,6 @@
 # PROJECT HEAP
 
-Status tracker for all personal iOS projects. Updated 2026-02-26.
+Status tracker for all personal iOS projects. Updated 2026-02-27.
 
 ---
 
@@ -24,7 +24,7 @@ Status tracker for all personal iOS projects. Updated 2026-02-26.
 - Recipe search with JSON-LD parsing
 - Meal planning, grocery list generation
 - 35 production files, 6 test files
-- Multiple TestFlight builds shipped (build 9)
+- Multiple TestFlight builds shipped (build 10)
 - Bundle ID: `com.highball71.Family-Meal-Planner`
 
 ## MileageTracker #active
@@ -91,3 +91,28 @@ Status tracker for all personal iOS projects. Updated 2026-02-26.
 **Proof of life — first iOS app**
 - Minimal SwiftUI app, 2 files
 - Done as intended
+
+---
+
+## Session Log
+
+### 2026-02-27 — FluffyList Icon Redesign + TestFlight Build 70
+**What happened:**
+- Redesigned FluffyList app icon from fork-and-knife to wooden cooking spoon
+- Iterated 4 times on spoon shape (mallet → mushroom → round → egg-oval)
+- Icon approved (not final — will revisit later)
+- Build number bumped 9 → 10
+- Archived and uploaded Build 70 to TestFlight
+- Submitted Build 70 for external testing review (pending Apple approval)
+- Fixed team signing issue (no developer team was selected)
+- Tralfaz Claude Code session started but paused (9 o'clock message from Tralfaz not yet addressed)
+
+**Decided:**
+- Spoon icon is "good enough for now" — revisit design later
+- Archive via Xcode GUI is easier than CLI for now
+
+**Next session:**
+- Check if Build 70 was approved for external testing
+- Shannon updates FluffyList in TestFlight
+- Return to Tralfaz work (pick up where Claude Code left off)
+- Revisit spoon icon design when eyes are fresh
