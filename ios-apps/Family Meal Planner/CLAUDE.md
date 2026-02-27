@@ -5,7 +5,7 @@ Weekly meal planning with recipe management and grocery lists.
 ## App Details
 - Bundle ID: `com.highball71.Family-Meal-Planner`
 - Native iOS (SwiftUI + SwiftData, iOS 17+)
-- TestFlight Build 9
+- TestFlight Build 10
 
 ## Key Features
 - Claude API integration for recipe suggestions
