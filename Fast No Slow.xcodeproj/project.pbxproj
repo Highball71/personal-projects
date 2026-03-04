@@ -255,6 +255,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Fast No Slow reads your heart zone during workouts to keep you in your target zone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Fast No Slow saves your workout data";
@@ -304,6 +305,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Fast No Slow reads your heart zone during workouts to keep you in your target zone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Fast No Slow saves your workout data";

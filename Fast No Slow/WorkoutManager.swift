@@ -1,11 +1,12 @@
 import Foundation
 import HealthKit
 import CoreLocation
+import CoreMotion
 import AVFoundation
 import Combine
 
 class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    
+
     // MARK: - Published Properties
     @Published var heartRate: Double = 0
     @Published var timeInZone: TimeInterval = 0
@@ -18,11 +19,14 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var isWorkoutActive: Bool = false
     @Published var zoneStatus: ZoneStatus = .belowZone
     @Published var elapsedTime: TimeInterval = 0
-    
+    @Published var cadence: Int? = nil // steps per minute, nil = no data / not walking
+
     // MARK: - Settings
     var lowHR: Int = 120
-    var highHR: Int = 150
-    
+    var highHR: Int = 160
+    var metronomeEnabled: Bool = false
+    var metronomeBPM: Int = 170
+
     // MARK: - Private
     private let healthStore = HKHealthStore()
     private var heartRateQuery: HKAnchoredObjectQuery?
@@ -37,13 +41,24 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let synthesizer = AVSpeechSynthesizer()
     private var lastPromptTime: Date = .distantPast
     private let promptCooldown: TimeInterval = 15 // seconds between voice prompts
-    
+
+    // MARK: - Pedometer
+    private let pedometer = CMPedometer()
+    private var cadenceTimer: Timer?
+    private var recentStepCounts: [(steps: Int, duration: TimeInterval)] = []
+
+    // MARK: - Metronome
+    private var audioEngine: AVAudioEngine?
+    private var playerNode: AVAudioPlayerNode?
+    private var metronomeTimer: Timer?
+    private var clickBuffer: AVAudioPCMBuffer?
+
     enum ZoneStatus: String {
         case belowZone = "SPEED UP"
         case inZone = "IN THE ZONE"
         case aboveZone = "SLOW DOWN"
     }
-    
+
     override init() {
         super.init()
         locationManager.delegate = self
@@ -51,7 +66,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.distanceFilter = 5
         locationManager.activityType = .fitness
     }
-    
+
     // MARK: - Authorization
     func requestAuthorization() {
         let typesToRead: Set<HKObjectType> = [
@@ -62,16 +77,16 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let typesToWrite: Set<HKSampleType> = [
             HKSampleType.workoutType()
         ]
-        
+
         healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
             if let error = error {
                 print("HealthKit auth error: \(error.localizedDescription)")
             }
         }
-        
+
         locationManager.requestWhenInUseAuthorization()
     }
-    
+
     // MARK: - Workout Control
     func startWorkout() {
         startDate = Date()
@@ -86,10 +101,14 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         previousElevation = nil
         lastLocation = nil
         lastInZoneLocation = nil
-        
+
+        cadence = nil
+        recentStepCounts = []
+
         startHeartRateQuery()
         locationManager.startUpdatingLocation()
-        
+        startCadenceUpdates()
+
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.elapsedTime = Date().timeIntervalSince(self.startDate ?? Date())
@@ -97,27 +116,148 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 self.timeInZone += 1
             }
         }
-        
+
+        if metronomeEnabled {
+            startMetronome()
+        }
+
         speak("Workout started. Target zone: \(lowHR) to \(highHR) beats per minute.")
     }
-    
+
     func stopWorkout() {
         isWorkoutActive = false
         heartRateQuery = nil
         timer?.invalidate()
         timer = nil
+        cadenceTimer?.invalidate()
+        cadenceTimer = nil
+        pedometer.stopUpdates()
         locationManager.stopUpdatingLocation()
-        
+        stopMetronome()
+
         let minutes = Int(timeInZone) / 60
         let seconds = Int(timeInZone) % 60
         let distanceMiles = distanceInZone * 0.000621371
-        speak("Workout complete. You spent \(minutes) minutes and \(seconds) seconds in your zone, covering \(String(format: "%.1f", distanceMiles)) miles.")
+        var summary = "Workout complete. You spent \(minutes) minutes and \(seconds) seconds in your zone, covering \(String(format: "%.1f", distanceMiles)) miles."
+        if let cadence = cadence {
+            summary += " Average cadence: \(cadence) steps per minute."
+        }
+        speak(summary)
     }
-    
+
+    // MARK: - Cadence (Pedometer)
+    private func startCadenceUpdates() {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+
+        // Query pedometer every 5 seconds for a rolling window
+        cadenceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isWorkoutActive else { return }
+            let now = Date()
+            let windowStart = now.addingTimeInterval(-5.0)
+            self.pedometer.queryPedometerData(from: windowStart, to: now) { data, error in
+                DispatchQueue.main.async {
+                    guard let data = data else {
+                        self.cadence = nil
+                        return
+                    }
+                    let steps = data.numberOfSteps.intValue
+                    let duration = data.endDate.timeIntervalSince(data.startDate)
+
+                    // Keep last 3 samples (15s rolling window) for smoothing
+                    self.recentStepCounts.append((steps: steps, duration: duration))
+                    if self.recentStepCounts.count > 3 {
+                        self.recentStepCounts.removeFirst()
+                    }
+
+                    let totalSteps = self.recentStepCounts.reduce(0) { $0 + $1.steps }
+                    let totalDuration = self.recentStepCounts.reduce(0.0) { $0 + $1.duration }
+
+                    if totalSteps == 0 || totalDuration < 1 {
+                        self.cadence = nil
+                    } else {
+                        self.cadence = Int(round(Double(totalSteps) / totalDuration * 60.0))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Metronome
+    private func startMetronome() {
+        configureAudioSession()
+
+        let engine = AVAudioEngine()
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+
+        let sampleRate: Double = 44100
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+
+        // Generate click buffer: ~30ms 880Hz sine wave with exponential decay
+        let duration: Double = 0.03
+        let frameCount = AVAudioFrameCount(sampleRate * duration)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
+        buffer.frameLength = frameCount
+
+        if let channelData = buffer.floatChannelData?[0] {
+            for i in 0..<Int(frameCount) {
+                let t = Double(i) / sampleRate
+                let sine = sin(2.0 * .pi * 880.0 * t)
+                let envelope = exp(-t * 100.0) // fast decay
+                channelData[i] = Float(sine * envelope * 0.5)
+            }
+        }
+
+        self.audioEngine = engine
+        self.playerNode = player
+        self.clickBuffer = buffer
+
+        do {
+            try engine.start()
+            player.play()
+        } catch {
+            print("Metronome audio engine error: \(error.localizedDescription)")
+            return
+        }
+
+        // Schedule repeating ticks
+        let interval = 60.0 / Double(metronomeBPM)
+        metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self = self, let player = self.playerNode, let buffer = self.clickBuffer else { return }
+            player.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+        }
+        // Play first tick immediately
+        player.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+    }
+
+    private func stopMetronome() {
+        metronomeTimer?.invalidate()
+        metronomeTimer = nil
+        playerNode?.stop()
+        audioEngine?.stop()
+        audioEngine = nil
+        playerNode = nil
+        clickBuffer = nil
+    }
+
+    private func configureAudioSession() {
+        #if os(iOS)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, options: .mixWithOthers)
+            try session.setActive(true)
+        } catch {
+            print("Audio session error: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
     // MARK: - Heart Rate Monitoring
     private func startHeartRateQuery() {
         guard let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
-        
+
         let query = HKAnchoredObjectQuery(
             type: heartRateType,
             predicate: HKQuery.predicateForSamples(withStart: startDate, end: nil, options: .strictStartDate),
@@ -126,29 +266,29 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         ) { [weak self] query, samples, deletedObjects, anchor, error in
             self?.processHeartRateSamples(samples)
         }
-        
+
         query.updateHandler = { [weak self] query, samples, deletedObjects, anchor, error in
             self?.processHeartRateSamples(samples)
         }
-        
+
         heartRateQuery = query
         healthStore.execute(query)
     }
-    
+
     private func processHeartRateSamples(_ samples: [HKSample]?) {
         guard let samples = samples as? [HKQuantitySample], let latest = samples.last else { return }
-        
+
         let hr = latest.quantity.doubleValue(for: HKUnit(from: "count/min"))
-        
+
         DispatchQueue.main.async {
             self.heartRate = hr
             self.updateZoneStatus()
         }
     }
-    
+
     private func updateZoneStatus() {
         let previousStatus = zoneStatus
-        
+
         if heartRate < Double(lowHR) {
             zoneStatus = .belowZone
             isInZone = false
@@ -160,7 +300,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             isInZone = true
             lastInZoneLocation = lastLocation
         }
-        
+
         // Voice prompt on zone change
         if zoneStatus != previousStatus {
             let now = Date()
@@ -177,11 +317,11 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
     }
-    
+
     // MARK: - Location
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last, isWorkoutActive else { return }
-        
+
         // Distance
         if let last = lastLocation {
             let delta = location.distance(from: last)
@@ -190,7 +330,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 distanceInZone += delta
             }
         }
-        
+
         // Elevation
         currentElevation = location.altitude
         if let prev = previousElevation {
@@ -204,7 +344,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         previousElevation = location.altitude
         lastLocation = location
     }
-    
+
     // MARK: - Speech
     private func speak(_ text: String) {
         let utterance = AVSpeechUtterance(string: text)
