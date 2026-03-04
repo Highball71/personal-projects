@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import AVFoundation
 
 /// Handles both adding a new recipe and editing an existing one.
 /// When `recipeToEdit` is nil → add mode (form starts empty).
@@ -48,6 +49,9 @@ struct AddEditRecipeView: View {
     @State private var showingURLInput = false
     @State private var importURLText = ""
     @State private var isExtractingFromURL = false
+
+    // Camera permission state
+    @State private var showingCameraPermissionDenied = false
 
     // Recipe search state
     @State private var showingRecipeSearch = false
@@ -175,7 +179,7 @@ struct AddEditRecipeView: View {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button("Take Photo") {
                         showingPhotoOptions = false
-                        showingCamera = true
+                        requestCameraAccess()
                     }
                 }
                 Button("Choose from Library") {
@@ -191,17 +195,22 @@ struct AddEditRecipeView: View {
             // Camera (UIImagePickerController wrapper)
             // After capturing the first photo, hand off to PhotoScanView
             // so the user can add more pages before extracting.
-            .fullScreenCover(isPresented: $showingCamera) {
+            // onDismiss presents the scan view AFTER the camera is fully
+            // dismissed — presenting a sheet while a fullScreenCover is
+            // still animating away can cause SwiftUI to drop or misrender it.
+            .fullScreenCover(isPresented: $showingCamera, onDismiss: {
+                if !scannedPages.isEmpty {
+                    showingPhotoScan = true
+                }
+            }) {
                 CameraView { image in
                     if let image {
                         print("[PhotoScan] First page captured, size: \(Int(image.size.width))x\(Int(image.size.height))")
                         scannedPages = [image]
-                        showingCamera = false
-                        showingPhotoScan = true
                     } else {
                         print("[PhotoScan] Camera cancelled")
-                        showingCamera = false
                     }
+                    showingCamera = false
                 }
                 .ignoresSafeArea()
             }
@@ -287,6 +296,17 @@ struct AddEditRecipeView: View {
             } message: {
                 Text(extractionError ?? "Something went wrong. Please try again.")
             }
+            // Camera permission denied alert — directs user to Settings
+            .alert("Camera Access Required", isPresented: $showingCameraPermissionDenied) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("FluffyList needs camera access to scan recipes. You can enable it in Settings.")
+            }
             // URL input alert
             .alert("Import from URL", isPresented: $showingURLInput) {
                 TextField("https://example.com/recipe", text: $importURLText)
@@ -326,6 +346,29 @@ struct AddEditRecipeView: View {
                     sourceDetail = recipe.sourceDetail ?? ""
                 }
             }
+        }
+    }
+
+    /// Check camera permission before presenting the camera.
+    /// Uses Task + await so the state update runs on @MainActor
+    /// (DispatchQueue.main.async doesn't guarantee @MainActor isolation).
+    private func requestCameraAccess() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            showingCamera = true
+        case .notDetermined:
+            Task {
+                let granted = await AVCaptureDevice.requestAccess(for: .video)
+                if granted {
+                    showingCamera = true
+                } else {
+                    showingCameraPermissionDenied = true
+                }
+            }
+        case .denied, .restricted:
+            showingCameraPermissionDenied = true
+        @unknown default:
+            showingCameraPermissionDenied = true
         }
     }
 

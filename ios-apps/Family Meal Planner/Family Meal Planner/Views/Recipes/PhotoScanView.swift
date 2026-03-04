@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 /// Multi-page photo scanning view for cookbook recipes.
 /// After capturing the first photo, the user can add more pages (up to 5),
@@ -16,6 +17,7 @@ struct PhotoScanView: View {
     let onCancel: () -> Void
 
     @State private var showingCamera = false
+    @State private var showingCameraPermissionDenied = false
 
     /// Maximum pages allowed per scan — enough for any cookbook recipe.
     private let maxPages = 5
@@ -59,7 +61,7 @@ struct PhotoScanView: View {
                 VStack(spacing: 12) {
                     if pages.count < maxPages {
                         Button {
-                            showingCamera = true
+                            requestCameraAccess()
                         } label: {
                             Label("Add Page", systemImage: "camera.fill")
                                 .frame(maxWidth: .infinity)
@@ -91,12 +93,24 @@ struct PhotoScanView: View {
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView { image in
                     if let image {
-                        print("[PhotoScan] Added page \(pages.count + 1)")
                         pages.append(image)
+                        print("[PhotoScan] Added page — now \(pages.count) page(s)")
+                    } else {
+                        print("[PhotoScan] Add-page camera cancelled")
                     }
                     showingCamera = false
                 }
                 .ignoresSafeArea()
+            }
+            .alert("Camera Access Required", isPresented: $showingCameraPermissionDenied) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("FluffyList needs camera access to scan recipes. You can enable it in Settings.")
             }
         }
     }
@@ -105,6 +119,29 @@ struct PhotoScanView: View {
     private func scanToolbar() -> some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
             Button("Cancel") { onCancel() }
+        }
+    }
+
+    /// Check camera permission before presenting the camera.
+    /// Uses Task + await so the state update runs on @MainActor
+    /// (DispatchQueue.main.async doesn't guarantee @MainActor isolation).
+    private func requestCameraAccess() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            showingCamera = true
+        case .notDetermined:
+            Task {
+                let granted = await AVCaptureDevice.requestAccess(for: .video)
+                if granted {
+                    showingCamera = true
+                } else {
+                    showingCameraPermissionDenied = true
+                }
+            }
+        case .denied, .restricted:
+            showingCameraPermissionDenied = true
+        @unknown default:
+            showingCameraPermissionDenied = true
         }
     }
 
