@@ -6,6 +6,9 @@ struct WorkoutView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // HR monitor status pill
+            hrMonitorPill
+
             // Status banner
             statusBanner
             
@@ -83,6 +86,35 @@ struct WorkoutView: View {
         }
     }
     
+    // MARK: - HR Monitor Pill
+    private var hrMonitorPill: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(workoutManager.hrMonitorState == .connected ? Color.green : Color.gray)
+                .frame(width: 8, height: 8)
+            switch workoutManager.hrMonitorState {
+            case .connected:
+                Text(workoutManager.connectedDeviceName ?? "HR Monitor")
+                    .font(.system(size: 12))
+                    .foregroundColor(.primary)
+            case .searching:
+                Text("Searching...")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            case .disconnected:
+                Text("No Monitor")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(Color.gray.opacity(0.15))
+        .cornerRadius(12)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+    }
+
     // MARK: - Status Banner
     private var statusBanner: some View {
         HStack {

@@ -258,6 +258,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Fast No Slow reads your heart zone during workouts to keep you in your target zone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Fast No Slow saves your workout data";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Fast No Slow connects to your Bluetooth heart rate monitor to show device status.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Fast No Slow tracks distance and elevation during workouts.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -307,6 +308,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Fast No Slow reads your heart zone during workouts to keep you in your target zone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Fast No Slow saves your workout data";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Fast No Slow connects to your Bluetooth heart rate monitor to show device status.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Fast No Slow tracks distance and elevation during workouts.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
