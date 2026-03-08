@@ -27,8 +27,6 @@ struct SettingsView: View {
 
     // Sharing state
     @State private var isLoadingShare = false
-    @State private var shareURL: URL?
-    @State private var showShareSheet = false
     @State private var showCloudKitAlert = false
 
     var body: some View {
@@ -62,11 +60,6 @@ struct SettingsView: View {
             }
             .onAppear {
                 loadExistingKeyHint()
-            }
-            .sheet(isPresented: $showShareSheet) {
-                if let url = shareURL {
-                    ActivitySheet(items: [url])
-                }
             }
             .alert("iCloud Required", isPresented: $showCloudKitAlert) {
                 Button("OK", role: .cancel) {}
@@ -200,23 +193,53 @@ struct SettingsView: View {
 
             // Use existing share if one was already created.
             if let existingURL = await CloudKitSharingService.shared.existingShareURL() {
-                shareURL = existingURL
                 isLoadingShare = false
-                showShareSheet = true
+                presentShareSheet(url: existingURL)
                 return
             }
 
             // Create a new zone-wide share.
             do {
                 let url = try await CloudKitSharingService.shared.createHouseholdShare()
-                shareURL = url
                 isLoadingShare = false
-                showShareSheet = true
+                presentShareSheet(url: url)
             } catch {
                 isLoadingShare = false
                 print("[Sharing] Failed to create share: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Presents the system share sheet imperatively via UIKit.
+    /// UIActivityViewController must be presented directly — wrapping it
+    /// inside a SwiftUI .sheet causes a double-modal conflict that
+    /// silently prevents the share sheet from appearing.
+    private func presentShareSheet(url: URL) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first,
+              let rootVC = window.rootViewController else {
+            return
+        }
+
+        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+
+        // iPad requires popover source configuration.
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = rootVC.view
+            popover.sourceRect = CGRect(
+                x: rootVC.view.bounds.midX,
+                y: rootVC.view.bounds.midY,
+                width: 0, height: 0
+            )
+            popover.permittedArrowDirections = []
+        }
+
+        // Walk up to the topmost presented controller (Settings is already modal).
+        var presenter = rootVC
+        while let presented = presenter.presentedViewController {
+            presenter = presented
+        }
+        presenter.present(activityVC, animated: true)
     }
 
     // MARK: - API Key Section
@@ -317,17 +340,6 @@ struct SettingsView: View {
             showingSavedConfirmation = false
         }
     }
-}
-
-/// Wraps UIActivityViewController for presenting the system share sheet.
-private struct ActivitySheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {
