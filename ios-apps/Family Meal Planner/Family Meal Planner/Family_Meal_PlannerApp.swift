@@ -7,9 +7,33 @@
 
 import SwiftUI
 import SwiftData
+import CloudKit
+
+// MARK: - App Delegate (CloudKit Share Acceptance)
+
+/// Handles CloudKit share invitations when a household member
+/// taps a share link. Accepts the share so SwiftData automatically
+/// syncs the shared recipe library to their device.
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
+    ) {
+        let container = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
+        Task {
+            do {
+                try await container.accept(cloudKitShareMetadata)
+                print("[Sync] Accepted household share from \(cloudKitShareMetadata.ownerIdentity.nameComponents?.formatted() ?? "unknown")")
+            } catch {
+                print("[Sync] Failed to accept share: \(error.localizedDescription)")
+            }
+        }
+    }
+}
 
 @main
 struct Family_Meal_PlannerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
         #if DEBUG
@@ -29,21 +53,40 @@ struct Family_Meal_PlannerApp: App {
         }
         // SwiftData + CloudKit: syncs recipes, ingredients, and meal plans
         // across all family members via iCloud.
-        // Uses .automatic to pick up the CloudKit container from entitlements.
+        // Uses .automatic which supports both private and shared CloudKit
+        // zones — household members who accept a CKShare see the same data.
         .modelContainer(sharedModelContainer)
     }
 }
 
-/// Shared model container — tries CloudKit first, falls back to local-only
-/// storage if CloudKit isn't available (e.g. Simulator, no iCloud account).
+/// Shared model container — CloudKit-enabled with stable store for data persistence.
+/// Uses .automatic to sync via the iCloud container from entitlements.
+/// The .automatic scope supports both private and shared CloudKit zones,
+/// so household members who accept a CKShare see the same recipes.
+///
+/// Falls back to local-only storage if CloudKit isn't available
+/// (e.g. Simulator, no iCloud account).
 private let sharedModelContainer: ModelContainer = {
-    let schema = Schema([Recipe.self, Ingredient.self, MealPlan.self, GroceryItem.self, RecipeRating.self, HouseholdMember.self, MealSuggestion.self])
+    let schema = Schema([
+        Recipe.self,
+        Ingredient.self,
+        MealPlan.self,
+        GroceryItem.self,
+        RecipeRating.self,
+        HouseholdMember.self,
+        MealSuggestion.self
+    ])
 
-    // Try CloudKit-enabled configuration first
+    // CloudKit-enabled configuration.
+    // - Stable name "FamilyMealPlanner" ensures same store across app updates.
+    // - isStoredInMemoryOnly: false persists data to disk (prevents wipe on update).
+    // - .automatic picks up the CloudKit container from entitlements and
+    //   supports both private and shared database scopes.
     do {
         let cloudConfig = ModelConfiguration(
             "FamilyMealPlanner",
             schema: schema,
+            isStoredInMemoryOnly: false,
             cloudKitDatabase: .automatic
         )
         let container = try ModelContainer(for: schema, configurations: [cloudConfig])
@@ -53,11 +96,12 @@ private let sharedModelContainer: ModelContainer = {
         print("[Sync] CloudKit unavailable (\(error.localizedDescription)), falling back to local storage")
     }
 
-    // Fall back to local-only storage so the app never crashes
+    // Fall back to local-only storage so the app never crashes.
     do {
         let localConfig = ModelConfiguration(
             "FamilyMealPlanner",
             schema: schema,
+            isStoredInMemoryOnly: false,
             cloudKitDatabase: .none
         )
         return try ModelContainer(for: schema, configurations: [localConfig])
