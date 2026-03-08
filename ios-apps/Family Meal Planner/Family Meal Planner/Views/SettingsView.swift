@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import CloudKit
 
 /// Settings screen with household management and API key configuration.
 /// The Household section lets you add family members and designate a
@@ -24,11 +25,18 @@ struct SettingsView: View {
     @State private var saveError: String?
     @State private var newMemberName = ""
 
+    // Sharing state
+    @State private var isLoadingShare = false
+    @State private var shareURL: URL?
+    @State private var showShareSheet = false
+    @State private var showCloudKitAlert = false
+
     var body: some View {
         NavigationStack {
             Form {
                 householdSection
                 headCookSection
+                sharingSection
                 apiKeySection
 
                 if showingSavedConfirmation {
@@ -54,6 +62,16 @@ struct SettingsView: View {
             }
             .onAppear {
                 loadExistingKeyHint()
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let url = shareURL {
+                    ActivitySheet(items: [url])
+                }
+            }
+            .alert("iCloud Required", isPresented: $showCloudKitAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Sign in to iCloud in Settings to share your recipe library with household members.")
             }
         }
     }
@@ -145,6 +163,59 @@ struct SettingsView: View {
             Text("Head Cook")
         } footer: {
             Text("The Head Cook has final say on the weekly meal plan. Others can suggest recipes, but the Head Cook approves them. Leave unset to skip the approval flow.")
+        }
+    }
+
+    // MARK: - Sharing Section
+
+    private var sharingSection: some View {
+        Section {
+            Button {
+                generateShareURL()
+            } label: {
+                HStack {
+                    Label("Share with Household", systemImage: "person.2.fill")
+                    Spacer()
+                    if isLoadingShare {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isLoadingShare)
+        } header: {
+            Text("iCloud Sharing")
+        } footer: {
+            Text("Share your recipe library with household members so everyone sees the same recipes, meal plans, and grocery lists.")
+        }
+    }
+
+    private func generateShareURL() {
+        isLoadingShare = true
+        Task {
+            guard await CloudKitSharingService.shared.isCloudKitAvailable() else {
+                isLoadingShare = false
+                showCloudKitAlert = true
+                return
+            }
+
+            // Use existing share if one was already created.
+            if let existingURL = await CloudKitSharingService.shared.existingShareURL() {
+                shareURL = existingURL
+                isLoadingShare = false
+                showShareSheet = true
+                return
+            }
+
+            // Create a new zone-wide share.
+            do {
+                let url = try await CloudKitSharingService.shared.createHouseholdShare()
+                shareURL = url
+                isLoadingShare = false
+                showShareSheet = true
+            } catch {
+                isLoadingShare = false
+                print("[Sharing] Failed to create share: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -246,6 +317,17 @@ struct SettingsView: View {
             showingSavedConfirmation = false
         }
     }
+}
+
+/// Wraps UIActivityViewController for presenting the system share sheet.
+private struct ActivitySheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {
