@@ -118,29 +118,57 @@ actor CloudKitSharingService {
 
     // MARK: - User Identity
 
-    /// Fetches the current user's iCloud display name by looking up their
-    /// CloudKit user record identity. Returns nil if unavailable (e.g. not
-    /// signed in, discoverability disabled, or network error).
+    /// Fetches the current user's iCloud display name using the modern
+    /// `CKFetchShareParticipantsOperation` API (replaces the deprecated
+    /// `CKContainer.discoverUserIdentity` removed in iOS 17).
+    ///
+    /// Flow: get the current user's record ID → wrap it in a lookup info →
+    /// run a fetch-participants operation → read `nameComponents` from the
+    /// returned `CKShare.Participant.userIdentity`.
+    ///
+    /// Returns nil when the user hasn't enabled iCloud discoverability,
+    /// is not signed in, or a network error occurs.
     func fetchCurrentUserDisplayName() async -> String? {
         do {
             let recordID = try await container.userRecordID()
-            // discoverUserIdentity has no async overload — wrap with a continuation.
-            let identity: CKUserIdentity? = try await withCheckedThrowingContinuation { continuation in
-                container.discoverUserIdentity(withUserRecordID: recordID) { identity, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume(returning: identity)
+            let lookupInfo = CKUserIdentity.LookupInfo(userRecordID: recordID)
+
+            // CKFetchShareParticipantsOperation has no native async overload —
+            // wrap with a checked continuation.
+            let name: String? = try await withCheckedThrowingContinuation { continuation in
+                var fetchedName: String? = nil
+
+                let operation = CKFetchShareParticipantsOperation(
+                    userIdentityLookupInfos: [lookupInfo]
+                )
+                operation.qualityOfService = .userInitiated
+
+                // perShareParticipantResultBlock (iOS 15+) supersedes the
+                // deprecated shareParticipantFetchedBlock. Swift renames the
+                // NS_REFINED_FOR_SWIFT Obj-C property to this Result-typed form.
+                operation.perShareParticipantResultBlock = { _, result in
+                    if case .success(let participant) = result,
+                       let components = participant.userIdentity.nameComponents {
+                        let formatter = PersonNameComponentsFormatter()
+                        formatter.style = .default
+                        let n = formatter.string(from: components)
+                        if !n.isEmpty { fetchedName = n }
                     }
                 }
+
+                // Called when all lookups finish (success or failure).
+                operation.fetchShareParticipantsResultBlock = { result in
+                    switch result {
+                    case .success:
+                        continuation.resume(returning: fetchedName)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+
+                container.add(operation)
             }
-            if let components = identity?.nameComponents {
-                let formatter = PersonNameComponentsFormatter()
-                formatter.style = .default
-                let name = formatter.string(from: components)
-                return name.isEmpty ? nil : name
-            }
-            return nil
+            return name
         } catch {
             logger.info("Could not fetch iCloud display name: \(error.localizedDescription)")
             return nil
