@@ -19,11 +19,25 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
     ) {
+        // Capture the owner's display name before accepting — available immediately
+        // from the metadata without a network call.
+        let ownerName: String = {
+            guard let components = cloudKitShareMetadata.ownerIdentity.nameComponents else {
+                return ""
+            }
+            return PersonNameComponentsFormatter().string(from: components)
+        }()
+
+        if !ownerName.isEmpty {
+            // Store for ContentView to pick up on next appear and show a welcome message.
+            UserDefaults.standard.set(ownerName, forKey: "pendingWelcomeOwnerName")
+        }
+
         let container = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
         Task {
             do {
                 try await container.accept(cloudKitShareMetadata)
-                print("[Sync] Accepted household share from \(cloudKitShareMetadata.ownerIdentity.nameComponents?.formatted() ?? "unknown")")
+                print("[Sync] Accepted household share from \(ownerName.isEmpty ? "unknown" : ownerName)")
             } catch {
                 print("[Sync] Failed to accept share: \(error.localizedDescription)")
             }
@@ -34,6 +48,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct Family_Meal_PlannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var syncMonitor = SyncMonitor()
 
     init() {
         #if DEBUG
@@ -50,6 +65,7 @@ struct Family_Meal_PlannerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(syncMonitor)
         }
         // SwiftData + CloudKit: syncs recipes, ingredients, and meal plans
         // across all family members via iCloud.

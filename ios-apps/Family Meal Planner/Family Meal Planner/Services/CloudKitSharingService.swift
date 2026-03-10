@@ -115,6 +115,37 @@ actor CloudKitSharingService {
             return nil
         }
     }
+
+    // MARK: - User Identity
+
+    /// Fetches the current user's iCloud display name by looking up their
+    /// CloudKit user record identity. Returns nil if unavailable (e.g. not
+    /// signed in, discoverability disabled, or network error).
+    func fetchCurrentUserDisplayName() async -> String? {
+        do {
+            let recordID = try await container.userRecordID()
+            // discoverUserIdentity has no async overload — wrap with a continuation.
+            let identity: CKUserIdentity? = try await withCheckedThrowingContinuation { continuation in
+                container.discoverUserIdentity(withUserRecordID: recordID) { identity, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: identity)
+                    }
+                }
+            }
+            if let components = identity?.nameComponents {
+                let formatter = PersonNameComponentsFormatter()
+                formatter.style = .default
+                let name = formatter.string(from: components)
+                return name.isEmpty ? nil : name
+            }
+            return nil
+        } catch {
+            logger.info("Could not fetch iCloud display name: \(error.localizedDescription)")
+            return nil
+        }
+    }
 }
 
 /// Errors specific to CloudKit sharing operations.

@@ -13,6 +13,7 @@ import CloudKit
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(SyncMonitor.self) private var syncMonitor
     @Query(sort: \HouseholdMember.name) private var members: [HouseholdMember]
 
     // Device-local: remembers which household member is using this device.
@@ -175,6 +176,9 @@ struct SettingsView: View {
                 }
             }
             .disabled(isLoadingShare)
+
+            // Subtle sync status indicator
+            SyncStatusRow(syncState: syncMonitor.syncState, isOffline: syncMonitor.isOffline)
         } header: {
             Text("iCloud Sharing")
         } footer: {
@@ -342,7 +346,57 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Sync Status Row
+
+/// Small read-only row that shows the current iCloud sync state.
+struct SyncStatusRow: View {
+    let syncState: SyncMonitor.SyncState
+    let isOffline: Bool
+
+    private var icon: String {
+        if isOffline { return "wifi.slash" }
+        switch syncState {
+        case .synced:  return "checkmark.circle.fill"
+        case .syncing: return "arrow.triangle.2.circlepath"
+        case .error:   return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var color: Color {
+        if isOffline { return .orange }
+        switch syncState {
+        case .synced:  return .green
+        case .syncing: return .blue
+        case .error:   return .red
+        }
+    }
+
+    private var label: String {
+        if isOffline { return "Offline" }
+        switch syncState {
+        case .synced:       return "Synced"
+        case .syncing:      return "Syncing…"
+        case .error(let m): return "Sync error: \(m)"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+                .symbolEffect(.pulse, isActive: syncState == .syncing)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 #Preview {
     SettingsView()
         .modelContainer(for: [HouseholdMember.self], inMemory: true)
+        .environment(SyncMonitor())
 }

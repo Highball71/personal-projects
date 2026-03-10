@@ -208,6 +208,12 @@ struct RecipeRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            // "Added by" byline — shown only for recipes where the creator was recorded.
+            if let name = recipe.addedByName, !name.isEmpty {
+                Text("Added by \(name)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 }

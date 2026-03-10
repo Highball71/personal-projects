@@ -16,6 +16,7 @@ struct GroceryListView: View {
     @Query private var allGroceryItems: [GroceryItem]
     @Query private var allMealPlans: [MealPlan]
     @Environment(\.modelContext) private var modelContext
+    @Environment(SyncMonitor.self) private var syncMonitor
 
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
     @State private var showClearConfirmation = false
@@ -54,6 +55,22 @@ struct GroceryListView: View {
                 }
             }
             .navigationTitle("Grocery List")
+            // Offline banner — shown as a persistent inset above the content
+            .safeAreaInset(edge: .top) {
+                if syncMonitor.isOffline {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi.slash")
+                            .font(.caption)
+                        Text("Offline — changes will sync when connected")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.orange)
+                }
+            }
             .onAppear { generateIfNeeded() }
             .toolbar {
                 if !currentWeekItems.isEmpty {
@@ -82,7 +99,7 @@ struct GroceryListView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Clear", role: .destructive) { clearCheckedItems() }
             } message: {
-                Text("This will remove all checked items from the list.")
+                Text("This will remove all checked items from the list. This clears checkmarks for everyone in your household.")
             }
             .alert("Uncheck all items?", isPresented: $showUncheckConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -181,4 +198,5 @@ struct GroceryListView: View {
 #Preview {
     GroceryListView()
         .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, GroceryItem.self], inMemory: true)
+        .environment(SyncMonitor())
 }

@@ -26,6 +26,11 @@ final class Recipe {
     var sourceType: RecipeSource?
     var sourceDetail: String?
 
+    // Display name of whoever added this recipe to the shared library.
+    // Set at creation time from the iCloud display name (or local household name).
+    // Nil for recipes that pre-date this field.
+    var addedByName: String?
+
     // .cascade means: when you delete a recipe, its ingredients
     // are automatically deleted too. No orphaned data.
     // Optional because CloudKit requires all relationships to be optional.

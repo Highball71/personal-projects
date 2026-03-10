@@ -56,6 +56,11 @@ struct AddEditRecipeView: View {
     // Recipe search state
     @State private var showingRecipeSearch = false
 
+    // Creator name — fetched from iCloud on appear for new recipes.
+    // Stored in the recipe so it persists and syncs to household members.
+    @AppStorage("currentUserName") private var currentUserName: String = ""
+    @State private var creatorDisplayName: String? = nil
+
     var isEditing: Bool { recipeToEdit != nil }
 
     /// Placeholder text that changes based on the selected source type
@@ -326,6 +331,17 @@ struct AddEditRecipeView: View {
                 }
             }
             .onAppear {
+                // For new recipes, try to get the iCloud display name so we can
+                // attribute the recipe to whoever added it. Falls back to the
+                // local household name (currentUserName) if CloudKit lookup fails.
+                if recipeToEdit == nil {
+                    Task {
+                        let iCloudName = await CloudKitSharingService.shared.fetchCurrentUserDisplayName()
+                        // Prefer iCloud name → local name → nothing
+                        creatorDisplayName = iCloudName ?? (currentUserName.isEmpty ? nil : currentUserName)
+                    }
+                }
+
                 // If editing, populate the form with the existing recipe's data
                 if let recipe = recipeToEdit {
                     name = recipe.name
@@ -532,6 +548,8 @@ struct AddEditRecipeView: View {
                 sourceType: sourceType,
                 sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail
             )
+            // Record who added this recipe (iCloud name fetched on appear, or local name).
+            recipe.addedByName = creatorDisplayName
             modelContext.insert(recipe)
         }
 
