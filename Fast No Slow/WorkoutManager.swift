@@ -47,6 +47,11 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var cadenceTimer: Timer?
     private var recentStepCounts: [(steps: Int, duration: TimeInterval)] = []
 
+    // MARK: - HR Source Tracking
+    private var currentHRSource: HRSource = .none
+    private var hrTimeoutTimer: Timer?
+    private let hrTimeoutInterval: TimeInterval = 10
+
     // MARK: - Metronome
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
@@ -57,6 +62,12 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         case belowZone = "SPEED UP"
         case inZone = "IN THE ZONE"
         case aboveZone = "SLOW DOWN"
+    }
+
+    private enum HRSource {
+        case none
+        case appleWatch
+        case bluetoothStrap
     }
 
     override init() {
@@ -104,6 +115,9 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
         cadence = nil
         recentStepCounts = []
+        currentHRSource = .none
+        hrTimeoutTimer?.invalidate()
+        hrTimeoutTimer = nil
 
         startHeartRateQuery()
         locationManager.startUpdatingLocation()
@@ -131,6 +145,8 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         timer = nil
         cadenceTimer?.invalidate()
         cadenceTimer = nil
+        hrTimeoutTimer?.invalidate()
+        hrTimeoutTimer = nil
         pedometer.stopUpdates()
         locationManager.stopUpdatingLocation()
         stopMetronome()
@@ -279,10 +295,69 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         guard let samples = samples as? [HKQuantitySample], let latest = samples.last else { return }
 
         let hr = latest.quantity.doubleValue(for: HKUnit(from: "count/min"))
+        let newSource = detectHRSource(from: latest)
 
         DispatchQueue.main.async {
             self.heartRate = hr
+            self.handleHRSourceChange(newSource: newSource)
             self.updateZoneStatus()
+        }
+    }
+
+    private func detectHRSource(from sample: HKQuantitySample) -> HRSource {
+        // Apple Watch HR data comes from a com.apple bundle (e.g. com.apple.health)
+        // Bluetooth chest straps appear as third-party sources
+        let bundleID = sample.sourceRevision.source.bundleIdentifier
+        if bundleID.hasPrefix("com.apple") {
+            return .appleWatch
+        } else {
+            return .bluetoothStrap
+        }
+    }
+
+    private func handleHRSourceChange(newSource: HRSource) {
+        // Cancel any pending disconnection timeout since a new sample just arrived
+        hrTimeoutTimer?.invalidate()
+        hrTimeoutTimer = nil
+
+        guard newSource != currentHRSource else {
+            // Still on strap — reset the disconnection timeout
+            if newSource == .bluetoothStrap {
+                scheduleHRDisconnectTimeout()
+            }
+            return
+        }
+
+        let previous = currentHRSource
+        currentHRSource = newSource
+
+        switch newSource {
+        case .bluetoothStrap:
+            speak("Chest strap connected.")
+            scheduleHRDisconnectTimeout()
+        case .appleWatch:
+            // Only announce fallback when switching away from a strap
+            if previous == .bluetoothStrap {
+                speak("Switching to Apple Watch heart rate.")
+            }
+        case .none:
+            break
+        }
+    }
+
+    // Starts a timer that fires if no strap sample arrives within hrTimeoutInterval.
+    // This detects strap disconnection when there is no Apple Watch fallback,
+    // because HealthKit stops delivering samples entirely in that case.
+    private func scheduleHRDisconnectTimeout() {
+        hrTimeoutTimer?.invalidate()
+        hrTimeoutTimer = Timer.scheduledTimer(withTimeInterval: hrTimeoutInterval, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if self.currentHRSource == .bluetoothStrap {
+                    self.currentHRSource = .none
+                    self.speak("Heart rate monitor disconnected.")
+                }
+            }
         }
     }
 
