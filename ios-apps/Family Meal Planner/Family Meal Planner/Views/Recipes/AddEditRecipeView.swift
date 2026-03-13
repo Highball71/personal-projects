@@ -200,12 +200,16 @@ struct AddEditRecipeView: View {
             // Camera (UIImagePickerController wrapper)
             // After capturing the first photo, hand off to PhotoScanView
             // so the user can add more pages before extracting.
-            // onDismiss presents the scan view AFTER the camera is fully
-            // dismissed — presenting a sheet while a fullScreenCover is
-            // still animating away can cause SwiftUI to drop or misrender it.
+            // The onDismiss defers one run loop iteration so that the
+            // scannedPages state update from the camera callback has
+            // propagated before we check it — without this, onDismiss
+            // can fire in the same SwiftUI transaction and read the
+            // stale (empty) value, causing "0 pages scanned."
             .fullScreenCover(isPresented: $showingCamera, onDismiss: {
-                if !scannedPages.isEmpty {
-                    showingPhotoScan = true
+                DispatchQueue.main.async {
+                    if !scannedPages.isEmpty {
+                        showingPhotoScan = true
+                    }
                 }
             }) {
                 CameraView { image in
