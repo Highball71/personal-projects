@@ -6,6 +6,7 @@
 import SwiftUI
 import SwiftData
 import CloudKit
+import os
 
 /// Settings screen with household management and API key configuration.
 /// The Household section lets you add family members and designate a
@@ -209,7 +210,7 @@ struct SettingsView: View {
                 presentShareSheet(url: url)
             } catch {
                 isLoadingShare = false
-                print("[Sharing] Failed to create share: \(error.localizedDescription)")
+                Logger.cloudkit.error("Failed to create share: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

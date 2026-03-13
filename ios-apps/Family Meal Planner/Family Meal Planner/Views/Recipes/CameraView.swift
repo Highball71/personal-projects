@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UIKit
+import os
 
 /// Wraps UIImagePickerController to provide camera access from SwiftUI.
 /// SwiftUI's PhotosPicker only handles the photo library, not the camera,
@@ -38,7 +39,7 @@ struct CameraView: UIViewControllerRepresentable {
             didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
             let image = info[.originalImage] as? UIImage
-            print("[PhotoScan] Camera captured image: \(image != nil ? "yes" : "no")")
+            Logger.permissions.debug("Camera captured image: \(image != nil ? "yes" : "no", privacy: .public)")
             // Don't call picker.dismiss() — SwiftUI handles dismissal
             // via the fullScreenCover's isPresented binding. Calling both
             // causes a race condition that can swallow the callback.
@@ -46,7 +47,7 @@ struct CameraView: UIViewControllerRepresentable {
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            print("[PhotoScan] Camera cancelled")
+            Logger.permissions.debug("Camera cancelled")
             onImageCaptured(nil)
         }
     }

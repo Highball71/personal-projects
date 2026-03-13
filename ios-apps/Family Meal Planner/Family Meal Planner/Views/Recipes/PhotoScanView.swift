@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import os
 
 /// Multi-page photo scanning view for cookbook recipes.
 /// After capturing the first photo, the user can add more pages (up to 5),
@@ -94,9 +95,9 @@ struct PhotoScanView: View {
                 CameraView { image in
                     if let image {
                         pages.append(image)
-                        print("[PhotoScan] Added page — now \(pages.count) page(s)")
+                        Logger.importPipeline.debug("Added page — now \(pages.count, privacy: .public) page(s)")
                     } else {
-                        print("[PhotoScan] Add-page camera cancelled")
+                        Logger.importPipeline.debug("Add-page camera cancelled")
                     }
                     showingCamera = false
                 }

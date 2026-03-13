@@ -7,6 +7,7 @@
 //  of food blogs that include structured data for SEO.
 
 import Foundation
+import os
 
 /// Parses `<script type="application/ld+json">` blocks in HTML to find
 /// a Schema.org Recipe object, then converts it to an ExtractedRecipe.
@@ -18,10 +19,10 @@ enum JSONLDRecipeParser {
     /// Returns nil if no Recipe schema is found — caller should fall back
     /// to Claude API.
     static func extractRecipe(from html: String) -> ExtractedRecipe? {
-        print("[URLImport] JSON-LD: Searching for structured recipe data...")
+        Logger.importPipeline.info("JSON-LD: Searching for structured recipe data...")
 
         let jsonBlocks = findJSONLDBlocks(in: html)
-        print("[URLImport] JSON-LD: Found \(jsonBlocks.count) ld+json script block(s)")
+        Logger.importPipeline.info("JSON-LD: Found \(jsonBlocks.count, privacy: .public) ld+json script block(s)")
 
         for block in jsonBlocks {
             // Some CMSes HTML-encode "&" as "&amp;" inside script tags.
@@ -35,15 +36,15 @@ enum JSONLDRecipeParser {
             }
 
             if let recipe = findRecipeObject(in: json) {
-                print("[URLImport] JSON-LD: Found Recipe object")
+                Logger.importPipeline.info("JSON-LD: Found Recipe object")
                 if let extracted = convertToExtractedRecipe(recipe) {
-                    print("[URLImport] JSON-LD: Successfully parsed \"\(extracted.name)\"")
+                    Logger.importPipeline.info("JSON-LD: Successfully parsed \"\(extracted.name)\"")
                     return extracted
                 }
             }
         }
 
-        print("[URLImport] JSON-LD: No Recipe schema found, will fall back to Claude API")
+        Logger.importPipeline.warning("JSON-LD: No Recipe schema found, will fall back to Claude API")
         return nil
     }
 
@@ -106,16 +107,18 @@ enum JSONLDRecipeParser {
 
     private static func convertToExtractedRecipe(_ json: [String: Any]) -> ExtractedRecipe? {
         guard let rawName = json["name"] as? String, !rawName.isEmpty else {
-            print("[URLImport] JSON-LD: Recipe object missing 'name' field")
+            Logger.importPipeline.warning("JSON-LD: Recipe object missing 'name' field")
             return nil
         }
 
         let name = decodeHTMLEntities(rawName)
-        print("[JSONLDParser] Raw name from JSON: \"\(rawName)\"")
-        print("[JSONLDParser] Decoded name:       \"\(name)\"")
+        #if DEBUG
+        Logger.importPipeline.debug("Raw name from JSON: \"\(rawName)\"")
+        Logger.importPipeline.debug("Decoded name:       \"\(name)\"")
         if rawName != name {
-            print("[JSONLDParser] HTML entities were decoded in recipe name")
+            Logger.importPipeline.debug("HTML entities were decoded in recipe name")
         }
+        #endif
         let category = extractCategory(from: json)
         let servingSize = extractString(from: json["recipeYield"])
         let prepTime = parseISO8601Duration(extractString(from: json["prepTime"]))
@@ -126,7 +129,7 @@ enum JSONLDRecipeParser {
 
         // A recipe should have at least ingredients or instructions to be useful
         guard !ingredients.isEmpty || !instructions.isEmpty else {
-            print("[URLImport] JSON-LD: Recipe has no ingredients or instructions, skipping")
+            Logger.importPipeline.warning("JSON-LD: Recipe has no ingredients or instructions, skipping")
             return nil
         }
 

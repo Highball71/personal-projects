@@ -6,6 +6,7 @@
 //  then falls back to sending the page HTML to Claude.
 
 import Foundation
+import os
 
 enum RecipeWebImporter {
 
@@ -39,15 +40,14 @@ enum RecipeWebImporter {
     /// Step 3: If JSON-LD fails, send HTML to Claude
     /// Step 4: Parse response into ExtractedRecipe
     static func importRecipe(from url: URL) async throws -> ExtractedRecipe {
-        print("[URLImport] ======= Starting URL import =======")
-        print("[URLImport] URL: \(url.absoluteString)")
+        Logger.importPipeline.info("Starting URL import for \(url.absoluteString, privacy: .public)")
 
         // --- Step 1: Fetch HTML ---
         let htmlText = try await fetchHTML(from: url)
 
         // --- Step 2: Try JSON-LD (free, no API call) ---
         if let extracted = RecipeResponseParser.extractJSONLD(from: htmlText) {
-            print("[URLImport] ======= URL import succeeded (via JSON-LD) =======")
+            Logger.importPipeline.info("URL import succeeded (via JSON-LD)")
             return extracted
         }
 
@@ -56,7 +56,7 @@ enum RecipeWebImporter {
         let trimmedHTML = htmlText.count > maxChars
             ? String(htmlText.prefix(maxChars))
             : htmlText
-        print("[URLImport] Sending \(trimmedHTML.count) chars to Claude API...")
+        Logger.importPipeline.info("Sending \(trimmedHTML.count, privacy: .public) chars to Claude API...")
 
         let userPrompt = """
             Extract the recipe from this webpage HTML. Return JSON with these fields: \
@@ -83,13 +83,13 @@ enum RecipeWebImporter {
 
         let text = try AnthropicClient.extractText(from: response)
         #if DEBUG
-        print("[URLImport] Claude response preview: \(String(text.prefix(500)))")
+        Logger.importPipeline.debug("Claude response preview: \(String(text.prefix(500)), privacy: .public)")
         #endif
 
         // --- Step 4: Parse ---
         do {
             let recipe = try RecipeResponseParser.parse(response: text)
-            print("[URLImport] ======= URL import succeeded =======")
+            Logger.importPipeline.info("URL import succeeded")
             return recipe
         } catch let error as RecipeResponseParser.ParseError where error == .noRecipeFound {
             throw ImportError.noRecipeFound
@@ -99,7 +99,7 @@ enum RecipeWebImporter {
     // MARK: - Private
 
     private static func fetchHTML(from url: URL) async throws -> String {
-        print("[URLImport] Fetching webpage...")
+        Logger.network.info("Fetching webpage...")
 
         var fetchRequest = URLRequest(url: url)
         fetchRequest.setValue(
@@ -112,13 +112,13 @@ enum RecipeWebImporter {
         do {
             (data, response) = try await URLSession.shared.data(for: fetchRequest)
         } catch {
-            print("[URLImport] Network error — \(error)")
+            Logger.network.error("Network error: \(error.localizedDescription, privacy: .public)")
             throw ImportError.urlFetchFailed(error.localizedDescription)
         }
 
         let httpResponse = response as? HTTPURLResponse
         let statusCode = httpResponse?.statusCode ?? -1
-        print("[URLImport] HTTP \(statusCode), \(data.count) bytes")
+        Logger.network.info("HTTP \(statusCode, privacy: .public), \(data.count, privacy: .public) bytes")
 
         if !(200...299).contains(statusCode) {
             throw ImportError.urlFetchFailed("HTTP \(statusCode)")
@@ -133,11 +133,10 @@ enum RecipeWebImporter {
         }
 
         #if DEBUG
-        print("[URLImport] HTML preview (first 500 chars):")
-        print("[URLImport] \(String(htmlText.prefix(500)))")
+        Logger.network.debug("HTML preview (first 500 chars): \(String(htmlText.prefix(500)), privacy: .public)")
         #endif
 
-        print("[URLImport] Fetched \(htmlText.count) chars")
+        Logger.network.info("Fetched \(htmlText.count, privacy: .public) chars")
         return htmlText
     }
 }

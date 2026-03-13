@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import os
 
 /// Handles both adding a new recipe and editing an existing one.
 /// When `recipeToEdit` is nil → add mode (form starts empty).
@@ -116,10 +117,10 @@ private struct ImportModifiers: ViewModifier {
             }) {
                 CameraView { image in
                     if let image {
-                        print("[PhotoScan] First page captured, size: \(Int(image.size.width))x\(Int(image.size.height))")
+                        Logger.importPipeline.debug("First page captured, size: \(Int(image.size.width), privacy: .public)x\(Int(image.size.height), privacy: .public)")
                         coordinator.scannedPages = [image]
                     } else {
-                        print("[PhotoScan] Camera cancelled")
+                        Logger.importPipeline.debug("Camera cancelled")
                     }
                     coordinator.showingCamera = false
                 }

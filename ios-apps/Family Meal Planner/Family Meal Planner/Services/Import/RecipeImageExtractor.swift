@@ -5,6 +5,7 @@
 //  Extracts recipe data from photos of cookbook pages using the Claude Vision API.
 
 import Foundation
+import os
 import UIKit
 
 enum RecipeImageExtractor {
@@ -68,16 +69,16 @@ enum RecipeImageExtractor {
     // MARK: - Private
 
     private static func extractSingle(from image: UIImage) async throws -> ExtractedRecipe {
-        print("[RecipeScan] Starting recipe extraction...")
+        Logger.importPipeline.info("Starting recipe extraction...")
 
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            print("[RecipeScan] ERROR: Failed to convert image to JPEG data")
+            Logger.importPipeline.error("Failed to convert image to JPEG data")
             throw ExtractionError.imageConversionFailed
         }
         let base64String = imageData.base64EncodedString()
-        print("[RecipeScan] Image data size: \(imageData.count) bytes (\(String(format: "%.1f", Double(imageData.count) / 1_000_000)) MB)")
+        Logger.importPipeline.info("Image data size: \(imageData.count, privacy: .public) bytes")
 
-        print("[RecipeScan] Sending request to Claude API...")
+        Logger.importPipeline.info("Sending request to Claude API...")
         let response = try await AnthropicClient.sendImageMessage(
             systemPrompt: systemPrompt,
             userPrompt: singleImagePrompt,
@@ -87,24 +88,24 @@ enum RecipeImageExtractor {
 
         let text = try AnthropicClient.extractText(from: response)
         #if DEBUG
-        print("[RecipeScan] Raw response body:\n\(text)")
+        Logger.importPipeline.debug("Raw response body:\n\(text, privacy: .public)")
         #endif
 
         let recipe = try RecipeResponseParser.parse(response: text)
-        print("[RecipeScan] Successfully parsed recipe: \"\(recipe.name)\"")
+        Logger.importPipeline.info("Successfully parsed recipe: \"\(recipe.name)\"")
         return recipe
     }
 
     private static func extractMultiPage(from images: [UIImage]) async throws -> ExtractedRecipe {
-        print("[RecipeScan] Starting multi-page extraction (\(images.count) pages)...")
+        Logger.importPipeline.info("Starting multi-page extraction (\(images.count, privacy: .public) pages)...")
 
         var imageContents: [[String: Any]] = []
         for (index, image) in images.enumerated() {
             guard let data = image.jpegData(compressionQuality: 0.8) else {
-                print("[RecipeScan] ERROR: Failed to convert page \(index + 1) to JPEG")
+                Logger.importPipeline.error("Failed to convert page \(index + 1, privacy: .public) to JPEG")
                 throw ExtractionError.imageConversionFailed
             }
-            print("[RecipeScan] Page \(index + 1): \(data.count) bytes (\(String(format: "%.1f", Double(data.count) / 1_000_000)) MB)")
+            Logger.importPipeline.info("Page \(index + 1, privacy: .public): \(data.count, privacy: .public) bytes")
             imageContents.append([
                 "type": "image",
                 "source": [
@@ -115,7 +116,7 @@ enum RecipeImageExtractor {
             ])
         }
 
-        print("[RecipeScan] Sending multi-page request to Claude API...")
+        Logger.importPipeline.info("Sending multi-page request to Claude API...")
         let response = try await AnthropicClient.sendMultiImageMessage(
             systemPrompt: systemPrompt,
             userPrompt: multiPagePrompt,
@@ -125,11 +126,11 @@ enum RecipeImageExtractor {
 
         let text = try AnthropicClient.extractText(from: response)
         #if DEBUG
-        print("[RecipeScan] Raw response body:\n\(text)")
+        Logger.importPipeline.debug("Raw response body:\n\(text, privacy: .public)")
         #endif
 
         let recipe = try RecipeResponseParser.parse(response: text)
-        print("[RecipeScan] Successfully parsed multi-page recipe: \"\(recipe.name)\"")
+        Logger.importPipeline.info("Successfully parsed multi-page recipe: \"\(recipe.name)\"")
         return recipe
     }
 }

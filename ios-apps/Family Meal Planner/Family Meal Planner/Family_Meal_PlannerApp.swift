@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import CloudKit
+import os
 
 // MARK: - App Delegate (CloudKit Share Acceptance)
 
@@ -37,9 +38,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         Task {
             do {
                 try await container.accept(cloudKitShareMetadata)
-                print("[Sync] Accepted household share from \(ownerName.isEmpty ? "unknown" : ownerName)")
+                Logger.cloudkit.info("Accepted household share from \(ownerName.isEmpty ? "unknown" : ownerName, privacy: .public)")
             } catch {
-                print("[Sync] Failed to accept share: \(error.localizedDescription)")
+                Logger.cloudkit.error("Failed to accept share: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -106,10 +107,10 @@ private let sharedModelContainer: ModelContainer = {
             cloudKitDatabase: .automatic
         )
         let container = try ModelContainer(for: schema, configurations: [cloudConfig])
-        print("[Sync] CloudKit sync enabled")
+        Logger.cloudkit.info("CloudKit sync enabled")
         return container
     } catch {
-        print("[Sync] CloudKit unavailable (\(error.localizedDescription)), falling back to local storage")
+        Logger.cloudkit.error("CloudKit unavailable (\(error.localizedDescription, privacy: .public)), falling back to local storage")
     }
 
     // Fall back to local-only storage so the app never crashes.

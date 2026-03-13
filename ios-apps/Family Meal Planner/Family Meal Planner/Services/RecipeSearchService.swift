@@ -6,6 +6,7 @@
 //  parses the search results HTML, and returns a list of matching recipe pages.
 
 import Foundation
+import os
 
 /// A single recipe search result with a page title, URL, and site name.
 struct SearchResult: Identifiable {
@@ -74,7 +75,9 @@ enum RecipeSearchService {
             throw SearchError.invalidQuery
         }
         let searchURL = URL(string: "https://html.duckduckgo.com/html/?q=\(encoded)")!
-        print("[RecipeSearch] Searching: \(searchURL.absoluteString)")
+        #if DEBUG
+        Logger.search.debug("Searching: \(searchURL.absoluteString)")
+        #endif
 
         // Fetch search results HTML
         var request = URLRequest(url: searchURL)
@@ -86,12 +89,12 @@ enum RecipeSearchService {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
-            print("[RecipeSearch] Network error: \(error)")
+            Logger.search.error("Network error: \(error)")
             throw SearchError.networkError(error.localizedDescription)
         }
 
         if let httpResponse = response as? HTTPURLResponse {
-            print("[RecipeSearch] HTTP \(httpResponse.statusCode), \(data.count) bytes")
+            Logger.search.info("HTTP \(httpResponse.statusCode, privacy: .public), \(data.count, privacy: .public) bytes")
         }
 
         let html = String(data: data, encoding: .utf8)
@@ -99,7 +102,7 @@ enum RecipeSearchService {
             ?? ""
 
         let results = parseSearchResults(from: html)
-        print("[RecipeSearch] Found \(results.count) recipe result(s)")
+        Logger.search.info("Found \(results.count, privacy: .public) recipe result(s)")
         return results
     }
 
@@ -152,7 +155,9 @@ enum RecipeSearchService {
 
             let siteName = friendlySiteName(from: host)
             results.append(SearchResult(title: title, url: url, siteName: siteName))
-            print("[RecipeSearch]   \(siteName): \(title)")
+            #if DEBUG
+            Logger.search.debug("  \(siteName, privacy: .public): \(title)")
+            #endif
         }
 
         return results

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import os
 
 @Observable
 final class RecipeImportCoordinator {
@@ -76,21 +77,21 @@ final class RecipeImportCoordinator {
     @MainActor
     func extractRecipeFromImages(_ images: [UIImage], into viewModel: RecipeFormViewModel) async {
         let pageCount = images.count
-        print("[PhotoScan] Starting extraction of \(pageCount) page(s)...")
+        Logger.importPipeline.info("Starting extraction of \(pageCount, privacy: .public) page(s)")
         isExtractingRecipe = true
         extractionError = nil
         scanPageCount = pageCount
 
         do {
-            print("[PhotoScan] Sending \(pageCount) page(s) to Claude API...")
+            Logger.importPipeline.debug("Sending \(pageCount, privacy: .public) page(s) to Claude API")
             let extracted = try await RecipeImageExtractor.extract(from: images)
-            print("[PhotoScan] Got response: \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
+            Logger.importPipeline.info("Got response: \"\(extracted.name)\" with \(extracted.ingredients.count, privacy: .public) ingredients")
 
             viewModel.populateFrom(extracted, sourceType: .photo)
 
             withAnimation { showingExtractionSuccess = true }
         } catch {
-            print("[PhotoScan] Error: \(error)")
+            Logger.importPipeline.error("Photo extraction error: \(error)")
             extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
             showingExtractionError = true
         }
@@ -98,7 +99,7 @@ final class RecipeImportCoordinator {
         isExtractingRecipe = false
         scanPageCount = 0
         scannedPages = []
-        print("[PhotoScan] Extraction complete, loading indicator hidden")
+        Logger.importPipeline.debug("Extraction complete, loading indicator hidden")
     }
 
     /// Send a single image (from photo library).
@@ -117,13 +118,13 @@ final class RecipeImportCoordinator {
         }
 
         guard let url = URL(string: urlString), url.scheme != nil, url.host != nil else {
-            print("[URLImport] Invalid URL entered: \"\(importURLText)\"")
+            Logger.importPipeline.error("Invalid URL entered: \"\(self.importURLText)\"")
             extractionError = "That doesn't look like a valid URL. Check the link and try again."
             showingExtractionError = true
             return
         }
 
-        print("[URLImport] User initiated import for: \(url.absoluteString)")
+        Logger.importPipeline.info("User initiated URL import for: \(url.absoluteString)")
         isExtractingRecipe = true
         isExtractingFromURL = true
         extractionError = nil
@@ -133,11 +134,11 @@ final class RecipeImportCoordinator {
 
             viewModel.populateFrom(extracted, sourceURL: url.absoluteString, sourceType: .url)
 
-            print("[URLImport] Form pre-filled successfully with \"\(extracted.name)\"")
+            Logger.importPipeline.info("Form pre-filled successfully with \"\(extracted.name)\"")
             withAnimation { showingExtractionSuccess = true }
         } catch {
-            print("[URLImport] Import failed — no form data changed, nothing saved")
-            print("[URLImport] Error: \(error)")
+            Logger.importPipeline.error("URL import failed — no form data changed, nothing saved")
+            Logger.importPipeline.error("URL import error: \(error)")
 
             if error is RecipeWebImporter.ImportError,
                case RecipeWebImporter.ImportError.noRecipeFound = error {
