@@ -54,12 +54,7 @@ enum ClaudeAPIService {
     // MARK: - Public
 
     /// Extract recipe data from multiple photos of cookbook pages.
-    /// Sends all images in a single API request so Claude can combine
-    /// content across pages into one unified recipe.
-    ///
-    /// - Parameter images: One or more UIImages from the camera
-    /// - Returns: An ExtractedRecipe with parsed fields
-    /// - Throws: APIError or KeychainHelper.KeychainError
+    @available(*, deprecated, message: "Use RecipeImageExtractor.extract(from:) instead")
     static func extractRecipe(from images: [UIImage]) async throws -> ExtractedRecipe {
         guard !images.isEmpty else { throw APIError.imageConversionFailed }
 
@@ -124,10 +119,7 @@ enum ClaudeAPIService {
     }
 
     /// Extract recipe data from a photo of a cookbook page.
-    ///
-    /// - Parameter image: A UIImage from the camera or photo library
-    /// - Returns: An ExtractedRecipe with parsed fields
-    /// - Throws: APIError or KeychainHelper.KeychainError
+    @available(*, deprecated, message: "Use RecipeImageExtractor.extract(from:) instead")
     static func extractRecipe(from image: UIImage) async throws -> ExtractedRecipe {
         print("[RecipeScan] Starting recipe extraction...")
 
@@ -181,13 +173,7 @@ enum ClaudeAPIService {
     }
 
     /// Extract recipe data from a webpage URL.
-    ///
-    /// Fetches the page HTML, sends it to Claude as text, and parses the
-    /// same ExtractedRecipe JSON structure.
-    ///
-    /// - Parameter url: The recipe page URL
-    /// - Returns: An ExtractedRecipe with parsed fields
-    /// - Throws: APIError or KeychainHelper.KeychainError
+    @available(*, deprecated, message: "Use RecipeWebImporter.importRecipe(from:) instead")
     static func extractRecipe(fromURL url: URL) async throws -> ExtractedRecipe {
         print("[URLImport] ======= Starting URL import =======")
         print("[URLImport] URL: \(url.absoluteString)")

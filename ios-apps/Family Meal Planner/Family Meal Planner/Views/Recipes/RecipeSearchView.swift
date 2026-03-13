@@ -152,13 +152,13 @@ struct RecipeSearchView: View {
 
         Task {
             do {
-                let extracted = try await ClaudeAPIService.extractRecipe(fromURL: result.url)
+                let extracted = try await RecipeWebImporter.importRecipe(from: result.url)
                 // Success — call back to the parent and dismiss
                 onRecipeImported(extracted, result.url)
                 dismiss()
             } catch {
-                if let apiError = error as? ClaudeAPIService.APIError,
-                   case .noRecipeFound = apiError {
+                if error is RecipeWebImporter.ImportError,
+                   case RecipeWebImporter.ImportError.noRecipeFound = error {
                     importError = "Couldn't find a recipe on that page."
                 } else {
                     importError = "Couldn't read a recipe from that page. Try a different result."

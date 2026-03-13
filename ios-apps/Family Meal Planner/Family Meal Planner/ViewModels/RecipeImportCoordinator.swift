@@ -83,7 +83,7 @@ final class RecipeImportCoordinator {
 
         do {
             print("[PhotoScan] Sending \(pageCount) page(s) to Claude API...")
-            let extracted = try await ClaudeAPIService.extractRecipe(from: images)
+            let extracted = try await RecipeImageExtractor.extract(from: images)
             print("[PhotoScan] Got response: \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
 
             viewModel.populateFrom(extracted, sourceType: .photo)
@@ -129,7 +129,7 @@ final class RecipeImportCoordinator {
         extractionError = nil
 
         do {
-            let extracted = try await ClaudeAPIService.extractRecipe(fromURL: url)
+            let extracted = try await RecipeWebImporter.importRecipe(from: url)
 
             viewModel.populateFrom(extracted, sourceURL: url.absoluteString, sourceType: .url)
 
@@ -139,8 +139,8 @@ final class RecipeImportCoordinator {
             print("[URLImport] Import failed — no form data changed, nothing saved")
             print("[URLImport] Error: \(error)")
 
-            if let apiError = error as? ClaudeAPIService.APIError,
-               case .noRecipeFound = apiError {
+            if error is RecipeWebImporter.ImportError,
+               case RecipeWebImporter.ImportError.noRecipeFound = error {
                 extractionError = "Couldn't find a recipe on that page."
             } else {
                 extractionError = "Couldn't read a recipe from that page. Try a different URL."
