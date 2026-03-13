@@ -8,7 +8,6 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
-import AVFoundation
 
 /// Handles both adding a new recipe and editing an existing one.
 /// When `recipeToEdit` is nil → add mode (form starts empty).
@@ -17,224 +16,126 @@ struct AddEditRecipeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    /// Pass an existing recipe here to edit it. Leave nil to add a new one.
-    var recipeToEdit: Recipe?
+    @State private var viewModel: RecipeFormViewModel
+    @State private var coordinator = RecipeImportCoordinator()
 
-    // Form state — these are local copies. Nothing is saved to the
-    // database until the user taps "Save".
-    @State private var name = ""
-    @State private var category: RecipeCategory = .dinner
-    @State private var servings = 4
-    @State private var prepTimeMinutes = 30
-    @State private var cookTimeMinutes = 0
-    @State private var instructions = ""
-    @State private var ingredientRows: [IngredientFormData] = []
-    @State private var sourceType: RecipeSource?
-    @State private var sourceDetail = ""
-
-    // Photo-to-recipe state
-    @State private var showingPhotoOptions = false
-    @State private var showingCamera = false
-    @State private var showingPhotoLibrary = false
-    @State private var showingPhotoScan = false
-    @State private var scannedPages: [UIImage] = []
-    @State private var scanPageCount = 0
+    // Photo library — tied to the PhotosPicker modifier
     @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var isExtractingRecipe = false
-    @State private var extractionError: String?
-    @State private var showingExtractionError = false
-    @State private var showingExtractionSuccess = false
-
-    // URL import state
-    @State private var showingURLInput = false
-    @State private var importURLText = ""
-    @State private var isExtractingFromURL = false
-
-    // Camera permission state
-    @State private var showingCameraPermissionDenied = false
-
-    // Recipe search state
-    @State private var showingRecipeSearch = false
 
     // Creator name — fetched from iCloud on appear for new recipes.
-    // Stored in the recipe so it persists and syncs to household members.
     @AppStorage("currentUserName") private var currentUserName: String = ""
     @State private var creatorDisplayName: String? = nil
 
-    var isEditing: Bool { recipeToEdit != nil }
-
-    /// Placeholder text that changes based on the selected source type
-    private var sourcePlaceholder: String {
-        switch sourceType {
-        case .cookbook: "Book title, p. 42"
-        case .website: "https://..."
-        case .photo:   "Cookbook name"
-        case .url:     "https://..."
-        case .other:   "Where is this from?"
-        case nil:      ""
-        }
+    init(recipeToEdit: Recipe? = nil) {
+        self._viewModel = State(initialValue: RecipeFormViewModel(recipe: recipeToEdit))
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - Recipe Info Section
-                Section("Recipe Info") {
-                    TextField("Recipe Name", text: $name)
-
-                    // Photo-to-recipe: scan a cookbook page to auto-fill the form
-                    Button {
-                        showingPhotoOptions = true
-                    } label: {
-                        Label("Scan from Photo", systemImage: "camera.fill")
-                    }
-                    .disabled(isExtractingRecipe)
-
-                    // Import a recipe from a webpage URL
-                    Button {
-                        importURLText = ""
-                        showingURLInput = true
-                    } label: {
-                        Label("Import from URL", systemImage: "link")
-                    }
-                    .disabled(isExtractingRecipe)
-
-                    // Search for a recipe online by name
-                    Button {
-                        showingRecipeSearch = true
-                    } label: {
-                        Label("Search Online", systemImage: "magnifyingglass")
-                    }
-                    .disabled(isExtractingRecipe)
-
-                    Picker("Category", selection: $category) {
-                        ForEach(RecipeCategory.allCases) { cat in
-                            Text(cat.rawValue).tag(cat)
-                        }
-                    }
-
-                    Stepper("Servings: \(servings)", value: $servings, in: 1...20)
-
-                    Stepper(
-                        "Prep Time: \(prepTimeMinutes) min",
-                        value: $prepTimeMinutes,
-                        in: 5...480,
-                        step: 5
-                    )
-
-                    Stepper(
-                        "Cook Time: \(cookTimeMinutes) min",
-                        value: $cookTimeMinutes,
-                        in: 0...480,
-                        step: 5
-                    )
-                }
-
-                // MARK: - Ingredients Section
-                Section("Ingredients") {
-                    ForEach($ingredientRows) { $row in
-                        IngredientRowView(data: $row)
-                    }
-                    .onDelete { indexSet in
-                        ingredientRows.remove(atOffsets: indexSet)
-                    }
-
-                    Button("Add Ingredient") {
-                        ingredientRows.append(IngredientFormData())
-                    }
-                }
-
-                // MARK: - Instructions Section
-                Section("Instructions") {
-                    // TextEditor gives multi-line text input
-                    // (TextField is single-line only)
-                    TextEditor(text: $instructions)
-                        .frame(minHeight: 150)
-                }
-
-                // MARK: - Source Section
-                Section("Source") {
-                    Picker("Source Type", selection: $sourceType) {
-                        Text("None").tag(RecipeSource?.none)
-                        ForEach(RecipeSource.allCases) { source in
-                            Text(source.rawValue).tag(RecipeSource?.some(source))
-                        }
-                    }
-
-                    // Only show the detail field when a source type is selected
-                    if sourceType != nil {
-                        TextField(sourcePlaceholder, text: $sourceDetail)
-                    }
-                }
+                RecipeBasicsSection(viewModel: viewModel, coordinator: coordinator)
+                RecipeIngredientsSection(viewModel: viewModel)
+                RecipeInstructionsSection(viewModel: viewModel)
+                RecipeSourceSection(viewModel: viewModel)
             }
-            .navigationTitle(isEditing ? "Edit Recipe" : "New Recipe")
+            .navigationTitle(viewModel.isEditing ? "Edit Recipe" : "New Recipe")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveRecipe() }
-                        // Disable Save if the name is blank
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            .toolbar { formToolbar }
+            .modifier(ImportModifiers(
+                viewModel: viewModel,
+                coordinator: coordinator,
+                selectedPhotoItem: $selectedPhotoItem
+            ))
+            .modifier(FeedbackOverlays(coordinator: coordinator))
+            .modifier(ImportAlerts(viewModel: viewModel, coordinator: coordinator))
+            .onAppear {
+                if !viewModel.isEditing {
+                    Task {
+                        let iCloudName = await CloudKitSharingService.shared.fetchCurrentUserDisplayName()
+                        creatorDisplayName = iCloudName ?? (currentUserName.isEmpty ? nil : currentUserName)
+                    }
                 }
             }
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var formToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Save") {
+                viewModel.save(to: modelContext, addedBy: creatorDisplayName)
+                dismiss()
+            }
+            .disabled(!viewModel.validate())
+        }
+    }
+}
+
+// MARK: - Import Modifiers
+
+/// Groups the sheet/cover/picker modifiers for import pathways.
+/// Extracted to reduce body complexity for the Swift type-checker.
+private struct ImportModifiers: ViewModifier {
+    var viewModel: RecipeFormViewModel
+    var coordinator: RecipeImportCoordinator
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+
+    func body(content: Content) -> some View {
+        content
             // Choose between camera and photo library
-            .confirmationDialog("Add Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
+            .confirmationDialog("Add Photo", isPresented: Bindable(coordinator).showingPhotoOptions, titleVisibility: .visible) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button("Take Photo") {
-                        showingPhotoOptions = false
-                        requestCameraAccess()
+                        coordinator.showingPhotoOptions = false
+                        coordinator.requestCameraAccess()
                     }
                 }
                 Button("Choose from Library") {
-                    showingPhotoOptions = false
-                    showingPhotoLibrary = true
+                    coordinator.showingPhotoOptions = false
+                    coordinator.showingPhotoLibrary = true
                 }
                 Button("Cancel", role: .cancel) {
-                    showingPhotoOptions = false
+                    coordinator.showingPhotoOptions = false
                 }
             }
             // Photo library picker
-            .photosPicker(isPresented: $showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
-            // Camera (UIImagePickerController wrapper)
-            // After capturing the first photo, hand off to PhotoScanView
-            // so the user can add more pages before extracting.
-            // The onDismiss defers one run loop iteration so that the
-            // scannedPages state update from the camera callback has
-            // propagated before we check it — without this, onDismiss
-            // can fire in the same SwiftUI transaction and read the
-            // stale (empty) value, causing "0 pages scanned."
-            .fullScreenCover(isPresented: $showingCamera, onDismiss: {
+            .photosPicker(isPresented: Bindable(coordinator).showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
+            // Camera — defers onDismiss by one run loop iteration so the
+            // scannedPages state update has propagated (fixes "0 pages scanned").
+            .fullScreenCover(isPresented: Bindable(coordinator).showingCamera, onDismiss: {
                 DispatchQueue.main.async {
-                    if !scannedPages.isEmpty {
-                        showingPhotoScan = true
+                    if !coordinator.scannedPages.isEmpty {
+                        coordinator.showingPhotoScan = true
                     }
                 }
             }) {
                 CameraView { image in
                     if let image {
                         print("[PhotoScan] First page captured, size: \(Int(image.size.width))x\(Int(image.size.height))")
-                        scannedPages = [image]
+                        coordinator.scannedPages = [image]
                     } else {
                         print("[PhotoScan] Camera cancelled")
                     }
-                    showingCamera = false
+                    coordinator.showingCamera = false
                 }
                 .ignoresSafeArea()
             }
-            // Multi-page scan review — user can add pages, remove bad ones,
-            // then tap "Done Scanning" to send all pages to the API.
-            .sheet(isPresented: $showingPhotoScan) {
+            // Multi-page scan review
+            .sheet(isPresented: Bindable(coordinator).showingPhotoScan) {
                 PhotoScanView(
-                    initialPages: scannedPages,
+                    initialPages: coordinator.scannedPages,
                     onDone: { images in
-                        showingPhotoScan = false
-                        Task { await extractRecipeFromImages(images) }
+                        coordinator.showingPhotoScan = false
+                        Task { await coordinator.extractRecipeFromImages(images, into: viewModel) }
                     },
                     onCancel: {
-                        showingPhotoScan = false
-                        scannedPages = []
+                        coordinator.showingPhotoScan = false
+                        coordinator.scannedPages = []
                     }
                 )
             }
@@ -244,69 +145,109 @@ struct AddEditRecipeView: View {
                 Task {
                     if let data = try? await newItem.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
-                        await extractRecipeFromImage(image)
+                        await coordinator.extractRecipeFromImage(image, into: viewModel)
                     } else {
-                        extractionError = "Could not load the selected photo."
-                        showingExtractionError = true
+                        coordinator.extractionError = "Could not load the selected photo."
+                        coordinator.showingExtractionError = true
                     }
                     selectedPhotoItem = nil
                 }
             }
-            // Loading overlay while Claude processes the image or URL
-            .overlay {
-                if isExtractingRecipe {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                            .ignoresSafeArea()
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                            Text(isExtractingFromURL
-                                 ? "Importing recipe from URL..."
-                                 : scanPageCount > 1
-                                   ? "Reading recipe from \(scanPageCount) pages..."
-                                   : "Reading recipe from photo...")
-                                .font(.headline)
-                            Text(scanPageCount > 1
-                                 ? "Combining pages — this may take a few extra seconds"
-                                 : "This may take a few seconds")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(32)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    }
+            // Recipe search sheet
+            .sheet(isPresented: Bindable(coordinator).showingRecipeSearch) {
+                RecipeSearchView { extracted, url in
+                    coordinator.handleSearchResult(extracted, url: url, into: viewModel)
                 }
             }
-            // Brief "Recipe extracted!" confirmation that auto-dismisses
-            .overlay {
-                if showingExtractionSuccess {
-                    VStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.green)
-                        Text("Recipe extracted!")
-                            .font(.headline)
-                    }
-                    .padding(24)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    .transition(.opacity)
-                    .onAppear {
-                        // Auto-dismiss after 1.5 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            withAnimation { showingExtractionSuccess = false }
-                        }
-                    }
+    }
+}
+
+// MARK: - Feedback Overlays
+
+/// Loading spinner and success checkmark overlays.
+private struct FeedbackOverlays: ViewModifier {
+    var coordinator: RecipeImportCoordinator
+
+    func body(content: Content) -> some View {
+        content
+            .overlay { extractionOverlay }
+            .overlay { successOverlay }
+    }
+
+    @ViewBuilder
+    private var extractionOverlay: some View {
+        if coordinator.isExtractingRecipe {
+            ZStack {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text(extractionMessage)
+                        .font(.headline)
+                    Text(extractionDetail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(32)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
+
+    private var extractionMessage: String {
+        if coordinator.isExtractingFromURL {
+            return "Importing recipe from URL..."
+        } else if coordinator.scanPageCount > 1 {
+            return "Reading recipe from \(coordinator.scanPageCount) pages..."
+        } else {
+            return "Reading recipe from photo..."
+        }
+    }
+
+    private var extractionDetail: String {
+        coordinator.scanPageCount > 1
+            ? "Combining pages — this may take a few extra seconds"
+            : "This may take a few seconds"
+    }
+
+    @ViewBuilder
+    private var successOverlay: some View {
+        if coordinator.showingExtractionSuccess {
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.green)
+                Text("Recipe extracted!")
+                    .font(.headline)
+            }
+            .padding(24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .transition(.opacity)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation { coordinator.showingExtractionSuccess = false }
                 }
             }
-            // Error alert — user-friendly message
-            .alert("Couldn't Read Recipe", isPresented: $showingExtractionError) {
+        }
+    }
+}
+
+// MARK: - Import Alerts
+
+/// Alert modifiers for errors, camera permission, and URL input.
+private struct ImportAlerts: ViewModifier {
+    var viewModel: RecipeFormViewModel
+    var coordinator: RecipeImportCoordinator
+
+    func body(content: Content) -> some View {
+        content
+            .alert("Couldn't Read Recipe", isPresented: Bindable(coordinator).showingExtractionError) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text(extractionError ?? "Something went wrong. Please try again.")
+                Text(coordinator.extractionError ?? "Something went wrong. Please try again.")
             }
-            // Camera permission denied alert — directs user to Settings
-            .alert("Camera Access Required", isPresented: $showingCameraPermissionDenied) {
+            .alert("Camera Access Required", isPresented: Bindable(coordinator).showingCameraPermissionDenied) {
                 Button("Open Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
@@ -316,248 +257,17 @@ struct AddEditRecipeView: View {
             } message: {
                 Text("FluffyList needs camera access to scan recipes. You can enable it in Settings.")
             }
-            // URL input alert
-            .alert("Import from URL", isPresented: $showingURLInput) {
-                TextField("https://example.com/recipe", text: $importURLText)
+            .alert("Import from URL", isPresented: Bindable(coordinator).showingURLInput) {
+                TextField("https://example.com/recipe", text: Bindable(coordinator).importURLText)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                 Button("Import") {
-                    Task { await extractRecipeFromURL() }
+                    Task { await coordinator.extractRecipeFromURL(into: viewModel) }
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Paste a link to a recipe page")
             }
-            // Recipe search sheet
-            .sheet(isPresented: $showingRecipeSearch) {
-                RecipeSearchView { extracted, url in
-                    populateForm(from: extracted, sourceURL: url)
-                }
-            }
-            .onAppear {
-                // For new recipes, try to get the iCloud display name so we can
-                // attribute the recipe to whoever added it. Falls back to the
-                // local household name (currentUserName) if CloudKit lookup fails.
-                if recipeToEdit == nil {
-                    Task {
-                        let iCloudName = await CloudKitSharingService.shared.fetchCurrentUserDisplayName()
-                        // Prefer iCloud name → local name → nothing
-                        creatorDisplayName = iCloudName ?? (currentUserName.isEmpty ? nil : currentUserName)
-                    }
-                }
-
-                // If editing, populate the form with the existing recipe's data
-                if let recipe = recipeToEdit {
-                    name = recipe.name
-                    category = recipe.category
-                    servings = recipe.servings
-                    prepTimeMinutes = recipe.prepTimeMinutes
-                    cookTimeMinutes = recipe.cookTimeMinutes
-                    instructions = recipe.instructions
-                    ingredientRows = recipe.ingredientsList.map { ingredient in
-                        IngredientFormData(
-                            name: ingredient.name,
-                            quantity: ingredient.quantity,
-                            unit: ingredient.unit,
-                            quantityText: FractionFormatter.formatAsFraction(ingredient.quantity)
-                        )
-                    }
-                    sourceType = recipe.sourceType
-                    sourceDetail = recipe.sourceDetail ?? ""
-                }
-            }
-        }
-    }
-
-    /// Check camera permission before presenting the camera.
-    /// Uses Task + await so the state update runs on @MainActor
-    /// (DispatchQueue.main.async doesn't guarantee @MainActor isolation).
-    private func requestCameraAccess() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            showingCamera = true
-        case .notDetermined:
-            Task {
-                let granted = await AVCaptureDevice.requestAccess(for: .video)
-                if granted {
-                    showingCamera = true
-                } else {
-                    showingCameraPermissionDenied = true
-                }
-            }
-        case .denied, .restricted:
-            showingCameraPermissionDenied = true
-        @unknown default:
-            showingCameraPermissionDenied = true
-        }
-    }
-
-    /// Send one or more images to Claude API and populate form fields with the result.
-    /// For a single image, uses the standard prompt. For multiple images, uses the
-    /// multi-page prompt that tells Claude to combine pages into one recipe.
-    @MainActor
-    private func extractRecipeFromImages(_ images: [UIImage]) async {
-        let pageCount = images.count
-        print("[PhotoScan] Starting extraction of \(pageCount) page(s)...")
-        isExtractingRecipe = true
-        extractionError = nil
-        scanPageCount = pageCount
-
-        do {
-            print("[PhotoScan] Sending \(pageCount) page(s) to Claude API...")
-            let extracted = try await ClaudeAPIService.extractRecipe(from: images)
-            print("[PhotoScan] Got response: \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
-
-            // Populate form fields with extracted data
-            name = extracted.name
-            category = extracted.recipeCategory
-            servings = extracted.servingsInt
-            prepTimeMinutes = extracted.prepTimeMinutesInt
-            cookTimeMinutes = extracted.cookTimeMinutesInt
-            instructions = extracted.instructionsText
-            ingredientRows = extracted.ingredientFormRows
-
-            // Auto-set source to "Photo" and use Claude's description
-            sourceType = .photo
-            sourceDetail = extracted.source ?? ""
-
-            // Show brief success confirmation
-            withAnimation { showingExtractionSuccess = true }
-        } catch {
-            print("[PhotoScan] Error: \(error)")
-            extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
-            showingExtractionError = true
-        }
-
-        isExtractingRecipe = false
-        scanPageCount = 0
-        scannedPages = []
-        print("[PhotoScan] Extraction complete, loading indicator hidden")
-    }
-
-    /// Send a single image to Claude API (used by photo library picker).
-    @MainActor
-    private func extractRecipeFromImage(_ image: UIImage) async {
-        await extractRecipeFromImages([image])
-    }
-
-    /// Fetch a recipe webpage and populate form fields with the result.
-    @MainActor
-    private func extractRecipeFromURL() async {
-        // Normalize: add https:// if no scheme provided
-        var urlString = importURLText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !urlString.isEmpty && !urlString.contains("://") {
-            urlString = "https://" + urlString
-        }
-
-        guard let url = URL(string: urlString), url.scheme != nil, url.host != nil else {
-            print("[URLImport] Invalid URL entered: \"\(importURLText)\"")
-            extractionError = "That doesn't look like a valid URL. Check the link and try again."
-            showingExtractionError = true
-            return
-        }
-
-        print("[URLImport] User initiated import for: \(url.absoluteString)")
-        isExtractingRecipe = true
-        isExtractingFromURL = true
-        extractionError = nil
-
-        do {
-            let extracted = try await ClaudeAPIService.extractRecipe(fromURL: url)
-
-            // Populate form fields — same pattern as photo extraction
-            name = extracted.name
-            category = extracted.recipeCategory
-            servings = extracted.servingsInt
-            prepTimeMinutes = extracted.prepTimeMinutesInt
-            cookTimeMinutes = extracted.cookTimeMinutesInt
-            instructions = extracted.instructionsText
-            ingredientRows = extracted.ingredientFormRows
-
-            // Set source to .url and store the original URL
-            sourceType = .url
-            sourceDetail = url.absoluteString
-
-            print("[URLImport] Form pre-filled successfully with \"\(extracted.name)\"")
-            withAnimation { showingExtractionSuccess = true }
-        } catch {
-            // Nothing was saved or pre-filled — the form fields above are only
-            // set inside the do block, so on any throw the form stays untouched.
-            print("[URLImport] Import failed — no form data changed, nothing saved")
-            print("[URLImport] Error: \(error)")
-
-            if let apiError = error as? ClaudeAPIService.APIError,
-               case .noRecipeFound = apiError {
-                extractionError = "Couldn't find a recipe on that page."
-            } else {
-                extractionError = "Couldn't read a recipe from that page. Try a different URL."
-            }
-            showingExtractionError = true
-        }
-
-        isExtractingRecipe = false
-        isExtractingFromURL = false
-    }
-
-    /// Populate form fields from an extracted recipe (used by search and URL import).
-    @MainActor
-    private func populateForm(from extracted: ExtractedRecipe, sourceURL: URL) {
-        name = extracted.name
-        category = extracted.recipeCategory
-        servings = extracted.servingsInt
-        prepTimeMinutes = extracted.prepTimeMinutesInt
-        cookTimeMinutes = extracted.cookTimeMinutesInt
-        instructions = extracted.instructionsText
-        ingredientRows = extracted.ingredientFormRows
-
-        sourceType = .url
-        sourceDetail = sourceURL.absoluteString
-
-        withAnimation { showingExtractionSuccess = true }
-    }
-
-    private func saveRecipe() {
-        // Filter out any blank ingredient rows
-        let validIngredients = ingredientRows
-            .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
-            .map { Ingredient(name: $0.name, quantity: $0.quantity, unit: $0.unit) }
-
-        if let recipe = recipeToEdit {
-            // Update existing recipe
-            recipe.name = name
-            recipe.category = category
-            recipe.servings = servings
-            recipe.prepTimeMinutes = prepTimeMinutes
-            recipe.cookTimeMinutes = cookTimeMinutes
-            recipe.instructions = instructions
-
-            recipe.sourceType = sourceType
-            recipe.sourceDetail = sourceDetail.isEmpty ? nil : sourceDetail
-
-            // Replace all ingredients: delete old, add new
-            for ingredient in recipe.ingredientsList {
-                modelContext.delete(ingredient)
-            }
-            recipe.ingredientsList = validIngredients
-        } else {
-            // Create brand new recipe
-            let recipe = Recipe(
-                name: name,
-                category: category,
-                servings: servings,
-                prepTimeMinutes: prepTimeMinutes,
-                cookTimeMinutes: cookTimeMinutes,
-                instructions: instructions,
-                ingredients: validIngredients,
-                sourceType: sourceType,
-                sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail
-            )
-            // Record who added this recipe (iCloud name fetched on appear, or local name).
-            recipe.addedByName = creatorDisplayName
-            modelContext.insert(recipe)
-        }
-
-        dismiss()
     }
 }
 
