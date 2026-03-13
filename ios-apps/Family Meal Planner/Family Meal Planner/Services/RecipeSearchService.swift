@@ -1,6 +1,6 @@
 //
 //  RecipeSearchService.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Searches DuckDuckGo HTML for recipe URLs from popular food blogs,
 //  parses the search results HTML, and returns a list of matching recipe pages.

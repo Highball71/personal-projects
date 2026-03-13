@@ -1,6 +1,6 @@
 //
 //  JSONLDRecipeParser.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Extracts recipe data from JSON-LD structured data (Schema.org Recipe type)
 //  embedded in webpage HTML. This avoids a Claude API call for the majority

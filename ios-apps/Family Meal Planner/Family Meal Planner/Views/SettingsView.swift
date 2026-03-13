@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  Family Meal Planner
+//  FluffyList
 //
 
 import SwiftUI

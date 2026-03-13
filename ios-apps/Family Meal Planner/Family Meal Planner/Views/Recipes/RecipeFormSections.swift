@@ -1,6 +1,6 @@
 //
 //  RecipeFormSections.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Extracted form sections for AddEditRecipeView.
 //  Each section takes the ViewModel (and coordinator where needed) as a parameter.

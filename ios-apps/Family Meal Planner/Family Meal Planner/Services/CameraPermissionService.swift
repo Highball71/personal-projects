@@ -1,6 +1,6 @@
 //
 //  CameraPermissionService.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Wraps AVCaptureDevice camera authorization checks.
 

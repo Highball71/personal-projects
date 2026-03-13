@@ -1,6 +1,6 @@
 //
 //  CloudKitSharingService.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Manages CloudKit sharing so all household members access one recipe library.
 //
@@ -28,7 +28,7 @@ actor CloudKitSharingService {
 
     private let container: CKContainer
     private let logger = Logger(
-        subsystem: "com.highball71.Family-Meal-Planner",
+        subsystem: Bundle.main.bundleIdentifier ?? "com.highball71.fluffylist",
         category: "Sharing"
     )
 

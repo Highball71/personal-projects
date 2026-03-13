@@ -1,6 +1,6 @@
 //
 //  SyncMonitor.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Tracks CloudKit sync state and network connectivity for status indicators.
 //

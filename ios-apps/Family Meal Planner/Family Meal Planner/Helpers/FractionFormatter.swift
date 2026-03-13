@@ -1,6 +1,6 @@
 //
 //  FractionFormatter.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Converts between decimal quantities and cooking fractions.
 //  Used for both display ("1 1/2") and input parsing ("1/2" → 0.5).

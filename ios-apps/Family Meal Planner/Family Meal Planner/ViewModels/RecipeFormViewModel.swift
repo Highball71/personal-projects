@@ -1,6 +1,6 @@
 //
 //  RecipeFormViewModel.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Owns all form state for adding or editing a recipe.
 //  Extracted from AddEditRecipeView to keep the view thin.

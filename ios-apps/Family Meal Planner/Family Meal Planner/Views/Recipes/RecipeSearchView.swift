@@ -1,6 +1,6 @@
 //
 //  RecipeSearchView.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Search for recipes online by name, browse results from popular food
 //  blogs, and import a selected recipe into the form.

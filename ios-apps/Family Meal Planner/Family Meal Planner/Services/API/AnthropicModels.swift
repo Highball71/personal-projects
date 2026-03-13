@@ -1,6 +1,6 @@
 //
 //  AnthropicModels.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Request and response Codable types for the Anthropic Messages API.
 

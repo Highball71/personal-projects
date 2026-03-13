@@ -1,6 +1,6 @@
 //
 //  HouseholdMember.swift
-//  Family Meal Planner
+//  FluffyList
 //
 
 import Foundation

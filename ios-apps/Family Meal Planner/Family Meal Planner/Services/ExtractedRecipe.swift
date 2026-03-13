@@ -1,6 +1,6 @@
 //
 //  ExtractedRecipe.swift
-//  Family Meal Planner
+//  FluffyList
 //
 
 import Foundation

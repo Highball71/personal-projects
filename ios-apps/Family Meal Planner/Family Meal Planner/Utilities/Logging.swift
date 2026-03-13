@@ -1,6 +1,6 @@
 //
 //  Logging.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Standardized os.Logger instances by category.
 //  Use these instead of print() for structured, filterable logging.

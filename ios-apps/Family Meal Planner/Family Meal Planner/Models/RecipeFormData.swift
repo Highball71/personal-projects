@@ -1,6 +1,6 @@
 //
 //  RecipeFormData.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  A plain struct (not SwiftData) that holds intermediate recipe data
 //  between import and persistence. Used by the import pipeline to pass

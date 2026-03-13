@@ -1,6 +1,6 @@
 //
 //  RecipeImportCoordinator.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Manages the import pipeline state: camera → scan → extract → populate form.
 //  Coordinates between camera, photo library, URL import, and recipe search.

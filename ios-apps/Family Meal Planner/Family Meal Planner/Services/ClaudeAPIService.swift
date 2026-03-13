@@ -1,6 +1,6 @@
 //
 //  ClaudeAPIService.swift
-//  Family Meal Planner
+//  FluffyList
 //
 
 import Foundation

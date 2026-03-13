@@ -1,6 +1,6 @@
 //
 //  RecipeResponseParser.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Shared parsing logic for Claude API responses that contain recipe JSON.
 //  Used by both RecipeImageExtractor and RecipeWebImporter.

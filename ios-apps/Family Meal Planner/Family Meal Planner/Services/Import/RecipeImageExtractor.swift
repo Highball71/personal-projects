@@ -1,6 +1,6 @@
 //
 //  RecipeImageExtractor.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Extracts recipe data from photos of cookbook pages using the Claude Vision API.
 

@@ -1,6 +1,6 @@
 //
 //  AnthropicClient.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  HTTP transport to the Anthropic API. Handles request building,
 //  authentication, and response decoding. No recipe-specific logic.

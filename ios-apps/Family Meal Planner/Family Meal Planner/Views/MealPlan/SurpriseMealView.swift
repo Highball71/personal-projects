@@ -1,6 +1,6 @@
 //
 //  SurpriseMealView.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Created by David Albert on 2/15/26.
 //

@@ -1,6 +1,6 @@
 //
 //  CameraView.swift
-//  Family Meal Planner
+//  FluffyList
 //
 
 import SwiftUI

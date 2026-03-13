@@ -1,6 +1,6 @@
 //
 //  RecipeWebImporter.swift
-//  Family Meal Planner
+//  FluffyList
 //
 //  Imports recipe data from a URL: tries JSON-LD first (free, no API call),
 //  then falls back to sending the page HTML to Claude.
