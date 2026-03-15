@@ -107,7 +107,15 @@ private struct ImportModifiers: ViewModifier {
             // Photo library picker
             .photosPicker(isPresented: Bindable(coordinator).showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
             // Camera (UIImagePickerController wrapper)
-            .fullScreenCover(isPresented: Bindable(coordinator).showingCamera) {
+            // onDismiss fires after the cover's dismiss animation completes,
+            // so the sheet presentation doesn't race with the cover dismissal.
+            // scannedPages is set in the callback *before* showingCamera = false,
+            // so it's already populated by the time onDismiss runs.
+            .fullScreenCover(isPresented: Bindable(coordinator).showingCamera, onDismiss: {
+                if !coordinator.scannedPages.isEmpty {
+                    coordinator.showingPhotoScan = true
+                }
+            }) {
                 CameraView { image in
                     if let image {
                         Logger.importPipeline.debug("First page captured, size: \(Int(image.size.width), privacy: .public)x\(Int(image.size.height), privacy: .public)")
@@ -118,14 +126,6 @@ private struct ImportModifiers: ViewModifier {
                     coordinator.showingCamera = false
                 }
                 .ignoresSafeArea()
-            }
-            // Present PhotoScanView reactively when scannedPages goes from
-            // empty to non-empty. This is more reliable than onDismiss which
-            // can race with state propagation, causing "0 pages scanned."
-            .onChange(of: coordinator.scannedPages.count) { oldCount, newCount in
-                if oldCount == 0 && newCount > 0 {
-                    coordinator.showingPhotoScan = true
-                }
             }
             // Multi-page scan review
             .sheet(isPresented: Bindable(coordinator).showingPhotoScan) {

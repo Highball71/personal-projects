@@ -27,20 +27,26 @@ enum RecipeResponseParser {
     /// Handles markdown code fences and the "no_recipe_found" sentinel.
     static func parse(response: String) throws -> ExtractedRecipe {
         let cleaned = stripCodeFences(from: response)
+        print("[DEBUG RecipeResponseParser] Cleaned response (\(cleaned.count) chars):\n\(String(cleaned.prefix(500)))")
 
         guard let jsonData = cleaned.data(using: .utf8) else {
+            print("[DEBUG RecipeResponseParser] Could not convert cleaned response to Data")
             throw ParseError.decodingFailed("Could not convert response to data")
         }
 
         // Check for the "no recipe found" sentinel
         if let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
            jsonObject["error"] != nil {
+            print("[DEBUG RecipeResponseParser] Claude returned 'no recipe found' sentinel")
             throw ParseError.noRecipeFound
         }
 
         do {
-            return try JSONDecoder().decode(ExtractedRecipe.self, from: jsonData)
+            let recipe = try JSONDecoder().decode(ExtractedRecipe.self, from: jsonData)
+            print("[DEBUG RecipeResponseParser] Successfully decoded: \"\(recipe.name)\"")
+            return recipe
         } catch {
+            print("[DEBUG RecipeResponseParser] DECODING FAILED: \(error)")
             throw ParseError.decodingFailed(error.localizedDescription)
         }
     }

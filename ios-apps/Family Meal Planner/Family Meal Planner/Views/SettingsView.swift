@@ -21,15 +21,13 @@ struct SettingsView: View {
     // Not synced via CloudKit — each device picks independently.
     @AppStorage("currentUserName") private var currentUserName: String = ""
 
-    @State private var apiKeyText = ""
-    @State private var existingKeyHint = ""
-    @State private var showingSavedConfirmation = false
-    @State private var saveError: String?
     @State private var newMemberName = ""
 
     // Sharing state
     @State private var isLoadingShare = false
     @State private var showCloudKitAlert = false
+    @State private var showingShareError = false
+    @State private var shareErrorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -37,21 +35,6 @@ struct SettingsView: View {
                 householdSection
                 headCookSection
                 sharingSection
-                apiKeySection
-
-                if showingSavedConfirmation {
-                    Section {
-                        Label("Key saved", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    }
-                }
-
-                if let error = saveError {
-                    Section {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                    }
-                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -60,13 +43,15 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .onAppear {
-                loadExistingKeyHint()
-            }
             .alert("iCloud Required", isPresented: $showCloudKitAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("Sign in to iCloud in Settings to share your recipe library with household members.")
+            }
+            .alert("Couldn't Create Share Link", isPresented: $showingShareError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(shareErrorMessage)
             }
         }
     }
@@ -210,6 +195,8 @@ struct SettingsView: View {
                 presentShareSheet(url: url)
             } catch {
                 isLoadingShare = false
+                shareErrorMessage = error.localizedDescription
+                showingShareError = true
                 Logger.cloudkit.error("Failed to create share: \(error.localizedDescription, privacy: .public)")
             }
         }
@@ -245,31 +232,6 @@ struct SettingsView: View {
             presenter = presented
         }
         presenter.present(activityVC, animated: true)
-    }
-
-    // MARK: - API Key Section
-
-    private var apiKeySection: some View {
-        Section {
-            SecureField("sk-ant-...", text: $apiKeyText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-
-            if !existingKeyHint.isEmpty {
-                Text("Current key: \(existingKeyHint)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Button("Save Key") {
-                saveAPIKey()
-            }
-            .disabled(apiKeyText.trimmingCharacters(in: .whitespaces).isEmpty)
-        } header: {
-            Text("Anthropic API Key")
-        } footer: {
-            Text("Required for photo scanning and recipe import. Your key is stored securely in the device Keychain.")
-        }
     }
 
     // MARK: - Household Actions
@@ -319,32 +281,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - API Key Actions
-
-    /// Check if a key already exists and show the last 4 chars masked.
-    private func loadExistingKeyHint() {
-        if let key = try? KeychainHelper.getAnthropicAPIKey(), key.count >= 4 {
-            let lastFour = String(key.suffix(4))
-            existingKeyHint = "••••••\(lastFour)"
-        }
-    }
-
-    /// Save the entered key to Keychain.
-    private func saveAPIKey() {
-        let trimmed = apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        do {
-            try KeychainHelper.setAnthropicAPIKey(trimmed)
-            apiKeyText = ""
-            saveError = nil
-            showingSavedConfirmation = true
-            loadExistingKeyHint()
-        } catch {
-            saveError = "Failed to save: \(error.localizedDescription)"
-            showingSavedConfirmation = false
-        }
-    }
 }
 
 // MARK: - Sync Status Row

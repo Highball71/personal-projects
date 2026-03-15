@@ -92,6 +92,8 @@ final class RecipeImportCoordinator {
             withAnimation { showingExtractionSuccess = true }
         } catch {
             Logger.importPipeline.error("Photo extraction error: \(error)")
+            print("[DEBUG RecipeImportCoordinator] Photo extraction FAILED: \(error)")
+            print("[DEBUG RecipeImportCoordinator] Error type: \(type(of: error))")
             extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
             showingExtractionError = true
         }

@@ -9,12 +9,15 @@ import Foundation
 
 enum AnthropicClient {
 
-    static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
+    static let endpoint = URL(string: "https://fluffylist-proxy.onrender.com/v1/messages")!
+
+    // Proxy key — authenticates this app to the fluffylist-proxy server.
+    // The actual Anthropic API key is stored server-side and never sent to the app.
+    private static let proxyKey = "fluffylist-proxy-2026-xk9mq"
 
     // MARK: - Errors
 
     enum ClientError: LocalizedError {
-        case noAPIKey
         case networkError(Error)
         case httpError(statusCode: Int, message: String)
         case decodingError(String)
@@ -22,8 +25,6 @@ enum AnthropicClient {
 
         var errorDescription: String? {
             switch self {
-            case .noAPIKey:
-                "No API key found. Please add your Anthropic API key in Settings."
             case .networkError(let error):
                 "Network error: \(error.localizedDescription)"
             case .httpError(let code, let message):
@@ -46,9 +47,7 @@ enum AnthropicClient {
         maxTokens: Int = AnthropicModels.maxTokens,
         timeout: TimeInterval = 60
     ) async throws -> AnthropicResponse {
-        let apiKey = try getAPIKey()
-
-        var request = makeBaseRequest(apiKey: apiKey, timeout: timeout)
+        var request = makeBaseRequest(timeout: timeout)
 
         let body: [String: Any] = [
             "model": model,
@@ -72,9 +71,7 @@ enum AnthropicClient {
         maxTokens: Int = AnthropicModels.maxTokens,
         timeout: TimeInterval = 60
     ) async throws -> AnthropicResponse {
-        let apiKey = try getAPIKey()
-
-        var request = makeBaseRequest(apiKey: apiKey, timeout: timeout)
+        var request = makeBaseRequest(timeout: timeout)
 
         let body: [String: Any] = [
             "model": model,
@@ -114,9 +111,7 @@ enum AnthropicClient {
         maxTokens: Int = AnthropicModels.maxTokens,
         timeout: TimeInterval = 90
     ) async throws -> AnthropicResponse {
-        let apiKey = try getAPIKey()
-
-        var request = makeBaseRequest(apiKey: apiKey, timeout: timeout)
+        var request = makeBaseRequest(timeout: timeout)
 
         var messageContent: [[String: Any]] = imageContents
         messageContent.append([
@@ -150,44 +145,55 @@ enum AnthropicClient {
 
     // MARK: - Private
 
-    private static func getAPIKey() throws -> String {
-        if let key = try? KeychainHelper.getAnthropicAPIKey(), !key.isEmpty {
-            return key
-        }
-        if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
-            return envKey
-        }
-        throw ClientError.noAPIKey
-    }
-
-    private static func makeBaseRequest(apiKey: String, timeout: TimeInterval) -> URLRequest {
+    private static func makeBaseRequest(timeout: TimeInterval) -> URLRequest {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(proxyKey, forHTTPHeaderField: "X-Proxy-Key")
         request.setValue(AnthropicModels.apiVersion, forHTTPHeaderField: "anthropic-version")
         request.timeoutInterval = timeout
         return request
     }
 
     private static func execute(_ request: URLRequest) async throws -> AnthropicResponse {
+        // Log the outbound request so we can confirm the proxy URL and key.
+        let keyHint = request.value(forHTTPHeaderField: "X-Proxy-Key").map { "\($0.prefix(8))..." } ?? "MISSING"
+        let version = request.value(forHTTPHeaderField: "anthropic-version") ?? "?"
+        print("[DEBUG AnthropicClient] → POST \(request.url?.absoluteString ?? "?")")
+        print("[DEBUG AnthropicClient]   X-Proxy-Key: \(keyHint)  anthropic-version: \(version)")
+
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
+            print("[DEBUG AnthropicClient] Network request FAILED: \(error)")
             throw ClientError.networkError(error)
         }
 
-        if let httpResponse = response as? HTTPURLResponse,
-           !(200...299).contains(httpResponse.statusCode) {
-            let body = String(data: data, encoding: .utf8) ?? "No response body"
-            throw ClientError.httpError(statusCode: httpResponse.statusCode, message: body)
+        let httpResponse = response as? HTTPURLResponse
+        let statusCode = httpResponse?.statusCode ?? -1
+        let contentType = httpResponse?.value(forHTTPHeaderField: "Content-Type") ?? "?"
+        print("[DEBUG AnthropicClient] ← \(statusCode)  Content-Type: \(contentType)  (\(data.count) bytes)")
+
+        let rawBody = String(data: data, encoding: .utf8) ?? "<non-UTF8 data>"
+
+        if !(200...299).contains(statusCode) {
+            // Print the full error body — reveals whether it's a proxy error
+            // (HTML cold-start page, auth rejection) or an Anthropic API error.
+            print("[DEBUG AnthropicClient] Error body:\n\(rawBody)")
+            throw ClientError.httpError(statusCode: statusCode, message: rawBody)
         }
 
         do {
-            return try JSONDecoder().decode(AnthropicResponse.self, from: data)
+            let decoded = try JSONDecoder().decode(AnthropicResponse.self, from: data)
+            print("[DEBUG AnthropicClient] Decoded OK — id: \(decoded.id), blocks: \(decoded.content.count)")
+            return decoded
         } catch {
+            // Print the full body on decode failure — helps diagnose format
+            // mismatches between what the proxy returns and AnthropicResponse.
+            print("[DEBUG AnthropicClient] DECODING FAILED: \(error)")
+            print("[DEBUG AnthropicClient] Full response body:\n\(rawBody)")
             throw ClientError.decodingError(error.localizedDescription)
         }
     }

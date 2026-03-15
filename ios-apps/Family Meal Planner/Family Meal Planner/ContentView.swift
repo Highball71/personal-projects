@@ -16,6 +16,7 @@ struct ContentView: View {
 
     @State private var showingWelcome = false
     @State private var welcomeOwnerName = ""
+    @State private var showingSettings = false
 
     var body: some View {
         TabView {
@@ -47,10 +48,14 @@ struct ContentView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
         .alert("Welcome to FluffyList!", isPresented: $showingWelcome) {
-            Button("Get Started") { }
+            Button("Open Settings") { showingSettings = true }
+            Button("Later", role: .cancel) { }
         } message: {
-            Text("Welcome to \(welcomeOwnerName)'s FluffyList! Your shared recipes, meal plans, and grocery lists are syncing now.")
+            Text("Welcome to \(welcomeOwnerName)'s FluffyList! Your shared recipes, meal plans, and grocery lists are syncing now.\n\nOpen Settings to tell the app who you are on this device.")
         }
     }
 }

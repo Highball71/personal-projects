@@ -51,18 +51,6 @@ struct Family_Meal_PlannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var syncMonitor = SyncMonitor()
 
-    init() {
-        #if DEBUG
-        // Store your Anthropic API key in Keychain on first launch.
-        // Replace the placeholder below with your real key, run once,
-        // then change it back to the placeholder so you don't commit it.
-        let placeholder = "YOUR-KEY-HERE"
-        if placeholder != "YOUR-KEY-HERE" {
-            try? KeychainHelper.setAnthropicAPIKey(placeholder)
-        }
-        #endif
-    }
-
     var body: some Scene {
         WindowGroup {
             ContentView()
