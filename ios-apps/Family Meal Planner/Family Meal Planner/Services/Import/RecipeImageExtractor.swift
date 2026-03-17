@@ -83,7 +83,7 @@ enum RecipeImageExtractor {
             systemPrompt: systemPrompt,
             userPrompt: singleImagePrompt,
             base64Image: base64String,
-            timeout: 60
+            timeout: 120
         )
 
         let text = try AnthropicClient.extractText(from: response)

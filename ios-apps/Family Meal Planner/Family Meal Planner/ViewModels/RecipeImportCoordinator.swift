@@ -77,6 +77,9 @@ final class RecipeImportCoordinator {
     @MainActor
     func extractRecipeFromImages(_ images: [UIImage], into viewModel: RecipeFormViewModel) async {
         let pageCount = images.count
+        let sizes = images.map { "\(Int($0.size.width))x\(Int($0.size.height))" }.joined(separator: ", ")
+        print("[DEBUG RecipeImportCoordinator] extractRecipeFromImages called — \(pageCount) image(s): [\(sizes)]")
+
         Logger.importPipeline.info("Starting extraction of \(pageCount, privacy: .public) page(s)")
         isExtractingRecipe = true
         extractionError = nil
@@ -90,11 +93,35 @@ final class RecipeImportCoordinator {
             viewModel.populateFrom(extracted, sourceType: .photo)
 
             withAnimation { showingExtractionSuccess = true }
+        } catch let error as AnthropicClient.ClientError {
+            Logger.importPipeline.error("Photo extraction error: \(error)")
+            print("[DEBUG RecipeImportCoordinator] Photo extraction FAILED: \(error)")
+            print("[DEBUG RecipeImportCoordinator] Error type: \(type(of: error))")
+            switch error {
+            case .networkError:
+                extractionError = "Connection timed out \u{2014} the server may be waking up. Please try again in a moment."
+            case .httpError(let statusCode, _):
+                extractionError = "Server error (\(statusCode)). Please try again."
+            case .decodingError, .emptyResponse:
+                extractionError = "Got a response but couldn't parse the recipe. Please try again."
+            }
+            showingExtractionError = true
+        } catch let error as RecipeResponseParser.ParseError {
+            Logger.importPipeline.error("Photo extraction error: \(error)")
+            print("[DEBUG RecipeImportCoordinator] Photo extraction FAILED: \(error)")
+            print("[DEBUG RecipeImportCoordinator] Error type: \(type(of: error))")
+            switch error {
+            case .noRecipeFound:
+                extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
+            case .decodingFailed:
+                extractionError = "Got a response but couldn't parse the recipe. Please try again."
+            }
+            showingExtractionError = true
         } catch {
             Logger.importPipeline.error("Photo extraction error: \(error)")
             print("[DEBUG RecipeImportCoordinator] Photo extraction FAILED: \(error)")
             print("[DEBUG RecipeImportCoordinator] Error type: \(type(of: error))")
-            extractionError = "Couldn't read this recipe \u{2014} try a clearer photo."
+            extractionError = error.localizedDescription
             showingExtractionError = true
         }
 
