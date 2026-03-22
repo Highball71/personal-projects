@@ -39,6 +39,9 @@ class MetronomeEngine {
     private var currentCadence: Double = 0
     private let cadenceTolerance: Double = 10 // ±10 SPM = "on cadence"
 
+    // Pause state (keeps isRunning = true so resume can restart the timer)
+    private(set) var isPaused: Bool = false
+
     // MARK: - Public API
 
     func start(mode: MetronomeMode, targetBPM: Double) {
@@ -70,6 +73,21 @@ class MetronomeEngine {
         currentCadence = cadence
     }
 
+    /// Pause: cancel the click timer but keep the audio engine alive for a clean resume.
+    func pause() {
+        guard isRunning, !isPaused else { return }
+        isPaused = true
+        timer?.cancel()
+        timer = nil
+    }
+
+    /// Resume: restart the click timer where we left off.
+    func resume() {
+        guard isRunning, isPaused else { return }
+        isPaused = false
+        startClickTimer()
+    }
+
     /// Change target BPM while running (e.g., if user changes setting).
     func updateTargetBPM(_ bpm: Double) {
         guard bpm != targetBPM else { return }
@@ -92,10 +110,7 @@ class MetronomeEngine {
         engine.connect(player, to: mixer, format: format)
 
         do {
-            // Configure audio session to mix with speech and play in background.
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setActive(true)
+            // Audio session is already configured by WorkoutManager at init.
             try engine.start()
             player.play()
         } catch {

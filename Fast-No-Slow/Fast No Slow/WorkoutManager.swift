@@ -4,6 +4,24 @@ import CoreLocation
 import CoreBluetooth
 import AVFoundation
 import Combine
+import ActivityKit
+
+// MARK: - Live Activity Attributes
+// NOTE: This struct must be kept in sync with WorkoutActivityAttributes in the
+// WorkoutLiveActivity extension. Both targets define an identical copy so that
+// ActivityKit can serialize/deserialize across the process boundary.
+struct WorkoutActivityAttributes: ActivityAttributes {
+    struct ContentState: Codable, Hashable {
+        var heartRate: Int
+        var zoneStatus: String   // matches ZoneStatus.rawValue
+        var elapsedTime: TimeInterval
+        var cadence: Int
+        var isPaused: Bool
+    }
+    var targetLow: Int
+    var targetHigh: Int
+    var targetCadence: Int
+}
 
 class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBCentralManagerDelegate, CBPeripheralDelegate {
 
@@ -28,6 +46,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     @Published var coachingState: CoachingState = .stable
     @Published var timeOnCadence: TimeInterval = 0
     @Published var showSummary: Bool = false
+    @Published var isPaused: Bool = false
 
     enum HRMonitorState {
         case disconnected
@@ -65,6 +84,18 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     private var startDate: Date?
     private var previousElevation: Double?
     private let synthesizer = AVSpeechSynthesizer()
+    // Premium male US English voice — resolved once at init, falls back gracefully.
+    private let preferredVoice: AVSpeechSynthesisVoice? = {
+        // Try Zach (premium male) first
+        if let voice = AVSpeechSynthesisVoice(identifier: "com.apple.voice.premium.en-US.Zach") {
+            return voice
+        }
+        // Fallback: any premium/enhanced en-US voice
+        let enUS = AVSpeechSynthesisVoice.speechVoices().filter {
+            $0.language == "en-US" && $0.quality.rawValue >= AVSpeechSynthesisVoiceQuality.enhanced.rawValue
+        }
+        return enUS.first ?? AVSpeechSynthesisVoice(language: "en-US")
+    }()
 
     // BLE heart rate monitor
     private var centralManager: CBCentralManager!
@@ -84,6 +115,13 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     private var complianceStreakStart: Date?
     private var lastComplianceRewardTime: Date = .distantPast
 
+    // Pause tracking
+    private var pauseStart: Date?
+    private var totalPausedTime: TimeInterval = 0
+
+    // Live Activity
+    private var liveActivity: Activity<WorkoutActivityAttributes>?
+
     // Cancellables for cadence observation
     private var cancellables = Set<AnyCancellable>()
 
@@ -93,7 +131,12 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 5
         locationManager.activityType = .fitness
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
         centralManager = CBCentralManager(delegate: self, queue: nil)
+
+        // Configure audio session once so metronome + speech survive background
+        configureAudioSession()
 
         // Forward cadence from CadenceManager
         cadenceManager.$currentCadence
@@ -101,8 +144,23 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
             .assign(to: &$currentCadence)
     }
 
+    /// Set up audio session for background playback. Called once at init.
+    /// Metronome and speech both use this shared session.
+    private func configureAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            print("Audio session setup error: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Authorization
     func requestAuthorization() {
+        // Log all English voices so we can pick the best one
+        logAvailableVoices()
+
         let typesToRead: Set<HKObjectType> = [
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
             HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
@@ -118,7 +176,8 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
             }
         }
 
-        locationManager.requestWhenInUseAuthorization()
+        // Request Always so location continues when screen locks
+        locationManager.requestAlwaysAuthorization()
     }
 
     // MARK: - Workout Control
@@ -137,6 +196,9 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         lastLocation = nil
         lastInZoneLocation = nil
         showSummary = false
+        isPaused = false
+        pauseStart = nil
+        totalPausedTime = 0
         complianceStreakStart = nil
         lastComplianceRewardTime = .distantPast
 
@@ -155,38 +217,23 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
 
         // 1-second coaching/tracking timer
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            self.elapsedTime = Date().timeIntervalSince(self.startDate ?? Date())
-            if self.isInZone {
-                self.timeInZone += 1
-            }
-            // Cadence compliance: on target if within ±10 SPM
-            if self.currentCadence > 0 &&
-                abs(self.currentCadence - Double(self.targetCadence)) <= 10 {
-                self.timeOnCadence += 1
-            }
-
-            // Update metronome with current cadence
-            self.metronomeEngine.updateCadence(self.currentCadence)
-
-            // Run coaching evaluation
-            self.runCoaching()
-
-            // Compliance streak check (HR in zone AND cadence on target)
-            self.checkComplianceStreak()
+            self?.timerTick()
         }
 
+        startLiveActivity()
         speak("Workout started. Target zone: \(lowHR) to \(highHR) beats per minute.")
     }
 
     func stopWorkout() {
         isWorkoutActive = false
+        isPaused = false
         heartRateQuery = nil
         timer?.invalidate()
         timer = nil
         locationManager.stopUpdatingLocation()
         cadenceManager.stopTracking()
         metronomeEngine.stop()
+        endLiveActivity()
 
         let minutes = Int(timeInZone) / 60
         let seconds = Int(timeInZone) % 60
@@ -194,6 +241,35 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         speak("Workout complete. You spent \(minutes) minutes and \(seconds) seconds in your zone, covering \(String(format: "%.1f", distanceMiles)) miles.")
 
         showSummary = true
+    }
+
+    func pauseWorkout() {
+        guard isWorkoutActive, !isPaused else { return }
+        isPaused = true
+        pauseStart = Date()
+        timer?.invalidate()
+        timer = nil
+        metronomeEngine.pause()
+        synthesizer.stopSpeaking(at: .word)
+        locationManager.stopUpdatingLocation()
+        updateLiveActivity()
+    }
+
+    func resumeWorkout() {
+        guard isWorkoutActive, isPaused else { return }
+        if let ps = pauseStart {
+            totalPausedTime += Date().timeIntervalSince(ps)
+            pauseStart = nil
+        }
+        isPaused = false
+        // Discard last location so we don't count distance covered while paused
+        lastLocation = nil
+        locationManager.startUpdatingLocation()
+        metronomeEngine.resume()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.timerTick()
+        }
+        updateLiveActivity()
     }
 
     // MARK: - Heart Rate Monitoring (HealthKit)
@@ -250,6 +326,20 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
             isInZone = true
             lastInZoneLocation = lastLocation
         }
+    }
+
+    // MARK: - Timer Tick
+
+    private func timerTick() {
+        elapsedTime = Date().timeIntervalSince(startDate ?? Date()) - totalPausedTime
+        if isInZone { timeInZone += 1 }
+        if currentCadence > 0 && abs(currentCadence - Double(targetCadence)) <= 10 {
+            timeOnCadence += 1
+        }
+        metronomeEngine.updateCadence(currentCadence)
+        runCoaching()
+        checkComplianceStreak()
+        updateLiveActivity()
     }
 
     // MARK: - Coaching
@@ -321,12 +411,99 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         lastLocation = location
     }
 
+    // MARK: - Voice Diagnostics
+    private func logAvailableVoices() {
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("en") }
+            .sorted { $0.quality.rawValue > $1.quality.rawValue }
+
+        print("──── Available English voices (\(voices.count)) ────")
+        for v in voices {
+            let qualityLabel: String
+            switch v.quality {
+            case .premium:  qualityLabel = "premium"
+            case .enhanced: qualityLabel = "enhanced"
+            default:        qualityLabel = "default"
+            }
+            let gender: String
+            switch v.gender {
+            case .male:        gender = "male"
+            case .female:      gender = "female"
+            case .unspecified:  gender = "unspecified"
+            @unknown default:  gender = "unknown"
+            }
+            print("  \(qualityLabel.padding(toLength: 9, withPad: " ", startingAt: 0)) | \(gender.padding(toLength: 12, withPad: " ", startingAt: 0)) | \(v.language.padding(toLength: 8, withPad: " ", startingAt: 0)) | \(v.name.padding(toLength: 20, withPad: " ", startingAt: 0)) | \(v.identifier)")
+        }
+        print("──── Selected voice: \(preferredVoice?.identifier ?? "nil") ────")
+    }
+
     // MARK: - Speech
     private func speak(_ text: String) {
+        guard !isPaused else { return }
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.voice = preferredVoice
         synthesizer.speak(utterance)
+    }
+
+    // MARK: - Live Activity
+
+    private func startLiveActivity() {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            print("Live Activity: activities disabled in Settings")
+            return
+        }
+        let attributes = WorkoutActivityAttributes(
+            targetLow: lowHR,
+            targetHigh: highHR,
+            targetCadence: targetCadence
+        )
+        let initialState = WorkoutActivityAttributes.ContentState(
+            heartRate: 0,
+            zoneStatus: ZoneStatus.belowZone.rawValue,
+            elapsedTime: 0,
+            cadence: 0,
+            isPaused: false
+        )
+        do {
+            liveActivity = try Activity<WorkoutActivityAttributes>.request(
+                attributes: attributes,
+                content: ActivityContent(state: initialState, staleDate: nil)
+            )
+            print("Live Activity started: \(liveActivity?.id ?? "unknown")")
+        } catch {
+            print("Live Activity failed to start: \(error.localizedDescription)")
+        }
+    }
+
+    private func updateLiveActivity() {
+        guard let activity = liveActivity else { return }
+        let state = WorkoutActivityAttributes.ContentState(
+            heartRate: Int(heartRate),
+            zoneStatus: zoneStatus.rawValue,
+            elapsedTime: elapsedTime,
+            cadence: Int(currentCadence),
+            isPaused: isPaused
+        )
+        Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
+    }
+
+    private func endLiveActivity() {
+        guard let activity = liveActivity else { return }
+        let finalState = WorkoutActivityAttributes.ContentState(
+            heartRate: Int(heartRate),
+            zoneStatus: zoneStatus.rawValue,
+            elapsedTime: elapsedTime,
+            cadence: Int(currentCadence),
+            isPaused: false
+        )
+        Task {
+            await activity.end(
+                ActivityContent(state: finalState, staleDate: nil),
+                dismissalPolicy: .immediate
+            )
+            liveActivity = nil
+        }
     }
 
     // MARK: - BLE Heart Rate Monitor

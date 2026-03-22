@@ -15,7 +15,7 @@ class CadenceManager: ObservableObject {
     // CMPedometer.cadence is optional and only available on some devices.
     // We also compute our own from step deltas for reliability.
     func startTracking() {
-        guard CMPedometer.isPedometerEventMonitoringAvailable() else {
+        guard CMPedometer.isStepCountingAvailable() else {
             print("CadenceManager: pedometer not available")
             return
         }
