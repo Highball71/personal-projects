@@ -6,6 +6,7 @@
 import SwiftUI
 import SwiftData
 import CloudKit
+import CoreData
 import os
 
 /// Settings screen with household management and API key configuration.
@@ -25,9 +26,13 @@ struct SettingsView: View {
 
     // Sharing state
     @State private var isLoadingShare = false
+    @State private var shareTask: Task<Void, Never>?
+    @State private var sharingDelegate: CloudSharingDelegate?
     @State private var showCloudKitAlert = false
+    @State private var showContainerUnavailableAlert = false
     @State private var showingShareError = false
     @State private var shareErrorMessage = ""
+    @State private var showingResetConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -48,10 +53,25 @@ struct SettingsView: View {
             } message: {
                 Text("Sign in to iCloud in Settings to share your recipe library with household members.")
             }
+            .alert("Sync Not Ready", isPresented: $showContainerUnavailableAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("CloudKit hasn't synced yet. Wait a moment and try again.")
+            }
             .alert("Couldn't Create Share Link", isPresented: $showingShareError) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(shareErrorMessage)
+            }
+            .confirmationDialog(
+                "Delete the existing share link?",
+                isPresented: $showingResetConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Share", role: .destructive) { resetSharing() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("All household members will lose access. You can create a new share link afterwards.")
             }
         }
     }
@@ -150,21 +170,31 @@ struct SettingsView: View {
 
     private var sharingSection: some View {
         Section {
+            // Tapping while the spinner is showing cancels the in-flight operation.
             Button {
-                generateShareURL()
+                if isLoadingShare { cancelShare() } else { generateShareURL() }
             } label: {
                 HStack {
-                    Label("Share with Household", systemImage: "person.2.fill")
+                    if isLoadingShare {
+                        Label("Cancel", systemImage: "xmark.circle")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Label("Share with Household", systemImage: "person.2.fill")
+                    }
                     Spacer()
                     if isLoadingShare {
                         ProgressView()
                     }
                 }
             }
-            .disabled(isLoadingShare)
 
             // Subtle sync status indicator
             SyncStatusRow(syncState: syncMonitor.syncState, isOffline: syncMonitor.isOffline)
+
+            Button("Reset Sharing", role: .destructive) {
+                showingResetConfirm = true
+            }
+            .disabled(isLoadingShare)
         } header: {
             Text("iCloud Sharing")
         } footer: {
@@ -173,50 +203,110 @@ struct SettingsView: View {
     }
 
     private func generateShareURL() {
+        // SyncMonitor captures the NSPersistentCloudKitContainer from the first CloudKit
+        // event notification. It's usually available within seconds of launch, but may
+        // be nil if no sync has happened yet (e.g. first launch with no network).
+        guard let persistentContainer = syncMonitor.persistentContainer else {
+            showContainerUnavailableAlert = true
+            return
+        }
+
         isLoadingShare = true
-        Task {
+
+        shareTask = Task {
+            defer { isLoadingShare = false }
+
             guard await CloudKitSharingService.shared.isCloudKitAvailable() else {
-                isLoadingShare = false
                 showCloudKitAlert = true
                 return
             }
 
-            // Use existing share if one was already created.
-            if let existingURL = await CloudKitSharingService.shared.existingShareURL() {
-                isLoadingShare = false
-                presentShareSheet(url: existingURL)
+            // Fast path: a share already exists — present the controller immediately
+            // without touching CloudKit. This is what caused the infinite spin: calling
+            // share(_:to:existingShare) re-triggers a CloudKit write that can hang.
+            if let existing = await CloudKitSharingService.shared.existingShare(using: persistentContainer) {
+                let ckContainer = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
+                presentCloudSharingController(share: existing, container: ckContainer)
                 return
             }
 
-            // Create a new zone-wide share.
+            // Slow path: first-time creation. prepareShare has a 30-second timeout
+            // built in, so it can't spin forever. The task is also cancellable via
+            // the Cancel button (which calls cancelShare()).
             do {
-                let url = try await CloudKitSharingService.shared.createHouseholdShare()
-                isLoadingShare = false
-                presentShareSheet(url: url)
+                let (share, container) = try await CloudKitSharingService.shared.prepareShare(
+                    using: persistentContainer,
+                    existingShare: nil
+                )
+                guard !Task.isCancelled else { return }
+                presentCloudSharingController(share: share, container: container)
+            } catch is CancellationError {
+                // User tapped Cancel — spinner is already hidden by cancelShare().
             } catch {
-                isLoadingShare = false
+                guard !Task.isCancelled else { return }
                 shareErrorMessage = error.localizedDescription
                 showingShareError = true
-                Logger.cloudkit.error("Failed to create share: \(error.localizedDescription, privacy: .public)")
+                Logger.cloudkit.error("Failed to prepare share: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
 
-    /// Presents the system share sheet imperatively via UIKit.
-    /// UIActivityViewController must be presented directly — wrapping it
-    /// inside a SwiftUI .sheet causes a double-modal conflict that
-    /// silently prevents the share sheet from appearing.
-    private func presentShareSheet(url: URL) {
+    /// Cancels any in-flight share operation and resets the loading state immediately.
+    private func cancelShare() {
+        shareTask?.cancel()
+        shareTask = nil
+        isLoadingShare = false
+    }
+
+    /// Hard-resets sharing state: cancels in-flight tasks, clears cached delegate,
+    /// then nukes the CKShare directly from CloudKit (bypassing the container).
+    private func resetSharing() {
+        // Step 1: cancel any in-flight operation and clear all cached state.
+        shareTask?.cancel()
+        shareTask = nil
+        sharingDelegate = nil
+
+        // Step 2: start the hard reset. The container is passed as Optional —
+        // hardResetSharing's primary path (direct zone query) works without it,
+        // so this succeeds even if persistentContainer is nil.
+        isLoadingShare = true
+        shareTask = Task {
+            defer { isLoadingShare = false }
+            do {
+                try await CloudKitSharingService.shared.hardResetSharing(
+                    persistentContainer: syncMonitor.persistentContainer
+                )
+            } catch is CancellationError {
+                // User tapped Cancel — spinner is already hidden.
+            } catch {
+                shareErrorMessage = error.localizedDescription
+                showingShareError = true
+            }
+        }
+    }
+
+    /// Presents UICloudSharingController imperatively via UIKit.
+    /// UICloudSharingController must be presented directly — wrapping it inside a
+    /// SwiftUI .sheet causes a double-modal conflict that prevents it from appearing.
+    private func presentCloudSharingController(share: CKShare, container: CKContainer) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first,
               let rootVC = window.rootViewController else {
             return
         }
 
-        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        let sharingController = UICloudSharingController(share: share, container: container)
+        // Allow participants to read and write; keep the share private (invite-only).
+        sharingController.availablePermissions = [.allowReadWrite, .allowPrivate]
+
+        // Attach delegate so applicationVersion is cleared again after every
+        // participant change (UICloudSharingController re-sets it on each save).
+        let delegate = CloudSharingDelegate(container: container)
+        sharingDelegate = delegate           // retain: SwiftUI @State keeps it alive
+        sharingController.delegate = delegate
 
         // iPad requires popover source configuration.
-        if let popover = activityVC.popoverPresentationController {
+        if let popover = sharingController.popoverPresentationController {
             popover.sourceView = rootVC.view
             popover.sourceRect = CGRect(
                 x: rootVC.view.bounds.midX,
@@ -231,7 +321,7 @@ struct SettingsView: View {
         while let presented = presenter.presentedViewController {
             presenter = presented
         }
-        presenter.present(activityVC, animated: true)
+        presenter.present(sharingController, animated: true)
     }
 
     // MARK: - Household Actions
@@ -329,6 +419,48 @@ struct SyncStatusRow: View {
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Cloud Sharing Delegate
+
+/// UICloudSharingControllerDelegate that keeps applicationVersion cleared.
+///
+/// Root cause of the recurring "newer version" error: UICloudSharingController
+/// saves the CKShare to CloudKit whenever the owner manages participants, and
+/// iOS re-injects the `applicationVersion` field on every save. Our pre-presentation
+/// clear is not enough — the controller writes the field back after we present it.
+///
+/// `cloudSharingControllerDidSaveShare(_:)` fires immediately after the controller
+/// finishes its CloudKit write, giving us the hook we need to clear the field again.
+final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
+    private let container: CKContainer
+
+    init(container: CKContainer) {
+        self.container = container
+    }
+
+    func itemTitle(for csc: UICloudSharingController) -> String? {
+        "Family Meal Planner"
+    }
+
+    func cloudSharingController(
+        _ csc: UICloudSharingController,
+        failedToSaveShareWithError error: Error
+    ) {
+        Logger.cloudkit.error(
+            "UICloudSharingController save failed: \(error.localizedDescription, privacy: .public)"
+        )
+    }
+
+    func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
+        guard let share = csc.share else { return }
+        // Clear applicationVersion on the share the controller just wrote back.
+        Task { @MainActor in
+            await CloudKitSharingService.shared.clearApplicationVersion(
+                from: share, using: container
+            )
+        }
     }
 }
 
