@@ -14,7 +14,12 @@ import SwiftData
 final class Ingredient {
     var name: String = ""
     var quantity: Double = 1.0
-    var unit: IngredientUnit = IngredientUnit.piece
+    var unitRaw: String = IngredientUnit.piece.rawValue
+
+    var unit: IngredientUnit {
+        get { IngredientUnit(rawValue: unitRaw) ?? .piece }
+        set { unitRaw = newValue.rawValue }
+    }
 
     // Explicit inverse of Recipe.ingredients — CloudKit requires
     // every relationship to declare its inverse.

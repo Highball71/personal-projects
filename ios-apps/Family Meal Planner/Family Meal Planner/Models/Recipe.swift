@@ -13,7 +13,12 @@ import SwiftData
 @Model
 final class Recipe {
     var name: String = ""
-    var category: RecipeCategory = RecipeCategory.dinner
+    var categoryRaw: String = RecipeCategory.dinner.rawValue
+
+    var category: RecipeCategory {
+        get { RecipeCategory(rawValue: categoryRaw) ?? .dinner }
+        set { categoryRaw = newValue.rawValue }
+    }
     var servings: Int = 4
     var prepTimeMinutes: Int = 30
     var cookTimeMinutes: Int = 0
@@ -23,7 +28,17 @@ final class Recipe {
 
     // Where this recipe came from (cookbook, website, photo, etc.).
     // Optional — older or manually entered recipes may not have a source.
-    var sourceType: RecipeSource?
+    var sourceTypeRaw: String?
+
+    var sourceType: RecipeSource? {
+        get {
+            guard let sourceTypeRaw else { return nil }
+            return RecipeSource(rawValue: sourceTypeRaw)
+        }
+        set {
+            sourceTypeRaw = newValue?.rawValue
+        }
+    }
     var sourceDetail: String?
 
     // Display name of whoever added this recipe to the shared library.
