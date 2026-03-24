@@ -148,13 +148,17 @@ struct IngredientSearchView: View {
             }
         }
         .padding()
-        .background(.bar)
+        .background(Color.fluffyNavBar)
     }
 
     private func addIngredient() {
-        let trimmed = ingredientInput.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !trimmed.isEmpty, !selectedIngredients.contains(trimmed) else { return }
-        selectedIngredients.append(trimmed)
+        // Split on commas so "ground beef, shallots" adds two ingredients at once.
+        let tokens = ingredientInput
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty && !selectedIngredients.contains($0) }
+        guard !tokens.isEmpty else { return }
+        selectedIngredients.append(contentsOf: tokens)
         ingredientInput = ""
     }
 
@@ -191,6 +195,8 @@ struct IngredientSearchView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.fluffyBackground)
     }
 
     /// A single result row: tap to view the recipe, swipe left to add to meal plan.

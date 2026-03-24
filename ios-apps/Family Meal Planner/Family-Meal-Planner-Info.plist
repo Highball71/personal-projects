@@ -10,5 +10,7 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>ProxyKey</key>
+	<string>$(PROXY_KEY)</string>
 </dict>
 </plist>

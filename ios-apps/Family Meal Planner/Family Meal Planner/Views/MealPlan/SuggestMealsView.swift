@@ -110,8 +110,8 @@ struct SuggestMealsView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(surpriseMe ? Color.accentColor : Color(.systemGray5))
-                .foregroundStyle(surpriseMe ? .white : .primary)
+                .background(surpriseMe ? Color.fluffyAccent : Color.fluffyNavBar)
+                .foregroundStyle(surpriseMe ? .white : Color.fluffyPrimary)
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -125,7 +125,7 @@ struct SuggestMealsView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(canSuggest ? Color.accentColor : Color(.systemGray4))
+                    .background(canSuggest ? Color.fluffyAccent : Color.fluffyBorder)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -198,6 +198,8 @@ struct SuggestMealsView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.fluffyBackground)
 
                 // Shuffle / Use This Plan buttons
                 HStack(spacing: 16) {
@@ -209,7 +211,7 @@ struct SuggestMealsView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color(.systemGray5))
+                        .background(Color.fluffyNavBar)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
@@ -222,7 +224,7 @@ struct SuggestMealsView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor)
+                        .background(Color.fluffyAccent)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -332,8 +334,8 @@ struct ProteinChip: View {
                 .fontWeight(.medium)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(isSelected ? Color.accentColor : Color(.systemGray5))
-                .foregroundStyle(isSelected ? .white : .primary)
+                .background(isSelected ? Color.fluffyAccent : Color.fluffyNavBar)
+                .foregroundStyle(isSelected ? .white : Color.fluffyPrimary)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)

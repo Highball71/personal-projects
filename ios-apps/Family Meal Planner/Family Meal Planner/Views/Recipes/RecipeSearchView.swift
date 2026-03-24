@@ -103,6 +103,8 @@ struct RecipeSearchView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.fluffyBackground)
             .navigationTitle("Search Recipes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

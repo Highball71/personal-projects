@@ -67,7 +67,17 @@ final class IngredientUnitTests: XCTestCase {
         XCTAssertEqual(IngredientUnit.allCases.count, 21)
     }
 
-    // MARK: - Codable round-trip
+    // MARK: - Round-trip tests
+
+    func testRawRepresentableRoundTrip() {
+        // SwiftData stores IngredientUnit via its String raw value.
+        // This test guards against raw value changes that would silently
+        // corrupt existing persisted data.
+        for unit in IngredientUnit.allCases {
+            let restored = IngredientUnit(rawValue: unit.rawValue)
+            XCTAssertEqual(restored, unit, "\(unit) should round-trip through its raw value")
+        }
+    }
 
     func testCodableRoundTrip() throws {
         let original = IngredientUnit.tablespoon

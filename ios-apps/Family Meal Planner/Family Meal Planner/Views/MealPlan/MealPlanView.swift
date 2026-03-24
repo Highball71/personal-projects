@@ -119,6 +119,7 @@ struct MealPlanView: View {
                 }
                 .padding()
             }
+            .background(Color.fluffyBackground)
             .navigationTitle("Meal Plan")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

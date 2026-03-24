@@ -19,6 +19,7 @@
 /* Begin PBXFileReference section */
 		C396A9602F393DEA0074F954 /* Family Meal Planner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Family Meal Planner.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Family Meal PlannerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -58,6 +59,7 @@
 				C396A9622F393DEA0074F954 /* Family Meal Planner */,
 				D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */,
 				C396A9612F393DEA0074F954 /* Products */,
+				EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -319,6 +321,7 @@
 		};
 		C396A96C2F393DEB0074F954 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -355,6 +358,7 @@
 		};
 		C396A96D2F393DEB0074F954 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

@@ -12,8 +12,11 @@ enum AnthropicClient {
     static let endpoint = URL(string: "https://fluffylist-proxy.onrender.com/v1/messages")!
 
     // Proxy key — authenticates this app to the fluffylist-proxy server.
+    // Injected at build time via Secrets.xcconfig → Info.plist (ProxyKey).
     // The actual Anthropic API key is stored server-side and never sent to the app.
-    private static let proxyKey = "fluffylist-proxy-2026-xk9mq"
+    private static var proxyKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "ProxyKey") as? String ?? ""
+    }
 
     // MARK: - Errors
 

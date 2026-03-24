@@ -13,7 +13,7 @@ import os
 /// Tracks CloudKit sync state and network reachability.
 /// Inject into the environment at app level; observe in views.
 @Observable
-final class SyncMonitor {
+final class SyncMonitor: @unchecked Sendable {
 
     enum SyncState: Equatable {
         case synced
@@ -57,7 +57,7 @@ final class SyncMonitor {
 
     private func startNetworkMonitoring() {
         pathMonitor.pathUpdateHandler = { [weak self] path in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 self?.isOffline = path.status != .satisfied
             }
         }
@@ -102,12 +102,16 @@ final class SyncMonitor {
                 // Safe to leave permanently: only runs in debug builds (Development
                 // CloudKit environment), is a no-op after all fields already exist,
                 // and works on a temporary in-memory copy so it doesn't touch live data.
+                // Capture before entering the detached task: Logger.cloudkit is
+                // @MainActor-isolated (its initializer reads Bundle.main), but Logger
+                // itself is a Sendable struct — safe to copy and use off-actor.
+                let logger = Logger.cloudkit
                 Task.detached(priority: .background) {
                     do {
                         try container.initializeCloudKitSchema(options: [])
-                        Logger.cloudkit.info("initializeCloudKitSchema: Development schema updated")
+                        logger.info("initializeCloudKitSchema: Development schema updated")
                     } catch {
-                        Logger.cloudkit.warning(
+                        logger.warning(
                             "initializeCloudKitSchema failed: \(error.localizedDescription, privacy: .public)"
                         )
                     }

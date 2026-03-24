@@ -34,6 +34,11 @@ struct SettingsView: View {
     @State private var shareErrorMessage = ""
     @State private var showingResetConfirm = false
 
+    #if DEBUG
+    @State private var showDiagAlert = false
+    @State private var diagAlertMessage = ""
+    #endif
+
     var body: some View {
         NavigationStack {
             Form {
@@ -73,6 +78,14 @@ struct SettingsView: View {
             } message: {
                 Text("All household members will lose access. You can create a new share link afterwards.")
             }
+            #if DEBUG
+            .alert("Container Diagnostic", isPresented: $showDiagAlert) {
+                Button("Continue") { executeShareFlow() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(diagAlertMessage)
+            }
+            #endif
         }
     }
 
@@ -203,14 +216,22 @@ struct SettingsView: View {
     }
 
     private func generateShareURL() {
-        // SyncMonitor captures the NSPersistentCloudKitContainer from the first CloudKit
-        // event notification. It's usually available within seconds of launch, but may
-        // be nil if no sync has happened yet (e.g. first launch with no network).
-        guard let persistentContainer = syncMonitor.persistentContainer else {
-            showContainerUnavailableAlert = true
-            return
-        }
+        #if DEBUG
+        // Show container status before starting — tap Continue to proceed, Cancel to abort.
+        let isNil = syncMonitor.persistentContainer == nil
+        diagAlertMessage = isNil
+            ? "persistentContainer: nil\n\nNot yet captured from sync event notifications. The direct-CloudKit fallback will be attempted."
+            : "persistentContainer: available ✓\n\nReady to call share(_:to:completion:)."
+        showDiagAlert = true
+        // Execution resumes when the user taps Continue in the diagnostic alert.
+        #else
+        executeShareFlow()
+        #endif
+    }
 
+    /// Runs the actual share flow. Called directly in release builds and via the
+    /// Continue button in the DEBUG diagnostic alert.
+    private func executeShareFlow() {
         isLoadingShare = true
 
         shareTask = Task {
@@ -221,32 +242,44 @@ struct SettingsView: View {
                 return
             }
 
-            // Fast path: a share already exists — present the controller immediately
-            // without touching CloudKit. This is what caused the infinite spin: calling
-            // share(_:to:existingShare) re-triggers a CloudKit write that can hang.
-            if let existing = await CloudKitSharingService.shared.existingShare(using: persistentContainer) {
-                let ckContainer = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
-                presentCloudSharingController(share: existing, container: ckContainer)
-                return
-            }
-
-            // Slow path: first-time creation. prepareShare has a 30-second timeout
-            // built in, so it can't spin forever. The task is also cancellable via
-            // the Cancel button (which calls cancelShare()).
-            do {
-                let (share, container) = try await CloudKitSharingService.shared.prepareShare(
-                    using: persistentContainer,
-                    existingShare: nil
-                )
-                guard !Task.isCancelled else { return }
-                presentCloudSharingController(share: share, container: container)
-            } catch is CancellationError {
-                // User tapped Cancel — spinner is already hidden by cancelShare().
-            } catch {
-                guard !Task.isCancelled else { return }
-                shareErrorMessage = error.localizedDescription
-                showingShareError = true
-                Logger.cloudkit.error("Failed to prepare share: \(error.localizedDescription, privacy: .public)")
+            if let persistentContainer = syncMonitor.persistentContainer {
+                // Normal path: container captured — use NSPersistentCloudKitContainer API.
+                // prepareShare always deletes any existing share before creating a fresh one,
+                // so there is no fast path for an existing share here.
+                do {
+                    let (share, container) = try await CloudKitSharingService.shared.prepareShare(
+                        using: persistentContainer
+                    )
+                    guard !Task.isCancelled else { return }
+                    presentCloudSharingController(share: share, container: container)
+                } catch is CancellationError {
+                    // User tapped Cancel — spinner is already hidden by cancelShare().
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    shareErrorMessage = error.localizedDescription
+                    showingShareError = true
+                    Logger.cloudkit.error("Failed to prepare share: \(error.localizedDescription, privacy: .public)")
+                }
+            } else {
+                // Fallback: persistentContainer is nil — not yet captured from sync event
+                // notifications (e.g. hard reset deleted the zone; SwiftData hasn't restarted
+                // sync). Query CloudKit directly for an existing share; no container needed.
+                Logger.cloudkit.warning("persistentContainer nil at share time — trying direct CloudKit fallback")
+                do {
+                    let ckContainer = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
+                    if let share = try await CloudKitSharingService.shared.fetchExistingShareDirect() {
+                        presentCloudSharingController(share: share, container: ckContainer)
+                    } else {
+                        // No existing share and no container to create one — wait for sync.
+                        showContainerUnavailableAlert = true
+                    }
+                } catch is CancellationError {
+                    // User tapped Cancel
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    shareErrorMessage = error.localizedDescription
+                    showingShareError = true
+                }
             }
         }
     }

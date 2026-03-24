@@ -8,7 +8,8 @@
 import Foundation
 
 /// Categories for organizing recipes.
-/// - Codable: required so SwiftData can store it
+/// - Codable: required by SwiftData's @Model macro — getValue/setValue overload
+///   resolution depends on the stored property type conforming to Codable.
 /// - CaseIterable: lets us loop over all cases in Pickers
 /// - Identifiable: required for SwiftUI's ForEach
 enum RecipeCategory: String, Codable, CaseIterable, Identifiable {

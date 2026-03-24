@@ -52,6 +52,8 @@ struct GroceryListView: View {
                             }
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(Color.fluffyBackground)
                 }
             }
             .navigationTitle("Grocery List")

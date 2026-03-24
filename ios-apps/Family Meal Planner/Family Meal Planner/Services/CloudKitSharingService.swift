@@ -8,6 +8,7 @@
 import CloudKit
 import CoreData
 import os.log
+@preconcurrency import Dispatch
 
 /// Manages CloudKit sharing for the household recipe library.
 ///
@@ -26,8 +27,9 @@ import os.log
 /// new recipes added after sharing are automatically included.
 ///
 /// Flow:
-/// 1. Head Cook taps "Share" → `prepareShare(using:existingShare:)`
-/// 2. NSPersistentCloudKitContainer creates/updates the CKShare for the recipe zone
+/// 1. Head Cook taps "Share" → `prepareShare(using:)`
+/// 2. Any existing CKShare is deleted from CloudKit; NSPersistentCloudKitContainer
+///    creates a brand-new CKShare (clean participants list, no applicationVersion)
 /// 3. UICloudSharingController presents the system sharing UI
 /// 4. Head Cook sends the share URL to Shannon (e.g. via iMessage)
 /// 5. Shannon taps the link → AppDelegate accepts it → SwiftData (.automatic) syncs
@@ -63,21 +65,22 @@ final class CloudKitSharingService {
 
     // MARK: - Sharing
 
-    /// Creates or updates the household share via NSPersistentCloudKitContainer.
+    /// Force-creates a brand-new household share via NSPersistentCloudKitContainer.
     ///
-    /// Fetches all Recipe managed objects from the container's viewContext, then
-    /// calls `share(_:to:completion:)`. The container creates a CKShare for the
-    /// zone those objects live in — the same zone SwiftData uses for all models —
-    /// so new recipes added later are automatically covered by the share.
+    /// Always deletes any existing CKShare from CloudKit before creating a fresh one.
+    /// This guarantees a clean share with no stale participants and no applicationVersion
+    /// field that triggers the "needs newer version" error for TestFlight recipients.
     ///
-    /// - Parameters:
-    ///   - persistentContainer: The NSPersistentCloudKitContainer that backs SwiftData.
-    ///     Captured from `NSPersistentCloudKitContainer.eventChangedNotification` by SyncMonitor.
-    ///   - existingShare: An existing CKShare to update, or nil to create a new one.
+    /// If the container already tracks a share, its zone ID is used to construct a
+    /// fresh CKShare(recordZoneID:) which is passed to share(_:to:). Passing a new
+    /// CKShare object forces the container to adopt it rather than reusing its cached
+    /// reference to the old share — which would carry over stale participants.
+    ///
+    /// - Parameter persistentContainer: The NSPersistentCloudKitContainer that backs SwiftData.
+    ///   Captured from `NSPersistentCloudKitContainer.eventChangedNotification` by SyncMonitor.
     /// - Returns: (CKShare, CKContainer) ready for UICloudSharingController.
     func prepareShare(
-        using persistentContainer: NSPersistentCloudKitContainer,
-        existingShare: CKShare?
+        using persistentContainer: NSPersistentCloudKitContainer
     ) async throws -> (CKShare, CKContainer) {
         guard await isCloudKitAvailable() else {
             throw CloudKitSharingError.accountNotAvailable
@@ -94,15 +97,48 @@ final class CloudKitSharingService {
             throw CloudKitSharingError.noRecipesToShare
         }
 
-        // NSPersistentCloudKitContainer.share(_:to:completion:) creates (or updates)
-        // a CKShare for the zone those records live in and saves it to CloudKit.
-        // The container does NOT move records to a new zone — they stay where they are,
-        // so all future objects written to the same zone are automatically included.
-        //
+        // Step 1: Check the container's local metadata for an existing share.
+        // fetchShares(in:nil) is a synchronous CoreData read — no network, no hang.
+        logger.info("prepareShare: step 1 — fetchShares starting")
+        let existingShares = (try? persistentContainer.fetchShares(in: nil)) ?? []
+        logger.info("prepareShare: step 1 — fetchShares complete, found \(existingShares.count) share(s)")
+
+        // Step 2: Delete any existing share from CloudKit before creating a fresh one.
+        // Wrapped in withThrowingTaskGroup so it can't hang indefinitely — 30-second cutoff.
+        var freshShare: CKShare? = nil
+        if let old = existingShares.first {
+            logger.info("prepareShare: step 2 — modifyRecords delete starting (recordName: \(old.recordID.recordName, privacy: .public))")
+            let ck = ckContainer  // capture before entering task group to avoid actor isolation hop
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    _ = try await ck.privateCloudDatabase.modifyRecords(
+                        saving: [], deleting: [old.recordID]
+                    )
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(30))
+                    throw CloudKitSharingError.timeout
+                }
+                do {
+                    try await group.next()!
+                } catch {
+                    group.cancelAll()
+                    throw error
+                }
+                group.cancelAll()
+            }
+            logger.info("prepareShare: step 2 — modifyRecords delete complete")
+            freshShare = CKShare(recordZoneID: old.recordID.zoneID)
+        } else {
+            logger.info("prepareShare: step 2 — skipped (no existing share in container metadata)")
+        }
+
+        // Step 3: Create the new share via NSPersistentCloudKitContainer.
         // share(_:to:completion:) has no built-in timeout and can hang indefinitely if
-        // CloudKit is slow or unresponsive. We add a 30-second hard cutoff so the UI
-        // never gets stuck. Both the timeout and the callback dispatch to the main queue,
+        // CloudKit is slow or unresponsive. The DispatchWorkItem below adds a 30-second
+        // hard cutoff. Both the timeout and the callback dispatch to the main queue,
         // so the `resumed` flag is only ever read/written on one thread — no data race.
+        logger.info("prepareShare: step 3 — share(_:to:) starting (freshShare: \(freshShare != nil ? "new zone share" : "nil — first-time creation", privacy: .public))")
         let (share, shareContainer) = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(CKShare, CKContainer), Error>) in
             var resumed = false
 
@@ -113,18 +149,19 @@ final class CloudKitSharingService {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: timeoutWork)
 
-            persistentContainer.share(recipes, to: existingShare) { [logger] _, share, container, error in
+            persistentContainer.share(recipes, to: freshShare) { [logger] _, share, container, error in
                 DispatchQueue.main.async {
                     guard !resumed else { return }
                     resumed = true
                     timeoutWork.cancel()
                     if let error {
-                        logger.error("share(_:to:completion:) failed: \(error.localizedDescription)")
+                        logger.error("prepareShare: step 3 — share(_:to:) failed: \(error.localizedDescription)")
                         continuation.resume(throwing: error)
                     } else if let share, let container {
-                        logger.info("Share prepared. URL: \(share.url?.absoluteString ?? "none yet")")
+                        logger.info("prepareShare: step 3 — share(_:to:) complete, URL: \(share.url?.absoluteString ?? "none yet", privacy: .public)")
                         continuation.resume(returning: (share, container))
                     } else {
+                        logger.error("prepareShare: step 3 — share(_:to:) returned nil share/container")
                         continuation.resume(throwing: CloudKitSharingError.shareFailed)
                     }
                 }
@@ -234,7 +271,7 @@ final class CloudKitSharingService {
             logger.info("Hard reset: no shares found — already clean")
             return
         }
-        try await ckContainer.privateCloudDatabase.modifyRecords(
+        _ = try await ckContainer.privateCloudDatabase.modifyRecords(
             saving: [], deleting: [share.recordID]
         )
         logger.info("Hard reset: deleted share via container-ID fallback")
@@ -263,8 +300,43 @@ final class CloudKitSharingService {
         }
 
         guard !toDelete.isEmpty else { return 0 }
-        try await ckContainer.privateCloudDatabase.modifyRecords(saving: [], deleting: toDelete)
+        _ = try await ckContainer.privateCloudDatabase.modifyRecords(saving: [], deleting: toDelete)
         return toDelete.count
+    }
+
+    // MARK: - Direct CloudKit query (no container)
+
+    /// Fetches the existing CKShare directly from CloudKit without involving
+    /// NSPersistentCloudKitContainer. Used as a fallback when persistentContainer
+    /// hasn't been captured yet from sync event notifications (e.g. right after
+    /// a hard reset deleted the zone and sync hasn't restarted).
+    ///
+    /// Uses the same zone-enumeration approach as deleteSharesViaDirectQuery.
+    /// Returns the first CKShare found, or nil if no custom zones / no shares exist.
+    func fetchExistingShareDirect() async throws -> CKShare? {
+        let allZones = try await ckContainer.privateCloudDatabase.allRecordZones()
+        let customZones = allZones.filter { $0.zoneID != CKRecordZone.default().zoneID }
+
+        for zone in customZones {
+            let query = CKQuery(
+                recordType: CKRecord.SystemType.share,
+                predicate: NSPredicate(value: true)
+            )
+            let (matchResults, _) = try await ckContainer.privateCloudDatabase.records(
+                matching: query, inZoneWith: zone.zoneID
+            )
+            let shares = matchResults.compactMap { _, result -> CKShare? in
+                try? result.get() as? CKShare
+            }
+            if let share = shares.first {
+                // Clear applicationVersion so the App Store version check doesn't appear.
+                if share["applicationVersion"] as? String != nil {
+                    await clearApplicationVersion(from: share, using: ckContainer)
+                }
+                return share
+            }
+        }
+        return nil
     }
 
     // MARK: - Private helpers
@@ -279,7 +351,7 @@ final class CloudKitSharingService {
     func clearApplicationVersion(from share: CKShare, using container: CKContainer) async {
         share["applicationVersion"] = nil as CKRecordValue?
         do {
-            try await container.privateCloudDatabase.modifyRecords(saving: [share], deleting: [])
+            _ = try await container.privateCloudDatabase.modifyRecords(saving: [share], deleting: [])
             logger.info("Cleared applicationVersion from share.")
         } catch {
             // Non-fatal: log and continue. The share still works; recipients on

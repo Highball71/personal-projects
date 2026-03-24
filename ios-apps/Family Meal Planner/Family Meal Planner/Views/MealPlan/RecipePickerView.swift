@@ -39,6 +39,8 @@ struct RecipePickerView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.fluffyBackground)
             .navigationTitle("Choose Recipe")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search recipes")

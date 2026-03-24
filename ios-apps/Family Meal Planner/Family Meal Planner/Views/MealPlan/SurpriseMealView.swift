@@ -73,7 +73,8 @@ struct SurpriseMealView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color(.systemGray5))
+                    .background(Color.fluffyNavBar)
+                    .foregroundStyle(Color.fluffyPrimary)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -87,7 +88,7 @@ struct SurpriseMealView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(!selectedProteins.isEmpty ? Color.accentColor : Color(.systemGray4))
+                    .background(!selectedProteins.isEmpty ? Color.fluffyAccent : Color.fluffyBorder)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -162,8 +163,12 @@ struct SurpriseMealView: View {
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity)
-                .background(Color(.systemGray6))
+                .background(Color.fluffyCard)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.fluffyBorder, lineWidth: 0.5)
+                )
                 .padding(.horizontal)
 
                 Spacer()
@@ -178,7 +183,7 @@ struct SurpriseMealView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.accentColor)
+                            .background(Color.fluffyAccent)
                             .foregroundStyle(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -192,7 +197,8 @@ struct SurpriseMealView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color(.systemGray5))
+                        .background(Color.fluffyNavBar)
+                        .foregroundStyle(Color.fluffyPrimary)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)

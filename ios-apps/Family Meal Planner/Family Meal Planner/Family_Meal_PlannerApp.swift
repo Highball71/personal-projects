@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import CloudKit
+import CoreData
 import os
 
 // MARK: - App Delegate (CloudKit Share Acceptance)
@@ -51,6 +52,31 @@ struct Family_Meal_PlannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var syncMonitor = SyncMonitor()
 
+    init() {
+        // MARK: Navigation bar — Slate & Sage palette
+        let navAppearance = UINavigationBarAppearance()
+        navAppearance.configureWithOpaqueBackground()
+        navAppearance.backgroundColor = UIColor(Color.fluffyNavBar)
+        navAppearance.titleTextAttributes = [
+            .foregroundColor: UIColor(Color.fluffyPrimary)
+        ]
+        navAppearance.largeTitleTextAttributes = [
+            .foregroundColor: UIColor(Color.fluffyPrimary)
+        ]
+        UINavigationBar.appearance().standardAppearance  = navAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+        UINavigationBar.appearance().compactAppearance   = navAppearance
+        UINavigationBar.appearance().tintColor = UIColor(Color.fluffyAccent)
+
+        // MARK: Tab bar
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithOpaqueBackground()
+        tabAppearance.backgroundColor = UIColor(Color.fluffyNavBar)
+        UITabBar.appearance().standardAppearance  = tabAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+        UITabBar.appearance().tintColor = UIColor(Color.fluffyAccent)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -64,6 +90,23 @@ struct Family_Meal_PlannerApp: App {
     }
 }
 
+/// Replaces the deprecated NSKeyedUnarchiveFromData value transformer.
+///
+/// NSPersistentCloudKitContainer (which backs SwiftData's .cloudKitDatabase) creates
+/// internal Core Data entities whose valueTransformerName is hardcoded to
+/// "NSKeyedUnarchiveFromData". Registering this subclass under that name before the
+/// container initializes means Core Data finds a modern, secure-coding transformer
+/// instead of the deprecated one, silencing the runtime warning.
+///
+/// NSPersistentHistoryToken is added to allowedTopLevelClasses because the CloudKit
+/// sync engine archives history tokens (used for change tracking) as transformable
+/// binary data. It is not in NSSecureUnarchiveFromDataTransformer's default list.
+private final class CloudKitSecureTransformer: NSSecureUnarchiveFromDataTransformer {
+    override class var allowedTopLevelClasses: [AnyClass] {
+        super.allowedTopLevelClasses + [NSPersistentHistoryToken.self]
+    }
+}
+
 /// Shared model container — CloudKit-enabled with stable store for data persistence.
 /// Uses .automatic to sync via the iCloud container from entitlements.
 /// The .automatic scope supports both private and shared CloudKit zones,
@@ -72,6 +115,12 @@ struct Family_Meal_PlannerApp: App {
 /// Falls back to local-only storage if CloudKit isn't available
 /// (e.g. Simulator, no iCloud account).
 private let sharedModelContainer: ModelContainer = {
+    // Must run before any ModelContainer/NSPersistentCloudKitContainer init.
+    ValueTransformer.setValueTransformer(
+        CloudKitSecureTransformer(),
+        forName: NSValueTransformerName(rawValue: "NSKeyedUnarchiveFromData")
+    )
+
     let schema = Schema([
         Recipe.self,
         Ingredient.self,

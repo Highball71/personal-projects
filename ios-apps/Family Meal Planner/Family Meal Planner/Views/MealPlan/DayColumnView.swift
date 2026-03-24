@@ -58,8 +58,12 @@ struct DayColumnView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .background(Color.fluffyCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.fluffyBorder, lineWidth: 0.5)
+        )
     }
 }
 

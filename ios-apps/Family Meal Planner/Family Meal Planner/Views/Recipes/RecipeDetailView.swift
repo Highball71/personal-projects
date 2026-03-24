@@ -127,6 +127,8 @@ struct RecipeDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.fluffyBackground)
         .navigationTitle(recipe.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

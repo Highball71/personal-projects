@@ -35,6 +35,7 @@ struct ContentView: View {
                     Label("Groceries", systemImage: "cart")
                 }
         }
+        .tint(Color.fluffyAccent)
         // No sample data seeding — with CloudKit sync, seeding on each
         // device creates duplicates when the cloud copies sync down.
         .onAppear {

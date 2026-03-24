@@ -50,10 +50,15 @@ struct RecipeListView: View {
                     NavigationLink(value: recipe) {
                         RecipeRowView(recipe: recipe)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                 }
                 .onDelete(perform: deleteRecipes)
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.fluffyBackground)
             // Filter chips pinned above the list
             .safeAreaInset(edge: .top) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -93,7 +98,7 @@ struct RecipeListView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
-                .background(.bar)
+                .background(Color.fluffyNavBar)
             }
             .navigationTitle("Recipes")
             // This tells SwiftUI: "when someone taps a NavigationLink
@@ -101,6 +106,7 @@ struct RecipeListView: View {
             .navigationDestination(for: Recipe.self) { recipe in
                 RecipeDetailView(recipe: recipe)
             }
+
             .searchable(text: $searchText, prompt: "Search recipes")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -173,48 +179,66 @@ struct FilterChip: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(isActive ? Color.accentColor : Color(.systemGray5))
-            .foregroundStyle(isActive ? .white : .primary)
+            .background(isActive ? Color.fluffyAccent : Color.fluffyNavBar)
+            .foregroundStyle(isActive ? .white : Color.fluffyPrimary)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 }
 
-/// A single row in the recipe list, showing name, category, and ingredient count.
+/// A single row in the recipe list — rendered as a card with a category colour stripe.
 struct RecipeRowView: View {
     let recipe: Recipe
 
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(recipe.name)
-                    .font(.headline)
-                if recipe.isFavorite {
-                    Image(systemName: "heart.fill")
+        HStack(spacing: 0) {
+            // 3 pt left stripe coloured by meal category
+            Rectangle()
+                .fill(recipe.category.stripeColor)
+                .frame(width: 3)
+
+            // Card content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(recipe.name)
+                        .font(.headline)
+                        .foregroundStyle(Color.fluffyPrimary)
+                    if recipe.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+                HStack {
+                    Text(recipe.category.rawValue)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.fluffySecondary)
+                    if let avg = recipe.averageRating {
+                        RecipeRowStarView(rating: avg)
+                    }
+                    Spacer()
+                    Text("\(recipe.ingredientsList.count) ingredients")
+                        .font(.caption)
+                        .foregroundStyle(Color.fluffySecondary)
+                }
+                .lineLimit(1)
+                // "Added by" byline — shown only for recipes where the creator was recorded.
+                if let name = recipe.addedByName, !name.isEmpty {
+                    Text("Added by \(name)")
+                        .font(.caption2)
+                        .foregroundStyle(Color.fluffySecondary.opacity(0.7))
                 }
             }
-            HStack {
-                Text(recipe.category.rawValue)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let avg = recipe.averageRating {
-                    RecipeRowStarView(rating: avg)
-                }
-                Spacer()
-                Text("\(recipe.ingredientsList.count) ingredients")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            // "Added by" byline — shown only for recipes where the creator was recorded.
-            if let name = recipe.addedByName, !name.isEmpty {
-                Text("Added by \(name)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
+        .background(Color.fluffyCard)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.fluffyBorder, lineWidth: 0.5)
+        )
     }
 }
 
