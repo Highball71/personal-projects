@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreData
 
 /// Displays a single day with its three meal slots (breakfast, lunch, dinner).
 /// The current day gets a blue header to stand out.
@@ -15,14 +16,14 @@ import SwiftUI
 /// approve/reject buttons.
 struct DayColumnView: View {
     let date: Date
-    let mealPlans: [MealPlan]
-    let suggestions: [MealSuggestion]
+    let mealPlans: [CDMealPlan]
+    let suggestions: [CDMealSuggestion]
     let isHeadCook: Bool
     let approvalFlowActive: Bool
     let onSlotTapped: (MealType) -> Void
     let onSlotCleared: (MealType) -> Void
-    let onApproveSuggestion: (MealSuggestion) -> Void
-    let onRejectSuggestion: (MealSuggestion) -> Void
+    let onApproveSuggestion: (CDMealSuggestion) -> Void
+    let onRejectSuggestion: (CDMealSuggestion) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -34,8 +35,8 @@ struct DayColumnView: View {
 
             // One slot for each meal type, with suggestions below
             ForEach(MealType.allCases) { mealType in
-                let recipe = mealPlans.first(where: { $0.mealType == mealType })?.recipe
-                let slotSuggestions = suggestions.filter { $0.mealType == mealType }
+                let recipe = mealPlans.first(where: { $0.mealTypeRaw == mealType.rawValue })?.recipe
+                let slotSuggestions = suggestions.filter { $0.mealTypeRaw == mealType.rawValue }
 
                 VStack(alignment: .leading, spacing: 4) {
                     MealSlotView(
@@ -71,7 +72,7 @@ struct DayColumnView: View {
 /// The Head Cook sees approve/reject buttons; everyone else just
 /// sees the suggestion info.
 private struct SuggestionRowView: View {
-    let suggestion: MealSuggestion
+    let suggestion: CDMealSuggestion
     let isHeadCook: Bool
     let onApprove: () -> Void
     let onReject: () -> Void
@@ -128,4 +129,5 @@ private struct SuggestionRowView: View {
         onRejectSuggestion: { _ in }
     )
     .padding()
+    .environment(\.managedObjectContext, NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType))
 }

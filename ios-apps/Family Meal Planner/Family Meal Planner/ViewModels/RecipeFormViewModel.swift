@@ -6,7 +6,7 @@
 //  Extracted from AddEditRecipeView to keep the view thin.
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 @Observable
 final class RecipeFormViewModel {
@@ -22,18 +22,18 @@ final class RecipeFormViewModel {
     var sourceDetail: String = ""
 
     // The recipe being edited, or nil for add mode.
-    private(set) var recipeToEdit: Recipe?
+    private(set) var recipeToEdit: CDRecipe?
 
     var isEditing: Bool { recipeToEdit != nil }
 
-    init(recipe: Recipe? = nil) {
+    init(recipe: CDRecipe? = nil) {
         self.recipeToEdit = recipe
         if let recipe {
             name = recipe.name
             category = recipe.category
-            servings = recipe.servings
-            prepTimeMinutes = recipe.prepTimeMinutes
-            cookTimeMinutes = recipe.cookTimeMinutes
+            servings = Int(recipe.servings)
+            prepTimeMinutes = Int(recipe.prepTimeMinutes)
+            cookTimeMinutes = Int(recipe.cookTimeMinutes)
             instructions = recipe.instructions
             ingredientRows = recipe.ingredientsList.map { ingredient in
                 IngredientFormData(
@@ -52,19 +52,18 @@ final class RecipeFormViewModel {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && servings >= 1
     }
 
-    /// Save or update the recipe in the given model context.
-    func save(to context: ModelContext, addedBy: String?) {
+    /// Save or update the recipe in the given Core Data context.
+    func save(to context: NSManagedObjectContext, addedBy: String?) {
         let validIngredients = ingredientRows
             .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
-            .map { Ingredient(name: $0.name, quantity: $0.quantity, unit: $0.unit) }
 
         if let recipe = recipeToEdit {
             // Update existing recipe
             recipe.name = name
             recipe.category = category
-            recipe.servings = servings
-            recipe.prepTimeMinutes = prepTimeMinutes
-            recipe.cookTimeMinutes = cookTimeMinutes
+            recipe.servings = Int16(servings)
+            recipe.prepTimeMinutes = Int16(prepTimeMinutes)
+            recipe.cookTimeMinutes = Int16(cookTimeMinutes)
             recipe.instructions = instructions
             recipe.sourceType = sourceType
             recipe.sourceDetail = sourceDetail.isEmpty ? nil : sourceDetail
@@ -73,23 +72,45 @@ final class RecipeFormViewModel {
             for ingredient in recipe.ingredientsList {
                 context.delete(ingredient)
             }
-            recipe.ingredientsList = validIngredients
+            recipe.ingredients = nil
+
+            // Add new ingredients
+            for data in validIngredients {
+                let ingredient = CDIngredient(context: context)
+                ingredient.id = UUID()
+                ingredient.name = data.name
+                ingredient.quantity = data.quantity
+                ingredient.unitRaw = data.unit.rawValue
+                ingredient.recipe = recipe
+            }
         } else {
             // Create new recipe
-            let recipe = Recipe(
-                name: name,
-                category: category,
-                servings: servings,
-                prepTimeMinutes: prepTimeMinutes,
-                cookTimeMinutes: cookTimeMinutes,
-                instructions: instructions,
-                ingredients: validIngredients,
-                sourceType: sourceType,
-                sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail
-            )
+            let recipe = CDRecipe(context: context)
+            recipe.id = UUID()
+            recipe.name = name
+            recipe.categoryRaw = category.rawValue
+            recipe.servings = Int16(servings)
+            recipe.prepTimeMinutes = Int16(prepTimeMinutes)
+            recipe.cookTimeMinutes = Int16(cookTimeMinutes)
+            recipe.instructions = instructions
+            recipe.dateCreated = Date()
+            recipe.isFavorite = false
+            recipe.sourceType = sourceType
+            recipe.sourceDetail = sourceDetail.isEmpty ? nil : sourceDetail
             recipe.addedByName = addedBy
-            context.insert(recipe)
+
+            // Add ingredients
+            for data in validIngredients {
+                let ingredient = CDIngredient(context: context)
+                ingredient.id = UUID()
+                ingredient.name = data.name
+                ingredient.quantity = data.quantity
+                ingredient.unitRaw = data.unit.rawValue
+                ingredient.recipe = recipe
+            }
         }
+
+        try? context.save()
     }
 
     /// Populate form fields from an extracted recipe (photo scan, URL import, or search).

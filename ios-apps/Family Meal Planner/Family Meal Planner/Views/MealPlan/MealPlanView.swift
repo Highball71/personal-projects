@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// Captures the date + meal type for a tapped slot so the recipe picker
 /// sheet always has valid data when it renders.
@@ -48,10 +48,22 @@ enum MealPlanSheet: Identifiable {
 /// instead of directly filling meal slots. The Head Cook sees
 /// approve/reject controls next to each suggestion.
 struct MealPlanView: View {
-    @Query private var allMealPlans: [MealPlan]
-    @Query private var allSuggestions: [MealSuggestion]
-    @Query private var members: [HouseholdMember]
-    @Environment(\.modelContext) private var modelContext
+    @FetchRequest(
+        entity: CDMealPlan.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDMealPlan.date, ascending: true)]
+    ) private var allMealPlans: FetchedResults<CDMealPlan>
+
+    @FetchRequest(
+        entity: CDMealSuggestion.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDMealSuggestion.date, ascending: true)]
+    ) private var allSuggestions: FetchedResults<CDMealSuggestion>
+
+    @FetchRequest(
+        entity: CDHouseholdMember.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDHouseholdMember.name, ascending: true)]
+    ) private var members: FetchedResults<CDHouseholdMember>
+
+    @Environment(\.managedObjectContext) private var viewContext
 
     // Device-local identity — matches the "You are" picker in Settings
     @AppStorage("currentUserName") private var currentUserName: String = ""
@@ -72,7 +84,7 @@ struct MealPlanView: View {
     }
 
     /// The designated Head Cook, if one is set
-    private var headCook: HouseholdMember? {
+    private var headCook: CDHouseholdMember? {
         members.first(where: { $0.isHeadCook })
     }
 
@@ -208,22 +220,22 @@ struct MealPlanView: View {
     // MARK: - Meal Plan Data
 
     /// Get just the meal plans for a specific day
-    private func mealPlans(for date: Date) -> [MealPlan] {
+    private func mealPlans(for date: Date) -> [CDMealPlan] {
         let dayStart = DateHelper.stripTime(from: date)
-        return allMealPlans.filter { DateHelper.stripTime(from: $0.date) == dayStart }
+        return Array(allMealPlans).filter { DateHelper.stripTime(from: $0.date) == dayStart }
     }
 
     /// Get pending suggestions for a specific day
-    private func suggestions(for date: Date) -> [MealSuggestion] {
+    private func suggestions(for date: Date) -> [CDMealSuggestion] {
         let dayStart = DateHelper.stripTime(from: date)
-        return allSuggestions.filter { DateHelper.stripTime(from: $0.date) == dayStart }
+        return Array(allSuggestions).filter { DateHelper.stripTime(from: $0.date) == dayStart }
     }
 
     // MARK: - Recipe Selection Logic
 
     /// Decides whether to assign directly or create a suggestion based on
     /// whether a Head Cook is set and who the current user is.
-    private func handleRecipeSelection(_ recipe: Recipe, for slot: MealSlotSelection) {
+    private func handleRecipeSelection(_ recipe: CDRecipe, for slot: MealSlotSelection) {
         if approvalFlowActive && !isCurrentUserHeadCook {
             // Non-Head-Cook user: create a suggestion for the Head Cook to review
             createSuggestion(recipe, for: slot)
@@ -235,56 +247,65 @@ struct MealPlanView: View {
 
     /// Assign a recipe to a specific day and meal type.
     /// If a slot already has a recipe, it gets replaced.
-    private func assignRecipe(_ recipe: Recipe, to date: Date, for mealType: MealType) {
+    private func assignRecipe(_ recipe: CDRecipe, to date: Date, for mealType: MealType) {
         let dayStart = DateHelper.stripTime(from: date)
 
         // Check if there's already a meal plan for this slot
-        if let existing = allMealPlans.first(where: {
-            DateHelper.stripTime(from: $0.date) == dayStart && $0.mealType == mealType
+        if let existing = Array(allMealPlans).first(where: {
+            DateHelper.stripTime(from: $0.date) == dayStart && $0.mealTypeRaw == mealType.rawValue
         }) {
             existing.recipe = recipe
         } else {
-            let mealPlan = MealPlan(date: dayStart, mealType: mealType, recipe: recipe)
-            modelContext.insert(mealPlan)
+            let mealPlan = CDMealPlan(context: viewContext)
+            mealPlan.id = UUID()
+            mealPlan.date = dayStart
+            mealPlan.mealTypeRaw = mealType.rawValue
+            mealPlan.recipe = recipe
         }
+        try? viewContext.save()
     }
 
     /// Create a suggestion instead of directly assigning.
-    private func createSuggestion(_ recipe: Recipe, for slot: MealSlotSelection) {
+    private func createSuggestion(_ recipe: CDRecipe, for slot: MealSlotSelection) {
         let dayStart = DateHelper.stripTime(from: slot.date)
-        let suggestion = MealSuggestion(
-            date: dayStart,
-            mealType: slot.mealType,
-            suggestedBy: currentUserName,
-            recipe: recipe
-        )
-        modelContext.insert(suggestion)
+        let suggestion = CDMealSuggestion(context: viewContext)
+        suggestion.id = UUID()
+        suggestion.date = dayStart
+        suggestion.mealTypeRaw = slot.mealType.rawValue
+        suggestion.suggestedBy = currentUserName
+        suggestion.dateCreated = Date()
+        suggestion.recipe = recipe
+        try? viewContext.save()
     }
 
     /// Head Cook approves a suggestion: promotes it to a MealPlan entry.
-    private func approveSuggestion(_ suggestion: MealSuggestion) {
+    private func approveSuggestion(_ suggestion: CDMealSuggestion) {
         guard let recipe = suggestion.recipe else { return }
         assignRecipe(recipe, to: suggestion.date, for: suggestion.mealType)
-        modelContext.delete(suggestion)
+        viewContext.delete(suggestion)
+        try? viewContext.save()
     }
 
     /// Head Cook rejects a suggestion: removes it.
-    private func rejectSuggestion(_ suggestion: MealSuggestion) {
-        modelContext.delete(suggestion)
+    private func rejectSuggestion(_ suggestion: CDMealSuggestion) {
+        viewContext.delete(suggestion)
+        try? viewContext.save()
     }
 
     /// Remove the recipe from a meal slot
     private func clearMealSlot(date: Date, mealType: MealType) {
         let dayStart = DateHelper.stripTime(from: date)
-        if let existing = allMealPlans.first(where: {
-            DateHelper.stripTime(from: $0.date) == dayStart && $0.mealType == mealType
+        if let existing = Array(allMealPlans).first(where: {
+            DateHelper.stripTime(from: $0.date) == dayStart && $0.mealTypeRaw == mealType.rawValue
         }) {
-            modelContext.delete(existing)
+            viewContext.delete(existing)
+            try? viewContext.save()
         }
     }
 }
 
 #Preview {
+    let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
     MealPlanView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, MealSuggestion.self, HouseholdMember.self], inMemory: true)
+        .environment(\.managedObjectContext, context)
 }

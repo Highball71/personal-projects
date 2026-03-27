@@ -1,47 +1,35 @@
 //
 //  Family_Meal_PlannerApp.swift
-//  FluffyList
+//  Family Meal Planner
 //
-//  Created by David Albert on 2/8/26.
+//  Rebuilt with Core Data + NSPersistentCloudKitContainer.
+//  No SwiftData — direct Core Data for reliable CloudKit sharing.
 //
 
 import SwiftUI
-import SwiftData
-import CloudKit
 import CoreData
+import CloudKit
 import os
 
 // MARK: - App Delegate (CloudKit Share Acceptance)
 
-/// Handles CloudKit share invitations when a household member
-/// taps a share link. Accepts the share so SwiftData automatically
-/// syncs the shared recipe library to their device.
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
     ) {
-        // Capture the owner's display name before accepting — available immediately
-        // from the metadata without a network call.
-        let ownerName: String = {
-            guard let components = cloudKitShareMetadata.ownerIdentity.nameComponents else {
-                return ""
-            }
-            return PersonNameComponentsFormatter().string(from: components)
-        }()
+        let persistence = PersistenceController.shared
+        let container = persistence.container
 
-        if !ownerName.isEmpty {
-            // Store for ContentView to pick up on next appear and show a welcome message.
-            UserDefaults.standard.set(ownerName, forKey: "pendingWelcomeOwnerName")
-        }
-
-        let container = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
-        Task {
-            do {
-                try await container.accept(cloudKitShareMetadata)
-                Logger.cloudkit.info("Accepted household share from \(ownerName.isEmpty ? "unknown" : ownerName, privacy: .public)")
-            } catch {
-                Logger.cloudkit.error("Failed to accept share: \(error.localizedDescription, privacy: .public)")
+        // Accept the share into our shared persistent store.
+        container.acceptShareInvitations(
+            from: [cloudKitShareMetadata],
+            into: persistence.sharedStore!
+        ) { metadata, error in
+            if let error {
+                Logger.cloudkit.error("Failed to accept share: \(error.localizedDescription)")
+            } else {
+                Logger.cloudkit.info("Accepted household share successfully")
             }
         }
     }
@@ -50,116 +38,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct Family_Meal_PlannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var syncMonitor = SyncMonitor()
-
-    init() {
-        // MARK: Navigation bar — Slate & Sage palette
-        let navAppearance = UINavigationBarAppearance()
-        navAppearance.configureWithOpaqueBackground()
-        navAppearance.backgroundColor = UIColor(Color.fluffyNavBar)
-        navAppearance.titleTextAttributes = [
-            .foregroundColor: UIColor(Color.fluffyPrimary)
-        ]
-        navAppearance.largeTitleTextAttributes = [
-            .foregroundColor: UIColor(Color.fluffyPrimary)
-        ]
-        UINavigationBar.appearance().standardAppearance  = navAppearance
-        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
-        UINavigationBar.appearance().compactAppearance   = navAppearance
-        UINavigationBar.appearance().tintColor = UIColor(Color.fluffyAccent)
-
-        // MARK: Tab bar
-        let tabAppearance = UITabBarAppearance()
-        tabAppearance.configureWithOpaqueBackground()
-        tabAppearance.backgroundColor = UIColor(Color.fluffyNavBar)
-        UITabBar.appearance().standardAppearance  = tabAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
-        UITabBar.appearance().tintColor = UIColor(Color.fluffyAccent)
-    }
+    let persistence = PersistenceController.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(syncMonitor)
+                .environment(
+                    \.managedObjectContext,
+                    persistence.container.viewContext
+                )
+                .environment(SyncMonitor())
         }
-        // SwiftData + CloudKit: syncs recipes, ingredients, and meal plans
-        // across all family members via iCloud.
-        // Uses .automatic which supports both private and shared CloudKit
-        // zones — household members who accept a CKShare see the same data.
-        .modelContainer(sharedModelContainer)
     }
 }
-
-/// Replaces the deprecated NSKeyedUnarchiveFromData value transformer.
-///
-/// NSPersistentCloudKitContainer (which backs SwiftData's .cloudKitDatabase) creates
-/// internal Core Data entities whose valueTransformerName is hardcoded to
-/// "NSKeyedUnarchiveFromData". Registering this subclass under that name before the
-/// container initializes means Core Data finds a modern, secure-coding transformer
-/// instead of the deprecated one, silencing the runtime warning.
-///
-/// NSPersistentHistoryToken is added to allowedTopLevelClasses because the CloudKit
-/// sync engine archives history tokens (used for change tracking) as transformable
-/// binary data. It is not in NSSecureUnarchiveFromDataTransformer's default list.
-private final class CloudKitSecureTransformer: NSSecureUnarchiveFromDataTransformer {
-    override class var allowedTopLevelClasses: [AnyClass] {
-        super.allowedTopLevelClasses + [NSPersistentHistoryToken.self]
-    }
-}
-
-/// Shared model container — CloudKit-enabled with stable store for data persistence.
-/// Uses .automatic to sync via the iCloud container from entitlements.
-/// The .automatic scope supports both private and shared CloudKit zones,
-/// so household members who accept a CKShare see the same recipes.
-///
-/// Falls back to local-only storage if CloudKit isn't available
-/// (e.g. Simulator, no iCloud account).
-private let sharedModelContainer: ModelContainer = {
-    // Must run before any ModelContainer/NSPersistentCloudKitContainer init.
-    ValueTransformer.setValueTransformer(
-        CloudKitSecureTransformer(),
-        forName: NSValueTransformerName(rawValue: "NSKeyedUnarchiveFromData")
-    )
-
-    let schema = Schema([
-        Recipe.self,
-        Ingredient.self,
-        MealPlan.self,
-        GroceryItem.self,
-        RecipeRating.self,
-        HouseholdMember.self,
-        MealSuggestion.self
-    ])
-
-    // CloudKit-enabled configuration.
-    // - Stable name "FamilyMealPlanner" ensures same store across app updates.
-    // - isStoredInMemoryOnly: false persists data to disk (prevents wipe on update).
-    // - .automatic picks up the CloudKit container from entitlements and
-    //   supports both private and shared database scopes.
-    do {
-        let cloudConfig = ModelConfiguration(
-            "FamilyMealPlanner",
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
-        )
-        let container = try ModelContainer(for: schema, configurations: [cloudConfig])
-        Logger.cloudkit.info("CloudKit sync enabled")
-        return container
-    } catch {
-        Logger.cloudkit.error("CloudKit unavailable (\(error.localizedDescription, privacy: .public)), falling back to local storage")
-    }
-
-    // Fall back to local-only storage so the app never crashes.
-    do {
-        let localConfig = ModelConfiguration(
-            "FamilyMealPlanner",
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none
-        )
-        return try ModelContainer(for: schema, configurations: [localConfig])
-    } catch {
-        fatalError("Could not create ModelContainer: \(error)")
-    }
-}()

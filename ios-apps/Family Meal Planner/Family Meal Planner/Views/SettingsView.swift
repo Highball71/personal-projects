@@ -4,7 +4,6 @@
 //
 
 import SwiftUI
-import SwiftData
 import CloudKit
 import CoreData
 import os
@@ -14,9 +13,13 @@ import os
 /// Head Cook who approves the weekly meal plan.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.managedObjectContext) private var viewContext
     @Environment(SyncMonitor.self) private var syncMonitor
-    @Query(sort: \HouseholdMember.name) private var members: [HouseholdMember]
+
+    @FetchRequest(
+        entity: CDHouseholdMember.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDHouseholdMember.name, ascending: true)]
+    ) private var members: FetchedResults<CDHouseholdMember>
 
     // Device-local: remembers which household member is using this device.
     // Not synced via CloudKit — each device picks independently.
@@ -181,6 +184,11 @@ struct SettingsView: View {
 
     // MARK: - Sharing Section
 
+    /// Whether the sync pipeline is settled enough to attempt sharing.
+    private var isSyncReady: Bool {
+        syncMonitor.syncState == .synced && syncMonitor.persistentContainer != nil
+    }
+
     private var sharingSection: some View {
         Section {
             // Tapping while the spinner is showing cancels the in-flight operation.
@@ -200,6 +208,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            .disabled(!isSyncReady && !isLoadingShare)
 
             // Subtle sync status indicator
             SyncStatusRow(syncState: syncMonitor.syncState, isOffline: syncMonitor.isOffline)
@@ -211,7 +220,11 @@ struct SettingsView: View {
         } header: {
             Text("iCloud Sharing")
         } footer: {
-            Text("Share your recipe library with household members so everyone sees the same recipes, meal plans, and grocery lists.")
+            if !isSyncReady && !isLoadingShare {
+                Text("Waiting for iCloud sync to finish before sharing is available. This usually takes a few seconds after launch.")
+            } else {
+                Text("Share your recipe library with household members so everyone sees the same recipes, meal plans, and grocery lists.")
+            }
         }
     }
 
@@ -240,6 +253,25 @@ struct SettingsView: View {
             guard await CloudKitSharingService.shared.isCloudKitAvailable() else {
                 showCloudKitAlert = true
                 return
+            }
+
+            // Safety net: wait for the sync pipeline to reach .synced before
+            // calling share(_:to:). The UI button is already gated on isSyncReady,
+            // but the pipeline can briefly flip to .syncing between the tap and here.
+            // Poll up to 15 seconds; bail if the task is cancelled.
+            if syncMonitor.syncState != .synced || syncMonitor.persistentContainer == nil {
+                for _ in 0..<30 {  // 30 × 0.5s = 15s max
+                    guard !Task.isCancelled else { return }
+                    try? await Task.sleep(for: .milliseconds(500))
+                    if syncMonitor.syncState == .synced && syncMonitor.persistentContainer != nil {
+                        break
+                    }
+                }
+                // If still not ready after 15s, show the "not ready" alert.
+                guard syncMonitor.syncState == .synced, syncMonitor.persistentContainer != nil else {
+                    showContainerUnavailableAlert = true
+                    return
+                }
             }
 
             if let persistentContainer = syncMonitor.persistentContainer {
@@ -369,14 +401,18 @@ struct SettingsView: View {
             return
         }
 
-        let member = HouseholdMember(name: trimmed)
-        modelContext.insert(member)
+        let member = CDHouseholdMember(context: viewContext)
+        member.id = UUID()
+        member.name = trimmed
+        member.isHeadCook = false
         newMemberName = ""
 
         // If this is the first member added, auto-select as "You are"
         if members.count == 0 {
             currentUserName = trimmed
         }
+
+        try? viewContext.save()
     }
 
     private func deleteMembers(at offsets: IndexSet) {
@@ -386,22 +422,25 @@ struct SettingsView: View {
             if member.name == currentUserName {
                 currentUserName = ""
             }
-            modelContext.delete(member)
+            viewContext.delete(member)
         }
+        try? viewContext.save()
     }
 
-    private func setHeadCook(_ member: HouseholdMember) {
+    private func setHeadCook(_ member: CDHouseholdMember) {
         // Clear any existing Head Cook first
         for m in members {
             m.isHeadCook = false
         }
         member.isHeadCook = true
+        try? viewContext.save()
     }
 
     private func clearHeadCook() {
         for m in members {
             m.isHeadCook = false
         }
+        try? viewContext.save()
     }
 
 }
@@ -499,6 +538,6 @@ final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [HouseholdMember.self], inMemory: true)
+        .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         .environment(SyncMonitor())
 }

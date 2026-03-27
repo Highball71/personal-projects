@@ -6,26 +6,30 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// A sheet that lets the user pick a recipe to assign to a meal slot.
 /// Presented when the user taps an empty (or filled) meal slot.
 struct RecipePickerView: View {
-    @Query(sort: \Recipe.name) private var recipes: [Recipe]
+    @FetchRequest(
+        entity: CDRecipe.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDRecipe.name, ascending: true)]
+    ) private var recipes: FetchedResults<CDRecipe>
+
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
 
     /// Called with the selected recipe, then the sheet dismisses.
-    let onRecipeSelected: (Recipe) -> Void
+    let onRecipeSelected: (CDRecipe) -> Void
 
-    var filteredRecipes: [Recipe] {
-        if searchText.isEmpty { return recipes }
+    var filteredRecipes: [CDRecipe] {
+        if searchText.isEmpty { return Array(recipes) }
         return recipes.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {
         NavigationStack {
-            List(filteredRecipes) { recipe in
+            List(filteredRecipes, id: \.self) { recipe in
                 Button {
                     onRecipeSelected(recipe)
                     dismiss()
@@ -63,8 +67,9 @@ struct RecipePickerView: View {
 }
 
 #Preview {
+    let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
     RecipePickerView { recipe in
         print("Selected: \(recipe.name)")
     }
-    .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+    .environment(\.managedObjectContext, context)
 }

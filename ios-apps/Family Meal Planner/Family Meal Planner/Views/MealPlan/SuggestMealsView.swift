@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// The protein options available for filtering recipes.
 /// Each case includes keywords that match against ingredient names,
@@ -47,14 +47,18 @@ enum ProteinOption: String, CaseIterable, Identifiable {
 /// from all saved recipes.
 struct SuggestMealsView: View {
     let weekStartDate: Date
-    let onApply: ([(Date, Recipe)]) -> Void
+    let onApply: ([(Date, CDRecipe)]) -> Void
 
-    @Query(sort: \Recipe.name) private var allRecipes: [Recipe]
+    @FetchRequest(
+        entity: CDRecipe.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDRecipe.name, ascending: true)]
+    ) private var allRecipes: FetchedResults<CDRecipe>
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedProteins: Set<ProteinOption> = []
     @State private var surpriseMe = false
-    @State private var suggestedMeals: [(date: Date, recipe: Recipe)] = []
+    @State private var suggestedMeals: [(date: Date, recipe: CDRecipe)] = []
     @State private var showingSuggestions = false
 
     private var weekDays: [Date] {
@@ -251,21 +255,22 @@ struct SuggestMealsView: View {
     /// 2. Shuffling them randomly
     /// 3. Filling any remaining slots from all saved recipes
     private func generateSuggestions() {
-        guard !allRecipes.isEmpty else {
+        let recipes = Array(allRecipes)
+        guard !recipes.isEmpty else {
             suggestedMeals = []
             showingSuggestions = true
             return
         }
 
-        var pool: [Recipe]
+        var pool: [CDRecipe]
 
         if surpriseMe {
             // Use everything
-            pool = allRecipes
+            pool = recipes
         } else {
             // Find recipes with at least one matching protein ingredient
             let keywords = selectedProteins.flatMap { $0.keywords }
-            let matching = allRecipes.filter { recipe in
+            let matching = recipes.filter { recipe in
                 recipe.ingredientsList.contains { ingredient in
                     keywords.contains { keyword in
                         ingredient.name.localizedCaseInsensitiveContains(keyword)
@@ -278,7 +283,7 @@ struct SuggestMealsView: View {
         // Apply rating-based weighting:
         // - Exclude recipes rated 2 or below by anyone
         // - Give 3x weight to recipes rated 4+ average (family favorites)
-        let weightedPool = pool.flatMap { recipe -> [Recipe] in
+        let weightedPool = pool.flatMap { recipe -> [CDRecipe] in
             let hasLowRating = recipe.ratingsList.contains { $0.rating <= 2 }
             if hasLowRating { return [] }
 
@@ -292,9 +297,9 @@ struct SuggestMealsView: View {
         let effectivePool = weightedPool.isEmpty ? pool : weightedPool
 
         // Shuffle and deduplicate (weighted entries may repeat)
-        var selected: [Recipe] = []
+        var selected: [CDRecipe] = []
         for recipe in effectivePool.shuffled() {
-            if !selected.contains(where: { $0.persistentModelID == recipe.persistentModelID }) {
+            if !selected.contains(where: { $0.objectID == recipe.objectID }) {
                 selected.append(recipe)
             }
             if selected.count >= 7 { break }
@@ -302,9 +307,9 @@ struct SuggestMealsView: View {
 
         if selected.count < 7 {
             // Not enough matches — fill remaining slots from all recipes
-            let usedIDs = Set(selected.map { $0.persistentModelID })
-            let extras = allRecipes
-                .filter { !usedIDs.contains($0.persistentModelID) }
+            let usedIDs = Set(selected.map { $0.objectID })
+            let extras = recipes
+                .filter { !usedIDs.contains($0.objectID) }
                 .shuffled()
             selected.append(contentsOf: extras.prefix(7 - selected.count))
         }
@@ -315,7 +320,7 @@ struct SuggestMealsView: View {
     }
 
     private func applyPlan() {
-        onApply(suggestedMeals.map { ($0.date, $0.recipe) })
+        onApply(suggestedMeals.map { ($0.date, $0.recipe as CDRecipe) })
         dismiss()
     }
 }
@@ -343,9 +348,10 @@ struct ProteinChip: View {
 }
 
 #Preview {
+    let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
     SuggestMealsView(
         weekStartDate: DateHelper.startOfWeek(containing: Date()),
         onApply: { _ in }
     )
-    .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+    .environment(\.managedObjectContext, context)
 }

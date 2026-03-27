@@ -6,16 +6,24 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// Grocery list based on the current week's meal plan.
-/// Items are persisted in SwiftData so checked state survives app relaunches.
+/// Items are persisted in Core Data so checked state survives app relaunches.
 /// The list is generated from the meal plan once per week and only refreshed
 /// when the user explicitly asks or the meal plan changes.
 struct GroceryListView: View {
-    @Query private var allGroceryItems: [GroceryItem]
-    @Query private var allMealPlans: [MealPlan]
-    @Environment(\.modelContext) private var modelContext
+    @FetchRequest(
+        entity: CDGroceryItem.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDGroceryItem.name, ascending: true)]
+    ) private var allGroceryItems: FetchedResults<CDGroceryItem>
+
+    @FetchRequest(
+        entity: CDMealPlan.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDMealPlan.date, ascending: true)]
+    ) private var allMealPlans: FetchedResults<CDMealPlan>
+
+    @Environment(\.managedObjectContext) private var viewContext
     @Environment(SyncMonitor.self) private var syncMonitor
 
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
@@ -23,7 +31,7 @@ struct GroceryListView: View {
     @State private var showUncheckConfirmation = false
 
     /// Persisted grocery items for the current week, sorted alphabetically.
-    private var currentWeekItems: [GroceryItem] {
+    private var currentWeekItems: [CDGroceryItem] {
         let weekStart = DateHelper.stripTime(from: weekStartDate)
         return allGroceryItems
             .filter { DateHelper.stripTime(from: $0.weekStart) == weekStart }
@@ -153,39 +161,38 @@ struct GroceryListView: View {
 
         // Delete old items for this week
         for item in currentWeekItems {
-            modelContext.delete(item)
+            viewContext.delete(item)
         }
 
         // Insert fresh items, restoring checked state where applicable
         for (key, value) in combined {
-            let item = GroceryItem(
-                itemID: key,
-                name: value.name,
-                totalQuantity: value.qty,
-                unit: value.unit,
-                weekStart: weekStart
-            )
+            let item = CDGroceryItem(context: viewContext)
+            item.id = UUID()
+            item.itemID = key
+            item.name = value.name
+            item.totalQuantity = value.qty
+            item.unitRaw = value.unit.rawValue
+            item.weekStart = weekStart
             item.isChecked = previouslyChecked.contains(key)
-            modelContext.insert(item)
         }
 
-        try? modelContext.save()
+        try? viewContext.save()
     }
 
     // MARK: - Actions
 
     /// Toggle a single item's checked state.
-    private func toggleCheck(for item: GroceryItem) {
+    private func toggleCheck(for item: CDGroceryItem) {
         item.isChecked.toggle()
-        try? modelContext.save()
+        try? viewContext.save()
     }
 
     /// Remove all checked items from the list.
     private func clearCheckedItems() {
         for item in currentWeekItems where item.isChecked {
-            modelContext.delete(item)
+            viewContext.delete(item)
         }
-        try? modelContext.save()
+        try? viewContext.save()
     }
 
     /// Reset all items to unchecked for a fresh shopping trip.
@@ -193,12 +200,12 @@ struct GroceryListView: View {
         for item in currentWeekItems {
             item.isChecked = false
         }
-        try? modelContext.save()
+        try? viewContext.save()
     }
 }
 
 #Preview {
     GroceryListView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, GroceryItem.self], inMemory: true)
+        .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         .environment(SyncMonitor())
 }

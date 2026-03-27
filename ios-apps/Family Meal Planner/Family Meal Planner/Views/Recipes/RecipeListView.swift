@@ -6,15 +6,15 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// Shows all recipes in a searchable, scrollable list.
 /// This is the main view for the Recipes tab.
 struct RecipeListView: View {
-    // @Query automatically fetches all Recipe objects from SwiftData
+    // @FetchRequest automatically fetches all CDRecipe objects from Core Data
     // and re-renders this view whenever recipes change.
-    @Query(sort: \Recipe.name) private var recipes: [Recipe]
-    @Environment(\.modelContext) private var modelContext
+    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \CDRecipe.name, ascending: true)]) private var recipes: FetchedResults<CDRecipe>
+    @Environment(\.managedObjectContext) private var viewContext
 
     @State private var searchText = ""
     @State private var showingAddRecipe = false
@@ -24,7 +24,7 @@ struct RecipeListView: View {
     @State private var showFavoritesOnly = false
 
     /// Filter recipes based on search text, category, and favorites
-    var filteredRecipes: [Recipe] {
+    var filteredRecipes: [CDRecipe] {
         recipes.filter { recipe in
             // Search text filter
             if !searchText.isEmpty &&
@@ -102,8 +102,8 @@ struct RecipeListView: View {
             }
             .navigationTitle("Recipes")
             // This tells SwiftUI: "when someone taps a NavigationLink
-            // with a Recipe value, show RecipeDetailView"
-            .navigationDestination(for: Recipe.self) { recipe in
+            // with a CDRecipe value, show RecipeDetailView"
+            .navigationDestination(for: CDRecipe.self) { recipe in
                 RecipeDetailView(recipe: recipe)
             }
 
@@ -155,8 +155,9 @@ struct RecipeListView: View {
 
     private func deleteRecipes(at offsets: IndexSet) {
         for index in offsets {
-            modelContext.delete(filteredRecipes[index])
+            viewContext.delete(filteredRecipes[index])
         }
+        try? viewContext.save()
     }
 }
 
@@ -189,7 +190,7 @@ struct FilterChip: View {
 
 /// A single row in the recipe list — rendered as a card with a category colour stripe.
 struct RecipeRowView: View {
-    let recipe: Recipe
+    let recipe: CDRecipe
 
     var body: some View {
         HStack(spacing: 0) {
@@ -259,5 +260,5 @@ private struct RecipeRowStarView: View {
 
 #Preview {
     RecipeListView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+        .environment(\.managedObjectContext, NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType))
 }

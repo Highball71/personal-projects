@@ -6,11 +6,12 @@
 //
 
 import SwiftUI
+import CoreData
 
 /// A single grocery item row with a check-off circle.
 /// Checked items get a strikethrough and dimmed appearance.
 struct GroceryItemRow: View {
-    let item: GroceryItem
+    let item: CDGroceryItem
     let onToggle: () -> Void
 
     var body: some View {
@@ -37,7 +38,7 @@ struct GroceryItemRow: View {
 
     /// Format grocery quantity with fractions and human-readable units.
     /// "to taste" items just show "to taste", "none" unit shows only the quantity.
-    private func formatGroceryQuantity(_ item: GroceryItem) -> String {
+    private func formatGroceryQuantity(_ item: CDGroceryItem) -> String {
         if item.unit == .toTaste {
             return "to taste"
         }
@@ -50,18 +51,28 @@ struct GroceryItemRow: View {
 }
 
 #Preview {
-    List {
-        GroceryItemRow(
-            item: GroceryItem(itemID: "flour|cup", name: "Flour", totalQuantity: 2, unit: .cup, weekStart: Date()),
-            onToggle: {}
-        )
-        GroceryItemRow(
-            item: {
-                let item = GroceryItem(itemID: "eggs|piece", name: "Eggs", totalQuantity: 4, unit: .piece, weekStart: Date())
-                item.isChecked = true
-                return item
-            }(),
-            onToggle: {}
-        )
+    let context = PersistenceController.shared.container.viewContext
+
+    let item1 = CDGroceryItem(context: context)
+    item1.id = UUID()
+    item1.itemID = "flour|cup"
+    item1.name = "Flour"
+    item1.totalQuantity = 2
+    item1.unitRaw = IngredientUnit.cup.rawValue
+    item1.weekStart = Date()
+    item1.isChecked = false
+
+    let item2 = CDGroceryItem(context: context)
+    item2.id = UUID()
+    item2.itemID = "eggs|piece"
+    item2.name = "Eggs"
+    item2.totalQuantity = 4
+    item2.unitRaw = IngredientUnit.piece.rawValue
+    item2.weekStart = Date()
+    item2.isChecked = true
+
+    return List {
+        GroceryItemRow(item: item1, onToggle: {})
+        GroceryItemRow(item: item2, onToggle: {})
     }
 }

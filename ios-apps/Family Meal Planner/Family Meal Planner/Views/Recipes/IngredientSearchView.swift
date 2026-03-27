@@ -6,16 +6,16 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// A recipe matched against the user's selected ingredients,
 /// tracking which and how many ingredients were found.
 struct RecipeMatch: Identifiable {
-    let recipe: Recipe
+    let recipe: CDRecipe
     let matchCount: Int
     let matchedIngredients: [String]
 
-    var id: PersistentIdentifier { recipe.persistentModelID }
+    var id: UUID { recipe.id ?? UUID() }
 }
 
 /// Search saved recipes by ingredients you have on hand.
@@ -27,12 +27,12 @@ struct RecipeMatch: Identifiable {
 ///
 /// Tap a result to view the recipe. Swipe left to add it to your meal plan.
 struct IngredientSearchView: View {
-    @Query(sort: \Recipe.name) private var allRecipes: [Recipe]
+    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \CDRecipe.name, ascending: true)]) private var allRecipes: FetchedResults<CDRecipe>
     @Environment(\.dismiss) private var dismiss
 
     @State private var ingredientInput = ""
     @State private var selectedIngredients: [String] = []
-    @State private var recipeToAddToPlan: Recipe?
+    @State private var recipeToAddToPlan: CDRecipe?
 
     // MARK: - Search Logic
 
@@ -94,7 +94,7 @@ struct IngredientSearchView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .navigationDestination(for: Recipe.self) { recipe in
+            .navigationDestination(for: CDRecipe.self) { recipe in
                 RecipeDetailView(recipe: recipe)
             }
             .sheet(item: $recipeToAddToPlan) { recipe in
@@ -229,10 +229,10 @@ struct IngredientSearchView: View {
 /// Small sheet for quickly adding a recipe to a specific day and meal slot.
 /// Checks for an existing entry and replaces it rather than creating duplicates.
 struct AddToMealPlanSheet: View {
-    let recipe: Recipe
+    let recipe: CDRecipe
 
-    @Query private var allMealPlans: [MealPlan]
-    @Environment(\.modelContext) private var modelContext
+    @FetchRequest(sortDescriptors: []) private var allMealPlans: FetchedResults<CDMealPlan>
+    @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedDate = Date()
@@ -275,13 +275,17 @@ struct AddToMealPlanSheet: View {
         }) {
             existing.recipe = recipe
         } else {
-            let mealPlan = MealPlan(date: dayStart, mealType: selectedMealType, recipe: recipe)
-            modelContext.insert(mealPlan)
+            let mealPlan = CDMealPlan(context: viewContext)
+            mealPlan.id = UUID()
+            mealPlan.date = dayStart
+            mealPlan.mealType = selectedMealType
+            mealPlan.recipe = recipe
         }
+        try? viewContext.save()
     }
 }
 
 #Preview {
     IngredientSearchView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+        .environment(\.managedObjectContext, NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType))
 }

@@ -90,7 +90,7 @@ final class CloudKitSharingService {
         // We only need objects from any entity — Core Data uses them to identify
         // which zone to create the share for. Since all SwiftData models live in
         // the same zone, any non-empty set of objects is sufficient.
-        let request = NSFetchRequest<NSManagedObject>(entityName: "Recipe")
+        let request = NSFetchRequest<NSManagedObject>(entityName: "CDRecipe")
         let recipes = try persistentContainer.viewContext.fetch(request)
 
         guard !recipes.isEmpty else {
@@ -101,44 +101,35 @@ final class CloudKitSharingService {
         // fetchShares(in:nil) is a synchronous CoreData read — no network, no hang.
         logger.info("prepareShare: step 1 — fetchShares starting")
         let existingShares = (try? persistentContainer.fetchShares(in: nil)) ?? []
+
         logger.info("prepareShare: step 1 — fetchShares complete, found \(existingShares.count) share(s)")
 
-        // Step 2: Delete any existing share from CloudKit before creating a fresh one.
-        // Wrapped in withThrowingTaskGroup so it can't hang indefinitely — 30-second cutoff.
-        var freshShare: CKShare? = nil
-        if let old = existingShares.first {
-            logger.info("prepareShare: step 2 — modifyRecords delete starting (recordName: \(old.recordID.recordName, privacy: .public))")
-            let ck = ckContainer  // capture before entering task group to avoid actor isolation hop
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    _ = try await ck.privateCloudDatabase.modifyRecords(
-                        saving: [], deleting: [old.recordID]
-                    )
-                }
-                group.addTask {
-                    try await Task.sleep(for: .seconds(30))
-                    throw CloudKitSharingError.timeout
-                }
-                do {
-                    try await group.next()!
-                } catch {
-                    group.cancelAll()
-                    throw error
-                }
-                group.cancelAll()
+        // Step 2: Clean up stale shares that may reference deleted CloudKit zones.
+        // After a reinstall or model migration, old share zones may no longer exist on
+        // the server. Core Data's internal sync pipeline gets stuck trying to export to
+        // those dead zones, which blocks share(_:to:). The hardResetSharing method does
+        // a thorough cleanup: enumerates all custom zones, deletes any CKShare records
+        // directly from CloudKit, and falls back to container metadata if needed.
+        if !existingShares.isEmpty {
+            logger.info("prepareShare: step 2 — found \(existingShares.count) stale share(s), running hard reset")
+            do {
+                try await hardResetSharing(persistentContainer: persistentContainer)
+                logger.info("prepareShare: step 2 — hard reset complete")
+            } catch {
+                // Non-fatal: the zones may already be gone. Log and continue.
+                logger.info("prepareShare: step 2 — hard reset finished with error (may be OK): \(error.localizedDescription)")
             }
-            logger.info("prepareShare: step 2 — modifyRecords delete complete")
-            freshShare = CKShare(recordZoneID: old.recordID.zoneID)
+            // Give CloudKit's sync pipeline a moment to process the zone deletions
+            // before we ask it to create a new share. Without this pause, share(_:to:)
+            // can get queued behind stale export operations that are still draining.
+            logger.info("prepareShare: step 2 — waiting for sync pipeline to settle")
+            try await Task.sleep(for: .seconds(3))
         } else {
-            logger.info("prepareShare: step 2 — skipped (no existing share in container metadata)")
+            logger.info("prepareShare: step 2 — skipped (no existing shares)")
         }
-
         // Step 3: Create the new share via NSPersistentCloudKitContainer.
-        // share(_:to:completion:) has no built-in timeout and can hang indefinitely if
-        // CloudKit is slow or unresponsive. The DispatchWorkItem below adds a 30-second
-        // hard cutoff. Both the timeout and the callback dispatch to the main queue,
-        // so the `resumed` flag is only ever read/written on one thread — no data race.
-        logger.info("prepareShare: step 3 — share(_:to:) starting (freshShare: \(freshShare != nil ? "new zone share" : "nil — first-time creation", privacy: .public))")
+        // Always pass nil — let the container create a brand-new zone and share.
+        logger.info("prepareShare: step 3 — share(_:to:) starting (nil — fresh creation)")
         let (share, shareContainer) = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(CKShare, CKContainer), Error>) in
             var resumed = false
 
@@ -149,7 +140,8 @@ final class CloudKitSharingService {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: timeoutWork)
 
-            persistentContainer.share(recipes, to: freshShare) { [logger] _, share, container, error in
+            persistentContainer.share([recipes[0]]
+, to: nil) { [logger] _, share, container, error in
                 DispatchQueue.main.async {
                     guard !resumed else { return }
                     resumed = true

@@ -2,12 +2,12 @@
 //  RecipeFormData.swift
 //  FluffyList
 //
-//  A plain struct (not SwiftData) that holds intermediate recipe data
+//  A plain struct that holds intermediate recipe data
 //  between import and persistence. Used by the import pipeline to pass
-//  extracted data to the recipe form without touching SwiftData.
+//  extracted data to the recipe form without touching Core Data.
 
 import Foundation
-import SwiftData
+import CoreData
 
 struct RecipeFormData {
     var name: String = ""
@@ -20,29 +20,37 @@ struct RecipeFormData {
     var sourceURL: String = ""
     var category: RecipeCategory = .dinner
 
-    /// Create a SwiftData Recipe from this form data.
-    func toRecipe(in context: ModelContext, addedBy: String?) -> Recipe {
+    /// Create a Core Data CDRecipe from this form data.
+    func toRecipe(in context: NSManagedObjectContext, addedBy: String?) -> CDRecipe {
+        let recipe = CDRecipe(context: context)
+        recipe.id = UUID()
+        recipe.name = name
+        recipe.category = category
+        recipe.servings = Int16(servings)
+        recipe.prepTimeMinutes = Int16(prepTimeMinutes)
+        recipe.cookTimeMinutes = Int16(cookTimeMinutes)
+        recipe.instructions = instructions
+        recipe.dateCreated = Date()
+        recipe.sourceType = sourceURL.isEmpty ? nil : .url
+        recipe.sourceDetail = sourceURL.isEmpty ? nil : sourceURL
+        recipe.addedByName = addedBy
+
         let validIngredients = ingredients
             .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
-            .map { Ingredient(name: $0.name, quantity: $0.quantity, unit: $0.unit) }
+        for ingData in validIngredients {
+            let ing = CDIngredient(context: context)
+            ing.id = UUID()
+            ing.name = ingData.name
+            ing.quantity = ingData.quantity
+            ing.unit = ingData.unit
+            ing.recipe = recipe
+        }
 
-        let recipe = Recipe(
-            name: name,
-            category: category,
-            servings: servings,
-            prepTimeMinutes: prepTimeMinutes,
-            cookTimeMinutes: cookTimeMinutes,
-            instructions: instructions,
-            ingredients: validIngredients,
-            sourceType: sourceURL.isEmpty ? nil : .url,
-            sourceDetail: sourceURL.isEmpty ? nil : sourceURL
-        )
-        recipe.addedByName = addedBy
         return recipe
     }
 
-    /// Hydrate from an existing Recipe for editing.
-    static func from(recipe: Recipe) -> RecipeFormData {
+    /// Hydrate from an existing CDRecipe for editing.
+    static func from(recipe: CDRecipe) -> RecipeFormData {
         RecipeFormData(
             name: recipe.name,
             ingredients: recipe.ingredientsList.map { ingredient in
@@ -54,9 +62,9 @@ struct RecipeFormData {
                 )
             },
             instructions: recipe.instructions,
-            servings: recipe.servings,
-            prepTimeMinutes: recipe.prepTimeMinutes,
-            cookTimeMinutes: recipe.cookTimeMinutes,
+            servings: Int(recipe.servings),
+            prepTimeMinutes: Int(recipe.prepTimeMinutes),
+            cookTimeMinutes: Int(recipe.cookTimeMinutes),
             sourceURL: recipe.sourceDetail ?? "",
             category: recipe.category
         )

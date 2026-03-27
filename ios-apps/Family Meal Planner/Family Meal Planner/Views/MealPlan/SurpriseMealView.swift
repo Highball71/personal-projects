@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// Suggests a single random recipe for one meal slot.
 ///
@@ -17,16 +17,20 @@ import SwiftData
 /// Reuses ProteinOption and ProteinChip from SuggestMealsView.swift.
 struct SurpriseMealView: View {
     /// Called with the chosen recipe when the user taps "Use This"
-    let onRecipeSelected: (Recipe) -> Void
+    let onRecipeSelected: (CDRecipe) -> Void
 
-    @Query(sort: \Recipe.name) private var allRecipes: [Recipe]
+    @FetchRequest(
+        entity: CDRecipe.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDRecipe.name, ascending: true)]
+    ) private var allRecipes: FetchedResults<CDRecipe>
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedProteins: Set<ProteinOption> = []
-    @State private var suggestedRecipe: Recipe?
+    @State private var suggestedRecipe: CDRecipe?
     @State private var showingSuggestion = false
     // The filtered pool we're drawing from, so Shuffle stays consistent
-    @State private var currentPool: [Recipe] = []
+    @State private var currentPool: [CDRecipe] = []
 
     var body: some View {
         NavigationStack {
@@ -226,13 +230,14 @@ struct SurpriseMealView: View {
     // MARK: - Suggestion Logic
 
     private func suggestWithNoPreference() {
-        currentPool = allRecipes
+        currentPool = Array(allRecipes)
         pickRandomRecipe()
     }
 
     private func suggestWithProteins() {
         let keywords = selectedProteins.flatMap { $0.keywords }
-        let matching = allRecipes.filter { recipe in
+        let recipes = Array(allRecipes)
+        let matching = recipes.filter { recipe in
             recipe.ingredientsList.contains { ingredient in
                 keywords.contains { keyword in
                     ingredient.name.localizedCaseInsensitiveContains(keyword)
@@ -240,7 +245,7 @@ struct SurpriseMealView: View {
             }
         }
         // If no matches for the selected proteins, fall back to all recipes
-        currentPool = matching.isEmpty ? allRecipes : matching
+        currentPool = matching.isEmpty ? recipes : matching
         pickRandomRecipe()
     }
 
@@ -253,14 +258,14 @@ struct SurpriseMealView: View {
     /// - Recipes rated 2.5–3.9 or unrated get 1x weight (neutral)
     /// - Recipes rated 2 or below by ANY member are excluded
     private func pickRandomRecipe() {
-        guard !allRecipes.isEmpty else {
+        guard !currentPool.isEmpty else {
             suggestedRecipe = nil
             showingSuggestion = true
             return
         }
 
         // Build a weighted pool: exclude low-rated, boost high-rated
-        let weightedPool = currentPool.flatMap { recipe -> [Recipe] in
+        let weightedPool = currentPool.flatMap { recipe -> [CDRecipe] in
             // Exclude if anyone rated it 2 or below
             let hasLowRating = recipe.ratingsList.contains { $0.rating <= 2 }
             if hasLowRating {
@@ -281,7 +286,7 @@ struct SurpriseMealView: View {
         if pool.count > 1, let current = suggestedRecipe {
             // Avoid showing the same recipe twice in a row
             let others = pool.filter {
-                $0.persistentModelID != current.persistentModelID
+                $0.objectID != current.objectID
             }
             suggestedRecipe = others.randomElement() ?? pool.randomElement()
         } else {
@@ -293,8 +298,9 @@ struct SurpriseMealView: View {
 }
 
 #Preview {
+    let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
     SurpriseMealView { recipe in
         print("Selected: \(recipe.name)")
     }
-    .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+    .environment(\.managedObjectContext, context)
 }

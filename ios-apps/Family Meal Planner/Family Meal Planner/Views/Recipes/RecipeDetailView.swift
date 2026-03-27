@@ -6,16 +6,16 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// Read-only detail view showing a recipe's info, ingredients, and instructions.
 /// Has an Edit button that opens AddEditRecipeView in edit mode.
 struct RecipeDetailView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \HouseholdMember.name) private var members: [HouseholdMember]
+    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \CDHouseholdMember.name, ascending: true)]) private var members: FetchedResults<CDHouseholdMember>
 
-    let recipe: Recipe
+    let recipe: CDRecipe
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
 
@@ -137,6 +137,7 @@ struct RecipeDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     recipe.isFavorite.toggle()
+                    try? viewContext.save()
                 } label: {
                     Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(recipe.isFavorite ? .red : .secondary)
@@ -148,7 +149,8 @@ struct RecipeDetailView: View {
         }
         .alert("Delete this recipe?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {
-                modelContext.delete(recipe)
+                viewContext.delete(recipe)
+                try? viewContext.save()
                 dismiss()
             }
             Button("Cancel", role: .cancel) { }
@@ -203,9 +205,9 @@ struct RecipeDetailView: View {
     /// The current user's rating for this recipe, or 0 if they haven't rated yet.
     private var currentUserRating: Int {
         guard !effectiveRaterName.isEmpty else { return 0 }
-        return recipe.ratingsList
+        return Int(recipe.ratingsList
             .first { $0.raterName.lowercased() == effectiveRaterName.lowercased() }?
-            .rating ?? 0
+            .rating ?? 0)
     }
 
     /// Creates or updates the current user's rating for this recipe.
@@ -217,23 +219,24 @@ struct RecipeDetailView: View {
         if let existing = recipe.ratingsList.first(where: {
             $0.raterName.lowercased() == name.lowercased()
         }) {
-            existing.rating = newRating
+            existing.rating = Int16(newRating)
             existing.dateRated = Date()
         } else {
-            let newRatingObj = RecipeRating(
-                raterName: name,
-                rating: newRating,
-                recipe: recipe
-            )
-            modelContext.insert(newRatingObj)
+            let newRatingObj = CDRecipeRating(context: viewContext)
+            newRatingObj.id = UUID()
+            newRatingObj.raterName = name
+            newRatingObj.rating = Int16(newRating)
+            newRatingObj.dateRated = Date()
+            newRatingObj.recipe = recipe
         }
+        try? viewContext.save()
     }
 
     /// Format a single ingredient for display.
     /// "to taste" items: "Salt, to taste"
     /// "none" unit: "3 eggs"
     /// Normal: "1 1/2 cups all-purpose flour"
-    private func formatIngredientDisplay(_ ingredient: Ingredient) -> String {
+    private func formatIngredientDisplay(_ ingredient: CDIngredient) -> String {
         if ingredient.unit == .toTaste {
             return "\(ingredient.name), to taste"
         }
@@ -292,30 +295,29 @@ private struct StarDisplayView: View {
 }
 
 #Preview {
-    NavigationStack {
-        RecipeDetailView(recipe: Recipe(
-            name: "Spaghetti Bolognese",
-            category: .dinner,
-            servings: 4,
-            prepTimeMinutes: 45,
-            instructions: """
-            1. Brown the ground beef in a large pan.
-            2. Add diced onions and garlic, cook until soft.
-            3. Add crushed tomatoes and Italian seasoning.
-            4. Simmer for 20 minutes.
-            5. Cook spaghetti according to package directions.
-            6. Serve sauce over pasta.
-            """,
-            ingredients: [
-                Ingredient(name: "Spaghetti", quantity: 1, unit: .pound),
-                Ingredient(name: "Ground beef", quantity: 1, unit: .pound),
-                Ingredient(name: "Crushed tomatoes", quantity: 28, unit: .ounce),
-                Ingredient(name: "Onion", quantity: 1, unit: .whole),
-                Ingredient(name: "Garlic cloves", quantity: 3, unit: .piece),
-            ],
-            sourceType: .cookbook,
-            sourceDetail: "The Joy of Cooking, p. 312"
-        ))
+    let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+    let recipe = CDRecipe(context: context)
+    recipe.id = UUID()
+    recipe.name = "Spaghetti Bolognese"
+    recipe.categoryRaw = RecipeCategory.dinner.rawValue
+    recipe.servings = 4
+    recipe.prepTimeMinutes = 45
+    recipe.cookTimeMinutes = 0
+    recipe.instructions = """
+    1. Brown the ground beef in a large pan.
+    2. Add diced onions and garlic, cook until soft.
+    3. Add crushed tomatoes and Italian seasoning.
+    4. Simmer for 20 minutes.
+    5. Cook spaghetti according to package directions.
+    6. Serve sauce over pasta.
+    """
+    recipe.dateCreated = Date()
+    recipe.isFavorite = false
+    recipe.sourceTypeRaw = RecipeSource.cookbook.rawValue
+    recipe.sourceDetail = "The Joy of Cooking, p. 312"
+
+    return NavigationStack {
+        RecipeDetailView(recipe: recipe)
     }
-    .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+    .environment(\.managedObjectContext, context)
 }

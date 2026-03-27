@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 import PhotosUI
 import os
 
@@ -14,7 +14,7 @@ import os
 /// When `recipeToEdit` is nil → add mode (form starts empty).
 /// When `recipeToEdit` has a value → edit mode (form pre-populates).
 struct AddEditRecipeView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var viewModel: RecipeFormViewModel
@@ -27,7 +27,7 @@ struct AddEditRecipeView: View {
     @AppStorage("currentUserName") private var currentUserName: String = ""
     @State private var creatorDisplayName: String? = nil
 
-    init(recipeToEdit: Recipe? = nil) {
+    init(recipeToEdit: CDRecipe? = nil) {
         self._viewModel = State(initialValue: RecipeFormViewModel(recipe: recipeToEdit))
     }
 
@@ -69,7 +69,7 @@ struct AddEditRecipeView: View {
         }
         ToolbarItem(placement: .confirmationAction) {
             Button("Save") {
-                viewModel.save(to: modelContext, addedBy: creatorDisplayName)
+                viewModel.save(to: viewContext, addedBy: creatorDisplayName)
                 dismiss()
             }
             .disabled(!viewModel.validate())
@@ -275,5 +275,5 @@ private struct ImportAlerts: ViewModifier {
 
 #Preview("Add Recipe") {
     AddEditRecipeView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self], inMemory: true)
+        .environment(\.managedObjectContext, NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType))
 }

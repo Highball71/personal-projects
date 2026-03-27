@@ -1,12 +1,13 @@
 //
 //  ContentView.swift
-//  FluffyList
+//  Family Meal Planner
 //
-//  Created by David Albert on 2/8/26.
+//  Root TabView with three tabs: Recipes, Meal Plan, Groceries.
+//  Rebuilt for Core Data + CloudKit sharing.
 //
 
 import SwiftUI
-import SwiftData
+import CoreData
 
 /// The root view. TabView with three tabs matching the app's three features.
 struct ContentView: View {
@@ -61,7 +62,22 @@ struct ContentView: View {
     }
 }
 
+// MARK: - UICloudSharingController SwiftUI Wrapper
+
+import CloudKit
+import UIKit
+
+struct CloudSharingView: UIViewControllerRepresentable {
+    let controller: UICloudSharingController
+
+    func makeUIViewController(context: Context) -> UICloudSharingController {
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UICloudSharingController, context: Context) {}
+}
+
 #Preview {
     ContentView()
-        .modelContainer(for: [Recipe.self, Ingredient.self, MealPlan.self, MealSuggestion.self, HouseholdMember.self], inMemory: true)
+        .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
 }
