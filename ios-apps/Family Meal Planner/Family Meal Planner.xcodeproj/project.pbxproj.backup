@@ -1,0 +1,488 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		D4E1A0052F4B00AA0074F954 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C396A9582F393DEA0074F954 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C396A95F2F393DEA0074F954;
+			remoteInfo = "Family Meal Planner";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		C396A9602F393DEA0074F954 /* Family Meal Planner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Family Meal Planner.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Family Meal PlannerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+	A1B2C3D4E5F6A7B8C9D0E1F2 /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift.h; path = PersistenceController.swift; sourceTree = "<group>"; };
+	A2B3C4D5E6F7A8B9C0D1E2F3 /* CDHousehold+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift.h; path = "CDHousehold+CoreDataProperties.swift"; sourceTree = "<group>"; };
+	A3B4C5D6E7F8A9B0C1D2E3F4 /* CDRecipe+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift.h; path = "CDRecipe+CoreDataProperties.swift"; sourceTree = "<group>"; };
+	A4B5C6D7E8F9A0B1C2D3E4F5 /* HouseholdShareService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift.h; path = HouseholdShareService.swift; sourceTree = "<group>"; };
+	A5B6C7D8E9F0A1B2C3D4E5F6 /* ShareCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift.h; path = ShareCoordinator.swift; sourceTree = "<group>"; };
+	A6B7C8D9E0F1A2B3C4D5E6F7 /* SmokeTestContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift.h; path = SmokeTestContentView.swift; sourceTree = "<group>"; };
+	A7B8C9D0E1F2A3B4C5D6E7F8 /* FamilyMealPlanner.xcdatamodeld */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodeld; path = FamilyMealPlanner.xcdatamodeld; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXBuildFile section */
+	B1C2D3E4F5A6B7C8D9E0F1A2 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* PersistenceController.swift */; };
+	B2C3D4E5F6A7B8C9D0E1F1A3 /* CDHousehold+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F7A8B9C0D1E2F3 /* CDHousehold+CoreDataProperties.swift */; };
+	B3C4D5E6F7A8B9C0D1E2F2A4 /* CDRecipe+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B4C5D6E7F8A9B0C1D2E3F4 /* CDRecipe+CoreDataProperties.swift */; };
+	B4C5D6E7F8A9B0C1D2E3F3A5 /* HouseholdShareService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F9A0B1C2D3E4F5 /* HouseholdShareService.swift */; };
+	B5C6D7E8F9A0B1C2D3E4F4A6 /* ShareCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B6C7D8E9F0A1B2C3D4E5F6 /* ShareCoordinator.swift */; };
+	B6C7D8E9F0A1B2C3D4E5F5A7 /* SmokeTestContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B7C8D9E0F1A2B3C4D5E6F7 /* SmokeTestContentView.swift */; };
+	B7C8D9E0F1A2B3C4D5E6F6A8 /* FamilyMealPlanner.xcdatamodeld in Resources */ = {isa = PBXBuildFile; fileRef = A7B8C9D0E1F2A3B4C5D6E7F8 /* FamilyMealPlanner.xcdatamodeld */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		C396A9622F393DEA0074F954 /* Family Meal Planner */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Family Meal Planner";
+			sourceTree = "<group>";
+		};
+		D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Family Meal PlannerTests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C396A95D2F393DEA0074F954 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D4E1A0032F4B00AA0074F954 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C396A9572F393DEA0074F954 = {
+			isa = PBXGroup;
+			children = (
+				C396A9622F393DEA0074F954 /* Family Meal Planner */,
+				D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */,
+				C396A9612F393DEA0074F954 /* Products */,
+				EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */,
+			);
+			sourceTree = "<group>";
+		};
+		C396A9612F393DEA0074F954 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C396A9602F393DEA0074F954 /* Family Meal Planner.app */,
+				D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C396A95F2F393DEA0074F954 /* Family Meal Planner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C396A96B2F393DEB0074F954 /* Build configuration list for PBXNativeTarget "Family Meal Planner" */;
+			buildPhases = (
+				C396A95C2F393DEA0074F954 /* Sources */,
+				C396A95D2F393DEA0074F954 /* Frameworks */,
+				C396A95E2F393DEA0074F954 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C396A9622F393DEA0074F954 /* Family Meal Planner */,
+			);
+			name = "Family Meal Planner";
+			packageProductDependencies = (
+			);
+			productName = "Family Meal Planner";
+			productReference = C396A9602F393DEA0074F954 /* Family Meal Planner.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D4E1A0042F4B00AA0074F954 /* Family Meal PlannerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D4E1A00B2F4B00AA0074F954 /* Build configuration list for PBXNativeTarget "Family Meal PlannerTests" */;
+			buildPhases = (
+				D4E1A0072F4B00AA0074F954 /* Sources */,
+				D4E1A0032F4B00AA0074F954 /* Frameworks */,
+				D4E1A0082F4B00AA0074F954 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D4E1A0062F4B00AA0074F954 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D4E1A0022F4B00AA0074F954 /* Family Meal PlannerTests */,
+			);
+			name = "Family Meal PlannerTests";
+			productName = "Family Meal PlannerTests";
+			productReference = D4E1A0012F4B00AA0074F954 /* Family Meal PlannerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C396A9582F393DEA0074F954 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					C396A95F2F393DEA0074F954 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					D4E1A0042F4B00AA0074F954 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = C396A95F2F393DEA0074F954;
+					};
+				};
+			};
+			buildConfigurationList = C396A95B2F393DEA0074F954 /* Build configuration list for PBXProject "Family Meal Planner" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C396A9572F393DEA0074F954;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C396A9612F393DEA0074F954 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C396A95F2F393DEA0074F954 /* Family Meal Planner */,
+				D4E1A0042F4B00AA0074F954 /* Family Meal PlannerTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C396A95E2F393DEA0074F954 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D4E1A0082F4B00AA0074F954 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C396A95C2F393DEA0074F954 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D4E1A0072F4B00AA0074F954 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D4E1A0062F4B00AA0074F954 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C396A95F2F393DEA0074F954 /* Family Meal Planner */;
+			targetProxy = D4E1A0052F4B00AA0074F954 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C396A9692F393DEB0074F954 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C396A96A2F393DEB0074F954 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C396A96C2F393DEB0074F954 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Family Meal Planner/Family_Meal_Planner.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 85;
+				DEVELOPMENT_TEAM = A5DP57PZ7N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Family-Meal-Planner-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = FluffyList;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Family Meal Planner uses your camera to photograph cookbook pages and extract recipes.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Family-Meal-Planner";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C396A96D2F393DEB0074F954 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB874CC13D3948F1B2959CDB /* Secrets.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Family Meal Planner/Family_Meal_Planner.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 85;
+				DEVELOPMENT_TEAM = A5DP57PZ7N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Family-Meal-Planner-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = FluffyList;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Family Meal Planner uses your camera to photograph cookbook pages and extract recipes.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Family-Meal-Planner";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D4E1A0092F4B00AA0074F954 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 85;
+				DEVELOPMENT_TEAM = A5DP57PZ7N;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Family-Meal-PlannerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Family Meal Planner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Family Meal Planner";
+			};
+			name = Debug;
+		};
+		D4E1A00A2F4B00AA0074F954 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 85;
+				DEVELOPMENT_TEAM = A5DP57PZ7N;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.highball71.Family-Meal-PlannerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Family Meal Planner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Family Meal Planner";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C396A95B2F393DEA0074F954 /* Build configuration list for PBXProject "Family Meal Planner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C396A9692F393DEB0074F954 /* Debug */,
+				C396A96A2F393DEB0074F954 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C396A96B2F393DEB0074F954 /* Build configuration list for PBXNativeTarget "Family Meal Planner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C396A96C2F393DEB0074F954 /* Debug */,
+				C396A96D2F393DEB0074F954 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D4E1A00B2F4B00AA0074F954 /* Build configuration list for PBXNativeTarget "Family Meal PlannerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4E1A0092F4B00AA0074F954 /* Debug */,
+				D4E1A00A2F4B00AA0074F954 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C396A9582F393DEA0074F954 /* Project object */;
+}

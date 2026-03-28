@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23231" systemVersion="24D81" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="NO" userDefinedModelVersionIdentifier="">
+    <entity name="CDHousehold" representedClassName="CDHousehold" syncable="YES" codeGenerationType="manual">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <relationship name="recipes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="CDRecipe" inverseName="household" inverseEntity="CDRecipe"/>
+    </entity>
+    <entity name="CDRecipe" representedClassName="CDRecipe" syncable="YES" codeGenerationType="manual">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <relationship name="household" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDHousehold" inverseName="recipes" inverseEntity="CDHousehold"/>
+    </entity>
+    <configuration name="Private">
+        <memberEntity name="CDHousehold"/>
+        <memberEntity name="CDRecipe"/>
+    </configuration>
+    <configuration name="Shared">
+        <memberEntity name="CDHousehold"/>
+        <memberEntity name="CDRecipe"/>
+    </configuration>
+</model>

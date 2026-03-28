@@ -11,21 +11,39 @@
 //  triggered by .xcdatamodeld inside PBXFileSystemSynchronizedRootGroup.
 //
 
+import Combine
 import CoreData
 import CloudKit
 import os
 
-struct PersistenceController {
+/// Observable persistence controller that owns the Core Data + CloudKit stack.
+///
+/// Designed to support a full tear-down and rebuild of the local stores
+/// when the CloudKit sync pipeline becomes poisoned (e.g. stale export
+/// queue from a previous install). Call `resetLocalStoresAndRebuildContainer()`
+/// to destroy local SQLite files and recreate the container from scratch.
+@MainActor
+final class PersistenceController: ObservableObject {
     static let shared = PersistenceController()
 
     /// The CloudKit container identifier (must match entitlements).
     static let cloudKitContainerID = "iCloud.com.highball71.FamilyMealPlanner"
 
     /// The Core Data container — owns both private and shared stores.
-    let container: NSPersistentCloudKitContainer
+    /// Replaced during a local reset; dependents must re-bind after reset.
+    @Published private(set) var container: NSPersistentCloudKitContainer
+
+    /// True while a local-store reset is in progress.
+    /// The app root checks this flag and removes ALL @FetchRequest views
+    /// from the hierarchy during the reset window, preventing stale-object
+    /// crashes (CDRecipe, CDHouseholdMember, etc. from the old container).
+    @Published private(set) var isResetting = false
 
     /// Direct access to the CKContainer for share acceptance.
     let ckContainer: CKContainer
+
+    /// The managed object model — built once, reused across container rebuilds.
+    let managedObjectModel: NSManagedObjectModel
 
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.highball71.FamilyMealPlanner",
@@ -37,7 +55,7 @@ struct PersistenceController {
     /// Builds the Core Data model in code — equivalent to the
     /// FamilyMealPlanner.xcdatamodeld that was causing indexer crashes.
     ///
-    /// Entities (7 total):
+    /// Entities (8 total):
     ///   - CDHousehold: Core household data
     ///   - CDRecipe: Recipe details with relationships to ingredients, meal plans, ratings, suggestions
     ///   - CDIngredient: Recipe ingredients
@@ -51,7 +69,7 @@ struct PersistenceController {
     static func buildModel() -> NSManagedObjectModel {
         let model = NSManagedObjectModel()
 
-        // ── CDHousehold entity ───────────────────────────────────────────
+        // -- CDHousehold entity ---
         let householdEntity = NSEntityDescription()
         householdEntity.name = "CDHousehold"
         householdEntity.managedObjectClassName = "CDHousehold"
@@ -67,7 +85,7 @@ struct PersistenceController {
         householdName.defaultValue = ""
         householdName.isOptional = false
 
-        // ── CDIngredient entity ──────────────────────────────────────────
+        // -- CDIngredient entity ---
         let ingredientEntity = NSEntityDescription()
         ingredientEntity.name = "CDIngredient"
         ingredientEntity.managedObjectClassName = "CDIngredient"
@@ -95,7 +113,7 @@ struct PersistenceController {
         ingredientUnitRaw.defaultValue = "piece"
         ingredientUnitRaw.isOptional = false
 
-        // ── CDMealPlan entity ────────────────────────────────────────────
+        // -- CDMealPlan entity ---
         let mealPlanEntity = NSEntityDescription()
         mealPlanEntity.name = "CDMealPlan"
         mealPlanEntity.managedObjectClassName = "CDMealPlan"
@@ -116,7 +134,7 @@ struct PersistenceController {
         mealPlanMealTypeRaw.defaultValue = "dinner"
         mealPlanMealTypeRaw.isOptional = false
 
-        // ── CDGroceryItem entity ─────────────────────────────────────────
+        // -- CDGroceryItem entity ---
         let groceryItemEntity = NSEntityDescription()
         groceryItemEntity.name = "CDGroceryItem"
         groceryItemEntity.managedObjectClassName = "CDGroceryItem"
@@ -161,7 +179,7 @@ struct PersistenceController {
         groceryItemWeekStart.attributeType = .dateAttributeType
         groceryItemWeekStart.isOptional = true
 
-        // ── CDHouseholdMember entity ────────────────────────────────────
+        // -- CDHouseholdMember entity ---
         let householdMemberEntity = NSEntityDescription()
         householdMemberEntity.name = "CDHouseholdMember"
         householdMemberEntity.managedObjectClassName = "CDHouseholdMember"
@@ -183,7 +201,7 @@ struct PersistenceController {
         householdMemberIsHeadCook.defaultValue = false
         householdMemberIsHeadCook.isOptional = false
 
-        // ── CDMealSuggestion entity ──────────────────────────────────────
+        // -- CDMealSuggestion entity ---
         let mealSuggestionEntity = NSEntityDescription()
         mealSuggestionEntity.name = "CDMealSuggestion"
         mealSuggestionEntity.managedObjectClassName = "CDMealSuggestion"
@@ -215,7 +233,7 @@ struct PersistenceController {
         mealSuggestionDateCreated.attributeType = .dateAttributeType
         mealSuggestionDateCreated.isOptional = true
 
-        // ── CDRecipeRating entity ────────────────────────────────────────
+        // -- CDRecipeRating entity ---
         let recipeRatingEntity = NSEntityDescription()
         recipeRatingEntity.name = "CDRecipeRating"
         recipeRatingEntity.managedObjectClassName = "CDRecipeRating"
@@ -242,7 +260,7 @@ struct PersistenceController {
         recipeRatingDateRated.attributeType = .dateAttributeType
         recipeRatingDateRated.isOptional = true
 
-        // ── CDRecipe entity (EXPANDED) ───────────────────────────────────
+        // -- CDRecipe entity (EXPANDED) ---
         let recipeEntity = NSEntityDescription()
         recipeEntity.name = "CDRecipe"
         recipeEntity.managedObjectClassName = "CDRecipe"
@@ -314,9 +332,9 @@ struct PersistenceController {
         recipeAddedByName.attributeType = .stringAttributeType
         recipeAddedByName.isOptional = true
 
-        // ── Relationships ────────────────────────────────────────────────
+        // -- Relationships ---
 
-        // CDHousehold → CDRecipe (to-many, cascade)
+        // CDHousehold -> CDRecipe (to-many, cascade)
         let householdToRecipes = NSRelationshipDescription()
         householdToRecipes.name = "recipes"
         householdToRecipes.destinationEntity = recipeEntity
@@ -325,7 +343,7 @@ struct PersistenceController {
         householdToRecipes.maxCount = 0  // to-many
         householdToRecipes.deleteRule = .cascadeDeleteRule
 
-        // CDRecipe → CDHousehold (to-one, nullify)
+        // CDRecipe -> CDHousehold (to-one, nullify)
         let recipeToHousehold = NSRelationshipDescription()
         recipeToHousehold.name = "household"
         recipeToHousehold.destinationEntity = householdEntity
@@ -334,11 +352,11 @@ struct PersistenceController {
         recipeToHousehold.maxCount = 1  // to-one
         recipeToHousehold.deleteRule = .nullifyDeleteRule
 
-        // Wire up household ↔ recipes inverse.
+        // Wire up household <-> recipes inverse.
         householdToRecipes.inverseRelationship = recipeToHousehold
         recipeToHousehold.inverseRelationship = householdToRecipes
 
-        // CDRecipe → CDIngredient (to-many, cascade)
+        // CDRecipe -> CDIngredient (to-many, cascade)
         let recipeToIngredients = NSRelationshipDescription()
         recipeToIngredients.name = "ingredients"
         recipeToIngredients.destinationEntity = ingredientEntity
@@ -347,7 +365,7 @@ struct PersistenceController {
         recipeToIngredients.maxCount = 0  // to-many
         recipeToIngredients.deleteRule = .cascadeDeleteRule
 
-        // CDIngredient → CDRecipe (to-one, nullify)
+        // CDIngredient -> CDRecipe (to-one, nullify)
         let ingredientToRecipe = NSRelationshipDescription()
         ingredientToRecipe.name = "recipe"
         ingredientToRecipe.destinationEntity = recipeEntity
@@ -356,11 +374,11 @@ struct PersistenceController {
         ingredientToRecipe.maxCount = 1  // to-one
         ingredientToRecipe.deleteRule = .nullifyDeleteRule
 
-        // Wire up recipe ↔ ingredients inverse.
+        // Wire up recipe <-> ingredients inverse.
         recipeToIngredients.inverseRelationship = ingredientToRecipe
         ingredientToRecipe.inverseRelationship = recipeToIngredients
 
-        // CDRecipe → CDMealPlan (to-many, nullify)
+        // CDRecipe -> CDMealPlan (to-many, nullify)
         let recipeToMealPlans = NSRelationshipDescription()
         recipeToMealPlans.name = "mealPlans"
         recipeToMealPlans.destinationEntity = mealPlanEntity
@@ -369,7 +387,7 @@ struct PersistenceController {
         recipeToMealPlans.maxCount = 0  // to-many
         recipeToMealPlans.deleteRule = .nullifyDeleteRule
 
-        // CDMealPlan → CDRecipe (to-one, nullify)
+        // CDMealPlan -> CDRecipe (to-one, nullify)
         let mealPlanToRecipe = NSRelationshipDescription()
         mealPlanToRecipe.name = "recipe"
         mealPlanToRecipe.destinationEntity = recipeEntity
@@ -378,11 +396,11 @@ struct PersistenceController {
         mealPlanToRecipe.maxCount = 1  // to-one
         mealPlanToRecipe.deleteRule = .nullifyDeleteRule
 
-        // Wire up recipe ↔ mealPlans inverse.
+        // Wire up recipe <-> mealPlans inverse.
         recipeToMealPlans.inverseRelationship = mealPlanToRecipe
         mealPlanToRecipe.inverseRelationship = recipeToMealPlans
 
-        // CDRecipe → CDRecipeRating (to-many, cascade)
+        // CDRecipe -> CDRecipeRating (to-many, cascade)
         let recipeToRatings = NSRelationshipDescription()
         recipeToRatings.name = "ratings"
         recipeToRatings.destinationEntity = recipeRatingEntity
@@ -391,7 +409,7 @@ struct PersistenceController {
         recipeToRatings.maxCount = 0  // to-many
         recipeToRatings.deleteRule = .cascadeDeleteRule
 
-        // CDRecipeRating → CDRecipe (to-one, nullify)
+        // CDRecipeRating -> CDRecipe (to-one, nullify)
         let ratingToRecipe = NSRelationshipDescription()
         ratingToRecipe.name = "recipe"
         ratingToRecipe.destinationEntity = recipeEntity
@@ -400,11 +418,11 @@ struct PersistenceController {
         ratingToRecipe.maxCount = 1  // to-one
         ratingToRecipe.deleteRule = .nullifyDeleteRule
 
-        // Wire up recipe ↔ ratings inverse.
+        // Wire up recipe <-> ratings inverse.
         recipeToRatings.inverseRelationship = ratingToRecipe
         ratingToRecipe.inverseRelationship = recipeToRatings
 
-        // CDRecipe → CDMealSuggestion (to-many, cascade)
+        // CDRecipe -> CDMealSuggestion (to-many, cascade)
         let recipeToSuggestions = NSRelationshipDescription()
         recipeToSuggestions.name = "suggestions"
         recipeToSuggestions.destinationEntity = mealSuggestionEntity
@@ -413,7 +431,7 @@ struct PersistenceController {
         recipeToSuggestions.maxCount = 0  // to-many
         recipeToSuggestions.deleteRule = .cascadeDeleteRule
 
-        // CDMealSuggestion → CDRecipe (to-one, nullify)
+        // CDMealSuggestion -> CDRecipe (to-one, nullify)
         let suggestionToRecipe = NSRelationshipDescription()
         suggestionToRecipe.name = "recipe"
         suggestionToRecipe.destinationEntity = recipeEntity
@@ -422,11 +440,11 @@ struct PersistenceController {
         suggestionToRecipe.maxCount = 1  // to-one
         suggestionToRecipe.deleteRule = .nullifyDeleteRule
 
-        // Wire up recipe ↔ suggestions inverse.
+        // Wire up recipe <-> suggestions inverse.
         recipeToSuggestions.inverseRelationship = suggestionToRecipe
         suggestionToRecipe.inverseRelationship = recipeToSuggestions
 
-        // CDHousehold → CDHouseholdMember (to-many, cascade)
+        // CDHousehold -> CDHouseholdMember (to-many, cascade)
         let householdToMembers = NSRelationshipDescription()
         householdToMembers.name = "members"
         householdToMembers.destinationEntity = householdMemberEntity
@@ -435,7 +453,7 @@ struct PersistenceController {
         householdToMembers.maxCount = 0  // to-many
         householdToMembers.deleteRule = .cascadeDeleteRule
 
-        // CDHouseholdMember → CDHousehold (to-one, nullify)
+        // CDHouseholdMember -> CDHousehold (to-one, nullify)
         let memberToHousehold = NSRelationshipDescription()
         memberToHousehold.name = "household"
         memberToHousehold.destinationEntity = householdEntity
@@ -444,11 +462,11 @@ struct PersistenceController {
         memberToHousehold.maxCount = 1  // to-one
         memberToHousehold.deleteRule = .nullifyDeleteRule
 
-        // Wire up household ↔ members inverse.
+        // Wire up household <-> members inverse.
         householdToMembers.inverseRelationship = memberToHousehold
         memberToHousehold.inverseRelationship = householdToMembers
 
-        // ── Set entity properties ────────────────────────────────────────
+        // -- Set entity properties ---
         householdEntity.properties = [householdID, householdName, householdToRecipes, householdToMembers]
 
         ingredientEntity.properties = [
@@ -489,7 +507,7 @@ struct PersistenceController {
             recipeToHousehold, recipeToIngredients, recipeToMealPlans, recipeToRatings, recipeToSuggestions
         ]
 
-        // ── Model & Configurations ───────────────────────────────────────
+        // -- Model & Configurations ---
         let allEntities = [
             householdEntity, recipeEntity, ingredientEntity, mealPlanEntity,
             groceryItemEntity, householdMemberEntity, mealSuggestionEntity, recipeRatingEntity
@@ -505,30 +523,48 @@ struct PersistenceController {
         return model
     }
 
+    // MARK: - Initialization
+
     init(inMemory: Bool = false) {
         // Build the model programmatically instead of loading from .xcdatamodeld.
         let model = Self.buildModel()
-        container = NSPersistentCloudKitContainer(name: "FamilyMealPlanner", managedObjectModel: model)
-        ckContainer = CKContainer(identifier: Self.cloudKitContainerID)
+        self.managedObjectModel = model
+        self.ckContainer = CKContainer(identifier: Self.cloudKitContainerID)
+        self.container = Self.makeContainer(model: model, inMemory: inMemory, logger: logger)
+        Self.configureViewContext(container)
 
-        // Capture logger and container locally so closures don't capture mutating 'self'.
-        let logger = self.logger
-        let container = self.container
+        #if DEBUG
+        runSchemaInitialization(container)
+        #endif
+    }
 
-        // ── Store descriptions ──────────────────────────────────────────
+    // MARK: - Container Factory
+
+    /// Creates a new NSPersistentCloudKitContainer with the private + shared
+    /// store split. Reusable for both initial setup and post-reset rebuilds.
+    private static func makeContainer(
+        model: NSManagedObjectModel,
+        inMemory: Bool = false,
+        logger: Logger
+    ) -> NSPersistentCloudKitContainer {
+        let container = NSPersistentCloudKitContainer(
+            name: "FamilyMealPlanner",
+            managedObjectModel: model
+        )
+
+        // -- Store descriptions ---
         //
         // We configure TWO stores:
         //   1. Private store  — the owner's data (default zone)
         //   2. Shared store   — data shared via CKShare (shared zone)
         //
         // This is the Apple-recommended pattern for CloudKit sharing.
-        // See: https://developer.apple.com/documentation/coredata/mirroring_a_core_data_store_with_cloudkit
 
         guard let description = container.persistentStoreDescriptions.first else {
             fatalError("No persistent store descriptions found")
         }
 
-        // ── Private store (owner's data) ────────────────────────────────
+        // -- Private store (owner's data) ---
         let privateDescription = description.copy() as! NSPersistentStoreDescription
 
         if inMemory {
@@ -536,13 +572,13 @@ struct PersistenceController {
         }
 
         let privateOptions = NSPersistentCloudKitContainerOptions(
-            containerIdentifier: Self.cloudKitContainerID
+            containerIdentifier: cloudKitContainerID
         )
         privateOptions.databaseScope = .private
         privateDescription.cloudKitContainerOptions = privateOptions
         privateDescription.configuration = "Private"
 
-        // ── Shared store (household data from CKShare) ──────────────────
+        // -- Shared store (household data from CKShare) ---
         let sharedDescription = description.copy() as! NSPersistentStoreDescription
 
         // Shared store must be at a DIFFERENT URL than private store.
@@ -552,7 +588,7 @@ struct PersistenceController {
         sharedDescription.url = sharedStoreURL
 
         let sharedOptions = NSPersistentCloudKitContainerOptions(
-            containerIdentifier: Self.cloudKitContainerID
+            containerIdentifier: cloudKitContainerID
         )
         sharedOptions.databaseScope = .shared
         sharedDescription.cloudKitContainerOptions = sharedOptions
@@ -561,9 +597,9 @@ struct PersistenceController {
         // Replace the default description with our two stores.
         container.persistentStoreDescriptions = [privateDescription, sharedDescription]
 
-        // ── Load stores ─────────────────────────────────────────────────
+        // -- Load stores ---
         //
-        // If loading fails (e.g. model migration from SwiftData → Core Data),
+        // If loading fails (e.g. model migration from SwiftData -> Core Data),
         // destroy the incompatible store and retry once.
         container.loadPersistentStores { description, error in
             if let error {
@@ -589,18 +625,22 @@ struct PersistenceController {
             logger.info("Loaded store: \(description.configuration ?? "default") at \(description.url?.absoluteString ?? "unknown")")
         }
 
-        // Merge changes from CloudKit automatically.
+        return container
+    }
+
+    /// Configures the view context with standard settings for CloudKit sync.
+    private static func configureViewContext(_ container: NSPersistentCloudKitContainer) {
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
         // Pin the viewContext to the current query generation so that
         // UI reads are consistent even while background imports run.
         try? container.viewContext.setQueryGenerationFrom(.current)
+    }
 
+    /// Pushes the CloudKit schema in DEBUG builds.
+    private func runSchemaInitialization(_ container: NSPersistentCloudKitContainer) {
         #if DEBUG
-        // Push the full CloudKit schema (including internal sharing fields)
-        // to the Development environment. Safe to leave permanently — no-op
-        // once all fields exist.
         let containerForSchema = container
         Task.detached(priority: .background) {
             do {
@@ -613,6 +653,121 @@ struct PersistenceController {
             }
         }
         #endif
+    }
+
+    // MARK: - Local Store Reset
+
+    /// Destroys ALL local Core Data stores (private + shared) and rebuilds
+    /// the container from scratch. CloudKit will re-download data on next sync.
+    ///
+    /// This is the key fix for the sharing hang: the poisoned export queue
+    /// lives in Core Data's internal sync metadata inside the SQLite files.
+    /// Deleting and recreating the stores forces a clean pipeline.
+    ///
+    /// Pass the active SyncMonitor so this method can detach it from the old
+    /// container and reattach it to the new one. This guarantees no service
+    /// retains a stale container reference after the rebuild.
+    ///
+    /// After calling this method:
+    /// - The `container` property is replaced with a new instance
+    /// - All old NSManagedObject instances are INVALID — re-fetch everything
+    /// - SyncMonitor is reattached to the new container automatically
+    /// - A default household is recreated
+    func resetLocalStoresAndRebuildContainer(syncMonitor: SyncMonitor? = nil) async throws {
+        logger.info("resetLocalStores: starting tear-down")
+
+        // 0. Signal that a reset is in progress.
+        //    The app root observes this and removes ALL @FetchRequest views
+        //    from the hierarchy, preventing stale-object crashes.
+        isResetting = true
+
+        // 1. Detach all observers from the OLD container.
+        //    This prevents SyncMonitor from receiving stale notifications
+        //    and capturing a reference to the container we're about to destroy.
+        if let syncMonitor {
+            logger.info("resetLocalStores: detaching SyncMonitor from old container")
+            syncMonitor.detach()
+            syncMonitor.resetState()
+        }
+
+        // 2. Reset the viewContext to release all managed objects.
+        container.viewContext.reset()
+
+        // 3. Collect store URLs before we destroy them.
+        let storeURLs = container.persistentStoreCoordinator.persistentStores.compactMap { $0.url }
+
+        // 4. Destroy each persistent store via the coordinator.
+        let coordinator = container.persistentStoreCoordinator
+        for store in coordinator.persistentStores {
+            if let url = store.url {
+                do {
+                    try coordinator.destroyPersistentStore(at: url, type: .sqlite)
+                    logger.info("resetLocalStores: destroyed store at \(url.lastPathComponent)")
+                } catch {
+                    logger.warning("resetLocalStores: destroyPersistentStore failed for \(url.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        // 5. Delete sidecar files (.sqlite, .sqlite-shm, .sqlite-wal).
+        let fm = FileManager.default
+        for url in storeURLs {
+            for suffix in ["", "-shm", "-wal"] {
+                let fileURL = URL(fileURLWithPath: url.path + suffix)
+                try? fm.removeItem(at: fileURL)
+            }
+        }
+        logger.info("resetLocalStores: deleted SQLite files and sidecars")
+
+        // 6. Build a fresh container with the same model.
+        let newContainer = Self.makeContainer(
+            model: managedObjectModel,
+            logger: logger
+        )
+        Self.configureViewContext(newContainer)
+
+        #if DEBUG
+        runSchemaInitialization(newContainer)
+        #endif
+
+        // 7. Replace the published container — triggers UI updates via @Published.
+        container = newContainer
+        logger.info("resetLocalStores: new container built and active")
+
+        // 8. Ensure a default household exists (the app assumes one).
+        ensureDefaultHouseholdExists()
+
+        // 9. Reattach SyncMonitor to the NEW container so it observes
+        //    fresh CloudKit events and shares the correct container reference.
+        if let syncMonitor {
+            logger.info("resetLocalStores: reattaching SyncMonitor to new container")
+            syncMonitor.attach(to: newContainer)
+        }
+
+        logger.info("resetLocalStores: rebuild complete — all references updated")
+
+        // 10. Clear the resetting flag AFTER a brief yield so SwiftUI has
+        //     time to tear down old views before we allow new ones to appear.
+        //     This ensures @FetchRequest views are freshly created with the
+        //     new managedObjectContext, not recycled with stale objects.
+        try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1s
+        isResetting = false
+        logger.info("resetLocalStores: isResetting cleared — views can rebind")
+    }
+
+    /// Creates a default household if none exists. Called after a local reset
+    /// because the reset deletes all local data (CloudKit will re-sync it,
+    /// but until then the app needs a household object to function).
+    func ensureDefaultHouseholdExists() {
+        let request = CDHousehold.fetchRequest()
+        let count = (try? container.viewContext.count(for: request)) ?? 0
+        guard count == 0 else { return }
+
+        let household = CDHousehold(context: container.viewContext)
+        household.id = UUID()
+        household.name = "My Household"
+        try? container.viewContext.save()
+        logger.info("ensureDefaultHouseholdExists: created default household")
     }
 
     // MARK: - Helpers

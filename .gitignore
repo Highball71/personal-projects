@@ -23,5 +23,8 @@ Packages/
 # Personal notes
 *.local.md
 
+# Local secrets (never commit)
+Secrets.xcconfig
+
 # Xcode user data
 xcuserdata/

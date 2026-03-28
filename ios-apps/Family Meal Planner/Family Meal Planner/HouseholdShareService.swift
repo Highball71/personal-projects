@@ -2,9 +2,10 @@
 //  HouseholdShareService.swift
 //  Family Meal Planner
 //
-//  Manages CloudKit sharing for the household.
-//  Uses NSPersistentCloudKitContainer's native share API directly —
-//  no SwiftData bridging, no manual CloudKit record manipulation.
+//  DEPRECATED — This is the older sharing approach.
+//  All sharing logic is now consolidated in CloudKitSharingService.swift.
+//  This file is kept only to avoid breaking any remaining references.
+//  Do NOT call any methods in this file for new code.
 //
 
 import CloudKit
@@ -12,6 +13,15 @@ import CoreData
 import UIKit
 import os
 
+/// DEPRECATED: Use CloudKitSharingService.shared instead.
+///
+/// This was the original sharing service that used PersistenceController.shared
+/// directly. It has been superseded by CloudKitSharingService which:
+/// - Uses the SyncMonitor-captured container (not the static shared one)
+/// - Shares CDHousehold as the root object (not individual recipes)
+/// - Supports container rebuilds after local store resets
+/// - Handles stale share cleanup and applicationVersion clearing
+@available(*, deprecated, message: "Use CloudKitSharingService.shared.startShareFlow(from:) instead")
 @MainActor
 final class HouseholdShareService {
     static let shared = HouseholdShareService()
@@ -25,7 +35,6 @@ final class HouseholdShareService {
 
     // MARK: - Account Check
 
-    /// Returns true if the user is signed into iCloud.
     func isCloudKitAvailable() async -> Bool {
         do {
             let status = try await PersistenceController.shared.ckContainer.accountStatus()
@@ -38,14 +47,6 @@ final class HouseholdShareService {
 
     // MARK: - Share Household
 
-    /// Creates a new CKShare for the given household object.
-    ///
-    /// This calls `NSPersistentCloudKitContainer.share(_:to:completion:)` directly,
-    /// which is the supported API for sharing Core Data objects via CloudKit.
-    /// The container handles all the zone/record/share plumbing internally.
-    ///
-    /// - Parameter household: The CDHousehold managed object to share.
-    /// - Returns: A tuple of (CKShare, CKContainer) ready for UICloudSharingController.
     func shareHousehold(_ household: CDHousehold) async throws -> (CKShare, CKContainer) {
         guard await isCloudKitAvailable() else {
             throw HouseholdShareError.accountNotAvailable
@@ -55,12 +56,9 @@ final class HouseholdShareService {
 
         logger.info("shareHousehold: starting share for household '\(household.name)'")
 
-        // Use withCheckedThrowingContinuation to bridge the callback-based API.
         let (share, ckContainer) = try await withCheckedThrowingContinuation {
             (continuation: CheckedContinuation<(CKShare, CKContainer), Error>) in
 
-            // share(_:to:completion:) — pass nil for `to:` to create a NEW share.
-            // Do NOT pass an existing share. Do NOT manually delete old shares.
             container.share([household], to: nil) { _, share, ckContainer, error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -72,7 +70,6 @@ final class HouseholdShareService {
             }
         }
 
-        // Set the share title for better UX in the sharing UI.
         share[CKShare.SystemFieldKey.title] = household.name as CKRecordValue
 
         logger.info("shareHousehold: share created. URL: \(share.url?.absoluteString ?? "none yet")")
@@ -81,33 +78,24 @@ final class HouseholdShareService {
 
     // MARK: - Check for Existing Share
 
-    /// Returns the existing CKShare for the household, if one exists.
     func existingShare(for household: CDHousehold) -> CKShare? {
         let container = PersistenceController.shared.container
         guard let shares = try? container.fetchShares(in: nil) else {
             return nil
         }
-        // Find the share that covers this household's record.
-        // fetchShares(matching:) is also available but fetchShares(in:)
-        // is simpler when there's only one share.
         return shares.first
     }
 
     // MARK: - Create UICloudSharingController
 
-    /// Returns a configured UICloudSharingController for sharing the household.
-    /// If a share already exists, it returns a controller for managing participants.
-    /// If no share exists, it creates one.
     func makeSharingController(for household: CDHousehold) async throws -> UICloudSharingController {
         if let existingShare = existingShare(for: household) {
-            // Share already exists — return a controller to manage participants.
             let controller = UICloudSharingController(share: existingShare,
                                                        container: PersistenceController.shared.ckContainer)
             controller.availablePermissions = [.allowReadWrite, .allowPrivate, .allowPublic]
             return controller
         }
 
-        // No share yet — create one.
         let (share, ckContainer) = try await shareHousehold(household)
         let controller = UICloudSharingController(share: share, container: ckContainer)
         controller.availablePermissions = [.allowReadWrite, .allowPrivate, .allowPublic]

@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  FluffyList
+//  Family Meal Planner
 //
 
 import SwiftUI
@@ -15,6 +15,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(SyncMonitor.self) private var syncMonitor
+    @EnvironmentObject private var persistence: PersistenceController
 
     @FetchRequest(
         entity: CDHouseholdMember.entity(),
@@ -37,6 +38,13 @@ struct SettingsView: View {
     @State private var shareErrorMessage = ""
     @State private var showingResetConfirm = false
 
+    // Debug reset state
+    @State private var isResettingLocalState = false
+    @State private var showingLocalResetConfirm = false
+    @State private var showingCloudResetConfirm = false
+    @State private var showResetSuccessAlert = false
+    @State private var resetSuccessMessage = ""
+
     #if DEBUG
     @State private var showDiagAlert = false
     @State private var diagAlertMessage = ""
@@ -48,6 +56,10 @@ struct SettingsView: View {
                 householdSection
                 headCookSection
                 sharingSection
+
+                #if DEBUG
+                debugSection
+                #endif
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -71,6 +83,11 @@ struct SettingsView: View {
             } message: {
                 Text(shareErrorMessage)
             }
+            .alert("Reset Complete", isPresented: $showResetSuccessAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(resetSuccessMessage)
+            }
             .confirmationDialog(
                 "Delete the existing share link?",
                 isPresented: $showingResetConfirm,
@@ -80,6 +97,26 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("All household members will lose access. You can create a new share link afterwards.")
+            }
+            .confirmationDialog(
+                "Reset Local Sync State?",
+                isPresented: $showingLocalResetConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Reset Local Data", role: .destructive) { performLocalReset() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This deletes all local Core Data stores and rebuilds the container. CloudKit will re-download your data. Use this when sharing is stuck.")
+            }
+            .confirmationDialog(
+                "Reset CloudKit Sharing State?",
+                isPresented: $showingCloudResetConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Reset Server Shares", role: .destructive) { performCloudReset() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This deletes all CKShare records from CloudKit. Household members will lose access until you re-share.")
             }
             #if DEBUG
             .alert("Container Diagnostic", isPresented: $showDiagAlert) {
@@ -96,44 +133,55 @@ struct SettingsView: View {
 
     private var householdSection: some View {
         Section {
-            // Add a new member
-            HStack {
-                TextField("Add family member", text: $newMemberName)
-                    .textContentType(.name)
-                    .submitLabel(.done)
-                    .onSubmit { addMember() }
-
-                Button(action: addMember) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.accentColor)
-                }
-                .disabled(newMemberName.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-
-            // List existing members
-            ForEach(members) { member in
+            // During a reset, the @FetchRequest holds stale CDHouseholdMember
+            // objects from the destroyed context. Accessing them crashes with
+            // "persistent store is not reachable". Show a placeholder instead.
+            if isResettingLocalState {
                 HStack {
-                    if member.isHeadCook {
-                        Image(systemName: "frying.pan.fill")
-                            .foregroundStyle(.orange)
-                            .font(.caption)
+                    ProgressView()
+                    Text("Resetting…")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                // Add a new member
+                HStack {
+                    TextField("Add family member", text: $newMemberName)
+                        .textContentType(.name)
+                        .submitLabel(.done)
+                        .onSubmit { addMember() }
+
+                    Button(action: addMember) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.accentColor)
                     }
-                    Text(member.name)
-                    if member.isHeadCook {
-                        Text("Head Cook")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                    .disabled(newMemberName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                // List existing members
+                ForEach(members) { member in
+                    HStack {
+                        if member.isHeadCook {
+                            Image(systemName: "frying.pan.fill")
+                                .foregroundStyle(.orange)
+                                .font(.caption)
+                        }
+                        Text(member.name)
+                        if member.isHeadCook {
+                            Text("Head Cook")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
                     }
                 }
-            }
-            .onDelete(perform: deleteMembers)
+                .onDelete(perform: deleteMembers)
 
-            // "You are" picker — device-local identity
-            if !members.isEmpty {
-                Picker("You are", selection: $currentUserName) {
-                    Text("Not set").tag("")
-                    ForEach(members) { member in
-                        Text(member.name).tag(member.name)
+                // "You are" picker — device-local identity
+                if !members.isEmpty {
+                    Picker("You are", selection: $currentUserName) {
+                        Text("Not set").tag("")
+                        ForEach(members) { member in
+                            Text(member.name).tag(member.name)
+                        }
                     }
                 }
             }
@@ -148,7 +196,10 @@ struct SettingsView: View {
 
     private var headCookSection: some View {
         Section {
-            if members.isEmpty {
+            // Guard against stale @FetchRequest objects during a reset.
+            if isResettingLocalState {
+                EmptyView()
+            } else if members.isEmpty {
                 Text("Add family members above first")
                     .foregroundStyle(.secondary)
             } else {
@@ -184,9 +235,14 @@ struct SettingsView: View {
 
     // MARK: - Sharing Section
 
-    /// Whether the sync pipeline is settled enough to attempt sharing.
+    /// Whether we should enable the Share button. We no longer require
+    /// SyncMonitor to have captured a container — the share flow falls back
+    /// to PersistenceController's container if needed. We only disable when
+    /// we know for sure something is wrong (offline or active sync error).
     private var isSyncReady: Bool {
-        syncMonitor.syncState == .synced && syncMonitor.persistentContainer != nil
+        if syncMonitor.isOffline { return false }
+        if case .error = syncMonitor.syncState { return false }
+        return true
     }
 
     private var sharingSection: some View {
@@ -211,7 +267,11 @@ struct SettingsView: View {
             .disabled(!isSyncReady && !isLoadingShare)
 
             // Subtle sync status indicator
-            SyncStatusRow(syncState: syncMonitor.syncState, isOffline: syncMonitor.isOffline)
+            SyncStatusRow(
+                syncState: syncMonitor.syncState,
+                isOffline: syncMonitor.isOffline,
+                lastErrorMessage: syncMonitor.lastErrorMessage
+            )
 
             Button("Reset Sharing", role: .destructive) {
                 showingResetConfirm = true
@@ -220,30 +280,89 @@ struct SettingsView: View {
         } header: {
             Text("iCloud Sharing")
         } footer: {
-            if !isSyncReady && !isLoadingShare {
-                Text("Waiting for iCloud sync to finish before sharing is available. This usually takes a few seconds after launch.")
+            if syncMonitor.isOffline {
+                Text("You appear to be offline. Connect to the internet to share your recipe library.")
+            } else if case .error(let msg) = syncMonitor.syncState {
+                Text("Sync issue: \(msg). Try again or use Debug Recovery tools.")
             } else {
                 Text("Share your recipe library with household members so everyone sees the same recipes, meal plans, and grocery lists.")
             }
         }
     }
 
+    // MARK: - Debug Section
+
+    #if DEBUG
+    private var debugSection: some View {
+        Section {
+            // Reset Local Sync State — destroys SQLite files, rebuilds container
+            Button {
+                showingLocalResetConfirm = true
+            } label: {
+                HStack {
+                    Label("Reset Local Sync State", systemImage: "arrow.counterclockwise.circle")
+                    Spacer()
+                    if isResettingLocalState {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isResettingLocalState || isLoadingShare)
+
+            // Reset CloudKit Sharing State — server-side only
+            Button {
+                showingCloudResetConfirm = true
+            } label: {
+                Label("Reset CloudKit Sharing State", systemImage: "cloud.bolt")
+            }
+            .disabled(isResettingLocalState || isLoadingShare)
+
+            // Force Clean Share Attempt — resets local + immediately shares
+            Button {
+                performForceCleanShare()
+            } label: {
+                HStack {
+                    Label("Force Clean Share Attempt", systemImage: "bolt.circle")
+                    Spacer()
+                    if isResettingLocalState {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isResettingLocalState || isLoadingShare)
+
+        } header: {
+            Text("Debug Recovery")
+        } footer: {
+            Text("\"Reset Local\" destroys local stores and lets CloudKit re-download. \"Reset CloudKit\" deletes server-side shares only. \"Force Clean Share\" does a full local reset then immediately attempts to share.")
+        }
+    }
+    #endif
+
+    // MARK: - Share Flow
+
     private func generateShareURL() {
         #if DEBUG
-        // Show container status before starting — tap Continue to proceed, Cancel to abort.
-        let isNil = syncMonitor.persistentContainer == nil
-        diagAlertMessage = isNil
-            ? "persistentContainer: nil\n\nNot yet captured from sync event notifications. The direct-CloudKit fallback will be attempted."
-            : "persistentContainer: available ✓\n\nReady to call share(_:to:completion:)."
+        let monitorContainer = syncMonitor.persistentContainer
+        let isSame = monitorContainer === persistence.container
+        diagAlertMessage = monitorContainer == nil
+            ? "SyncMonitor container: nil\nWill use PersistenceController container directly."
+            : "SyncMonitor container: available\nMatches PersistenceController: \(isSame ? "YES" : "NO — will fix stale reference")"
         showDiagAlert = true
-        // Execution resumes when the user taps Continue in the diagnostic alert.
         #else
         executeShareFlow()
         #endif
     }
 
-    /// Runs the actual share flow. Called directly in release builds and via the
-    /// Continue button in the DEBUG diagnostic alert.
+    /// Runs the actual share flow using the new startShareFlow(from:) entry point.
+    ///
+    /// Container resolution priority:
+    /// 1. SyncMonitor's captured container (if available and .synced)
+    /// 2. PersistenceController's container directly (always current)
+    ///
+    /// We do NOT gate on SyncMonitor.syncState == .synced because that only
+    /// reflects the last completed event — it doesn't mean the pipeline is idle.
+    /// Instead, we proceed with the best available container.
     private func executeShareFlow() {
         isLoadingShare = true
 
@@ -255,85 +374,70 @@ struct SettingsView: View {
                 return
             }
 
-            // Safety net: wait for the sync pipeline to reach .synced before
-            // calling share(_:to:). The UI button is already gated on isSyncReady,
-            // but the pipeline can briefly flip to .syncing between the tap and here.
-            // Poll up to 15 seconds; bail if the task is cancelled.
-            if syncMonitor.syncState != .synced || syncMonitor.persistentContainer == nil {
-                for _ in 0..<30 {  // 30 × 0.5s = 15s max
+            // Resolve the best available container.
+            // Prefer SyncMonitor's (it's been validated by CloudKit events),
+            // but fall back to PersistenceController's (always the current one).
+            let targetContainer: NSPersistentCloudKitContainer
+
+            if let monitored = syncMonitor.persistentContainer {
+                // Verify it's the SAME container as PersistenceController's.
+                // After a rebuild they could differ if SyncMonitor hasn't reattached.
+                if monitored === persistence.container {
+                    targetContainer = monitored
+                    Logger.cloudkit.info("executeShareFlow: using SyncMonitor container (matches PersistenceController)")
+                } else {
+                    Logger.cloudkit.warning("executeShareFlow: SyncMonitor container is STALE — using PersistenceController's current container")
+                    targetContainer = persistence.container
+                    // Fix the stale reference.
+                    syncMonitor.attach(to: targetContainer)
+                }
+            } else {
+                // SyncMonitor hasn't captured a container yet.
+                // Wait briefly for a sync event, then use PersistenceController's directly.
+                Logger.cloudkit.info("executeShareFlow: SyncMonitor has no container — waiting briefly")
+                for _ in 0..<10 {
                     guard !Task.isCancelled else { return }
                     try? await Task.sleep(for: .milliseconds(500))
-                    if syncMonitor.syncState == .synced && syncMonitor.persistentContainer != nil {
-                        break
-                    }
+                    if syncMonitor.persistentContainer != nil { break }
                 }
-                // If still not ready after 15s, show the "not ready" alert.
-                guard syncMonitor.syncState == .synced, syncMonitor.persistentContainer != nil else {
-                    showContainerUnavailableAlert = true
-                    return
+
+                if let monitored = syncMonitor.persistentContainer {
+                    targetContainer = monitored
+                } else {
+                    Logger.cloudkit.warning("executeShareFlow: SyncMonitor still nil — using PersistenceController container directly")
+                    targetContainer = persistence.container
                 }
             }
 
-            if let persistentContainer = syncMonitor.persistentContainer {
-                // Normal path: container captured — use NSPersistentCloudKitContainer API.
-                // prepareShare always deletes any existing share before creating a fresh one,
-                // so there is no fast path for an existing share here.
-                do {
-                    let (share, container) = try await CloudKitSharingService.shared.prepareShare(
-                        using: persistentContainer
-                    )
-                    guard !Task.isCancelled else { return }
-                    presentCloudSharingController(share: share, container: container)
-                } catch is CancellationError {
-                    // User tapped Cancel — spinner is already hidden by cancelShare().
-                } catch {
-                    guard !Task.isCancelled else { return }
-                    shareErrorMessage = error.localizedDescription
-                    showingShareError = true
-                    Logger.cloudkit.error("Failed to prepare share: \(error.localizedDescription, privacy: .public)")
-                }
-            } else {
-                // Fallback: persistentContainer is nil — not yet captured from sync event
-                // notifications (e.g. hard reset deleted the zone; SwiftData hasn't restarted
-                // sync). Query CloudKit directly for an existing share; no container needed.
-                Logger.cloudkit.warning("persistentContainer nil at share time — trying direct CloudKit fallback")
-                do {
-                    let ckContainer = CKContainer(identifier: CloudKitSharingService.containerIdentifier)
-                    if let share = try await CloudKitSharingService.shared.fetchExistingShareDirect() {
-                        presentCloudSharingController(share: share, container: ckContainer)
-                    } else {
-                        // No existing share and no container to create one — wait for sync.
-                        showContainerUnavailableAlert = true
-                    }
-                } catch is CancellationError {
-                    // User tapped Cancel
-                } catch {
-                    guard !Task.isCancelled else { return }
-                    shareErrorMessage = error.localizedDescription
-                    showingShareError = true
-                }
+            do {
+                let (share, container) = try await CloudKitSharingService.shared.startShareFlow(
+                    from: targetContainer,
+                    syncMonitor: syncMonitor
+                )
+                guard !Task.isCancelled else { return }
+                presentCloudSharingController(share: share, container: container)
+            } catch is CancellationError {
+                // User tapped Cancel
+            } catch {
+                guard !Task.isCancelled else { return }
+                shareErrorMessage = error.localizedDescription
+                showingShareError = true
+                Logger.cloudkit.error("Failed to start share flow: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
 
-    /// Cancels any in-flight share operation and resets the loading state immediately.
     private func cancelShare() {
         shareTask?.cancel()
         shareTask = nil
         isLoadingShare = false
     }
 
-    /// Hard-resets sharing state: cancels in-flight tasks, clears cached delegate,
-    /// then nukes the CKShare directly from CloudKit (bypassing the container).
     private func resetSharing() {
-        // Step 1: cancel any in-flight operation and clear all cached state.
         shareTask?.cancel()
         shareTask = nil
         sharingDelegate = nil
 
-        // Step 2: start the hard reset. The container is passed as Optional —
-        // hardResetSharing's primary path (direct zone query) works without it,
-        // so this succeeds even if persistentContainer is nil.
         isLoadingShare = true
         shareTask = Task {
             defer { isLoadingShare = false }
@@ -342,7 +446,7 @@ struct SettingsView: View {
                     persistentContainer: syncMonitor.persistentContainer
                 )
             } catch is CancellationError {
-                // User tapped Cancel — spinner is already hidden.
+                // User tapped Cancel
             } catch {
                 shareErrorMessage = error.localizedDescription
                 showingShareError = true
@@ -350,9 +454,147 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Debug Recovery Actions
+
+    /// Performs a full local store reset and container rebuild.
+    /// This is the primary fix for the sharing hang.
+    ///
+    /// During the reset, PersistenceController.isResetting removes ALL views
+    /// (including this sheet) from the hierarchy at the app root level. This
+    /// prevents stale @FetchRequest crashes across every view in the app.
+    private func performLocalReset() {
+        isResettingLocalState = true
+
+        Task {
+            defer { isResettingLocalState = false }
+
+            do {
+                // Single call handles everything: detach SyncMonitor, destroy stores,
+                // rebuild container, recreate household, reattach SyncMonitor.
+                try await persistence.resetLocalStoresAndRebuildContainer(syncMonitor: syncMonitor)
+
+                Logger.cloudkit.info("Local store reset completed successfully")
+
+                // No need to dismiss — PersistenceController.isResetting removes
+                // ALL @FetchRequest views from the hierarchy at the app root level.
+                // When isResetting clears, a fresh ContentView is created.
+            } catch {
+                shareErrorMessage = "Local reset failed: \(error.localizedDescription)"
+                showingShareError = true
+                Logger.cloudkit.error("Local store reset failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Cleans up server-side sharing state without touching local stores.
+    private func performCloudReset() {
+        isResettingLocalState = true
+
+        Task {
+            defer { isResettingLocalState = false }
+            do {
+                try await CloudKitSharingService.shared.cleanupServerSharingState()
+                resetSuccessMessage = "CloudKit sharing state has been reset. You can now create a fresh share."
+                showResetSuccessAlert = true
+            } catch {
+                shareErrorMessage = "CloudKit reset failed: \(error.localizedDescription)"
+                showingShareError = true
+            }
+        }
+    }
+
+    /// Nuclear option: cleans up CloudKit ghost zones, resets local stores,
+    /// rebuilds container, then attempts the share flow. Useful when the sync
+    /// pipeline is completely stuck due to orphaned share zones.
+    ///
+    /// During the local reset, PersistenceController.isResetting removes ALL
+    /// views from the hierarchy at the app root level — this prevents stale
+    /// @FetchRequest crashes across every view (not just SettingsView).
+    /// The share controller is presented via UIKit after the reset.
+    private func performForceCleanShare() {
+        isResettingLocalState = true
+        isLoadingShare = true
+
+        shareTask = Task {
+            defer {
+                isResettingLocalState = false
+                isLoadingShare = false
+            }
+
+            do {
+                // 1. Clean up server-side first — delete orphaned share zones
+                //    that cause "Zone Not Found" errors and share hangs.
+                Logger.cloudkit.info("Force clean share: step 1 — cleaning server-side sharing state")
+                try await CloudKitSharingService.shared.cleanupServerSharingState()
+                Logger.cloudkit.info("Force clean share: step 1 — server cleanup complete")
+
+                // 2. Full local reset (handles SyncMonitor lifecycle).
+                //    This clears the container's internal knowledge of the old zones.
+                Logger.cloudkit.info("Force clean share: step 2 — resetting local stores")
+                try await persistence.resetLocalStoresAndRebuildContainer(syncMonitor: syncMonitor)
+                Logger.cloudkit.info("Force clean share: step 2 — local reset complete")
+
+                // 3. PersistenceController.isResetting already removed all views
+                //    from the hierarchy (including this sheet). No dismiss needed.
+                //    This Task continues running even though SettingsView is gone.
+
+                // 4. Wait for CloudKit to set up + export with the fresh container.
+                Logger.cloudkit.info("Force clean share: step 3 — waiting for initial sync cycle")
+                for i in 0..<30 {
+                    guard !Task.isCancelled else { return }
+                    try await Task.sleep(for: .seconds(1))
+                    if syncMonitor.hasCompletedExport {
+                        Logger.cloudkit.info("Force clean share: step 3 — export ready after \(i)s")
+                        break
+                    }
+                }
+
+                guard !Task.isCancelled else { return }
+
+                // 5. Use the NEW container directly.
+                let currentContainer = persistence.container
+                Logger.cloudkit.info("Force clean share: step 4 — starting share flow")
+
+                // 6. Run the share flow.
+                let (share, container) = try await CloudKitSharingService.shared.startShareFlow(
+                    from: currentContainer,
+                    syncMonitor: syncMonitor
+                )
+                guard !Task.isCancelled else { return }
+
+                // 7. Present the sharing controller from root VC
+                //    (SettingsView is already dismissed).
+                presentCloudSharingController(share: share, container: container)
+
+            } catch is CancellationError {
+                // User cancelled
+            } catch {
+                guard !Task.isCancelled else { return }
+                Logger.cloudkit.error("Force clean share failed: \(error.localizedDescription, privacy: .public)")
+                // SettingsView is gone at this point, so show the error via UIKit directly.
+                await MainActor.run {
+                    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                          let window = windowScene.windows.first,
+                          let rootVC = window.rootViewController else { return }
+
+                    var presenter = rootVC
+                    while let presented = presenter.presentedViewController {
+                        presenter = presented
+                    }
+
+                    let alert = UIAlertController(
+                        title: "Sharing Failed",
+                        message: error.localizedDescription,
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    presenter.present(alert, animated: true)
+                }
+            }
+        }
+    }
+
     /// Presents UICloudSharingController imperatively via UIKit.
-    /// UICloudSharingController must be presented directly — wrapping it inside a
-    /// SwiftUI .sheet causes a double-modal conflict that prevents it from appearing.
     private func presentCloudSharingController(share: CKShare, container: CKContainer) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first,
@@ -361,16 +603,12 @@ struct SettingsView: View {
         }
 
         let sharingController = UICloudSharingController(share: share, container: container)
-        // Allow participants to read and write; keep the share private (invite-only).
         sharingController.availablePermissions = [.allowReadWrite, .allowPrivate]
 
-        // Attach delegate so applicationVersion is cleared again after every
-        // participant change (UICloudSharingController re-sets it on each save).
         let delegate = CloudSharingDelegate(container: container)
-        sharingDelegate = delegate           // retain: SwiftUI @State keeps it alive
+        sharingDelegate = delegate
         sharingController.delegate = delegate
 
-        // iPad requires popover source configuration.
         if let popover = sharingController.popoverPresentationController {
             popover.sourceView = rootVC.view
             popover.sourceRect = CGRect(
@@ -381,7 +619,6 @@ struct SettingsView: View {
             popover.permittedArrowDirections = []
         }
 
-        // Walk up to the topmost presented controller (Settings is already modal).
         var presenter = rootVC
         while let presented = presenter.presentedViewController {
             presenter = presented
@@ -395,7 +632,6 @@ struct SettingsView: View {
         let trimmed = newMemberName.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
-        // Don't add duplicates
         guard !members.contains(where: { $0.name.lowercased() == trimmed.lowercased() }) else {
             newMemberName = ""
             return
@@ -407,7 +643,6 @@ struct SettingsView: View {
         member.isHeadCook = false
         newMemberName = ""
 
-        // If this is the first member added, auto-select as "You are"
         if members.count == 0 {
             currentUserName = trimmed
         }
@@ -418,7 +653,6 @@ struct SettingsView: View {
     private func deleteMembers(at offsets: IndexSet) {
         for index in offsets {
             let member = members[index]
-            // If deleting the current user, clear the selection
             if member.name == currentUserName {
                 currentUserName = ""
             }
@@ -428,7 +662,6 @@ struct SettingsView: View {
     }
 
     private func setHeadCook(_ member: CDHouseholdMember) {
-        // Clear any existing Head Cook first
         for m in members {
             m.isHeadCook = false
         }
@@ -448,15 +681,23 @@ struct SettingsView: View {
 // MARK: - Sync Status Row
 
 /// Small read-only row that shows the current iCloud sync state.
+/// Labels are intentionally conservative — "iCloud connected" rather than
+/// "Ready to share" — because .synced only reflects the last event, not
+/// whether the internal pipeline is truly idle.
 struct SyncStatusRow: View {
     let syncState: SyncMonitor.SyncState
     let isOffline: Bool
+    /// Sticky error message from SyncMonitor — persists even when state
+    /// flips back to .syncing, so the user can actually read it.
+    var lastErrorMessage: String? = nil
 
     private var icon: String {
         if isOffline { return "wifi.slash" }
         switch syncState {
         case .synced:  return "checkmark.circle.fill"
-        case .syncing: return "arrow.triangle.2.circlepath"
+        case .syncing:
+            // Show warning icon if there was a recent error
+            return lastErrorMessage != nil ? "exclamationmark.triangle.fill" : "arrow.triangle.2.circlepath"
         case .error:   return "exclamationmark.triangle.fill"
         }
     }
@@ -465,7 +706,7 @@ struct SyncStatusRow: View {
         if isOffline { return .orange }
         switch syncState {
         case .synced:  return .green
-        case .syncing: return .blue
+        case .syncing: return lastErrorMessage != nil ? .orange : .blue
         case .error:   return .red
         }
     }
@@ -473,9 +714,16 @@ struct SyncStatusRow: View {
     private var label: String {
         if isOffline { return "Offline" }
         switch syncState {
-        case .synced:       return "Synced"
-        case .syncing:      return "Syncing…"
-        case .error(let m): return "Sync error: \(m)"
+        case .synced:
+            return "iCloud connected"
+        case .syncing:
+            // If there was a recent error, show it instead of just "Syncing..."
+            if let msg = lastErrorMessage {
+                return "Syncing (last error: \(msg))"
+            }
+            return "Syncing..."
+        case .error(let m):
+            return "Sync issue: \(m)"
         }
     }
 
@@ -484,11 +732,11 @@ struct SyncStatusRow: View {
             Image(systemName: icon)
                 .font(.caption)
                 .foregroundStyle(color)
-                .symbolEffect(.pulse, isActive: syncState == .syncing)
+                .symbolEffect(.pulse, isActive: syncState == .syncing && lastErrorMessage == nil)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .lineLimit(2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -497,14 +745,6 @@ struct SyncStatusRow: View {
 // MARK: - Cloud Sharing Delegate
 
 /// UICloudSharingControllerDelegate that keeps applicationVersion cleared.
-///
-/// Root cause of the recurring "newer version" error: UICloudSharingController
-/// saves the CKShare to CloudKit whenever the owner manages participants, and
-/// iOS re-injects the `applicationVersion` field on every save. Our pre-presentation
-/// clear is not enough — the controller writes the field back after we present it.
-///
-/// `cloudSharingControllerDidSaveShare(_:)` fires immediately after the controller
-/// finishes its CloudKit write, giving us the hook we need to clear the field again.
 final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
     private let container: CKContainer
 
@@ -527,7 +767,6 @@ final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
 
     func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
         guard let share = csc.share else { return }
-        // Clear applicationVersion on the share the controller just wrote back.
         Task { @MainActor in
             await CloudKitSharingService.shared.clearApplicationVersion(
                 from: share, using: container
@@ -540,4 +779,5 @@ final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
     SettingsView()
         .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         .environment(SyncMonitor())
+        .environmentObject(PersistenceController.shared)
 }

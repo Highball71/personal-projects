@@ -38,16 +38,48 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct Family_Meal_PlannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    let persistence = PersistenceController.shared
+
+    /// The shared persistence controller, injected as an environment object
+    /// so views can access the container (and react to container rebuilds
+    /// via @Published).
+    @StateObject private var persistence = PersistenceController.shared
+
+    /// Single SyncMonitor instance shared across the app.
+    @State private var syncMonitor = SyncMonitor()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(
-                    \.managedObjectContext,
-                    persistence.container.viewContext
-                )
-                .environment(SyncMonitor())
+            // When a local-store reset is in progress, remove ALL views
+            // that hold @FetchRequest from the hierarchy. This prevents
+            // stale-object crashes (CDRecipe, CDHouseholdMember, etc.)
+            // from the old container being accessed during the rebuild.
+            //
+            // When isResetting flips back to false, SwiftUI creates
+            // fresh ContentView (and all child views) with @FetchRequest
+            // instances bound to the NEW container's viewContext.
+            if persistence.isResetting {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Resetting sync data…")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else {
+                ContentView()
+                    .environment(
+                        \.managedObjectContext,
+                        persistence.container.viewContext
+                    )
+                    .environment(syncMonitor)
+                    .environmentObject(persistence)
+                    .onAppear {
+                        // Ensure a default household exists on first launch.
+                        persistence.ensureDefaultHouseholdExists()
+                    }
+            }
         }
     }
 }
