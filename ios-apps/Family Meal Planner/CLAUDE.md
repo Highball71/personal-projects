@@ -1,20 +1,31 @@
 # Family Meal Planner (FluffyList)
 
-Weekly meal planning with recipe management and grocery lists.
+**Current Status:** Build 92, TestFlight, pre-App Store
 
-## App Details
-- Bundle ID: `com.highball71.Family-Meal-Planner`
-- Native iOS (SwiftUI + SwiftData, iOS 17+)
-- TestFlight Build 10
+**Tech Stack:**
+- SwiftUI (UI)
+- Core Data (local persistence)
+- CloudKit (cloud sync)
+- iOS 17+
 
-## Key Features
-- Claude API integration for recipe suggestions
-- Recipe search with JSON-LD parsing
-- Meal planning and grocery list generation
-- 35 production files, 6 test files
+**Key Features:**
+- Multi-page photo scanning (Claude Vision API via proxy)
+- Weekly meal planning
+- Per-person recipe ratings
+- Grocery list with persistence
+- CloudKit sharing (recipient still needs to accept)
 
-## Dev Environment
-- SSH key (Ed25519) at `~/.ssh/id_ed25519`, added to GitHub, persists via macOS Keychain
-- Git: David Albert <david@highball71.com>
-- GitHub CLI (`gh`) installed via Homebrew, authenticated as Highball71
-- Repo remote uses SSH: `git@github.com:Highball71/personal-projects.git`
+**Current Work:**
+See `.context/ACTIVE_TASK.md` for what to work on next.
+
+**Repos:**
+- App: github.com/Highball71/personal-projects (ios-apps/Family Meal Planner/)
+- Proxy: github.com/Highball71/fluffylist-proxy
+
+**Context System:**
+All project state lives in `.context/` directory:
+- ACTIVE_TASK.md — Current work
+- HANDOFF.md — Resume point
+- AI_PROMPT_MAP.md — Terminology
+- SESSION_LOG.md — Execution trail
+- ARCH_DECISIONS.md — Design decisions
