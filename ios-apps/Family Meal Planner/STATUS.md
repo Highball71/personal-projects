@@ -1,5 +1,5 @@
 # Family Meal Planner (FluffyList) — STATUS.md
-**Last updated: 2026-03-28 (Phase 1 audit)**
+**Last updated: 2026-03-29**
 
 ---
 
@@ -19,6 +19,7 @@
 
 | Hash | Message |
 |------|---------|
+| 6c44c36 | Zone-level CloudKit sharing (Option B), fix CKRecordNameZoneWideShare fetch, delete HouseholdShareService |
 | f148739 | Fix CloudKit sharing: async share API, stale FetchRequest guard, zone cleanup |
 | 1d3f38f | Core Data + CloudKit migration, fix 22 warnings, add sync-ready sharing gate |
 | 9cf75d7 | Store shared model enums as raw strings for CloudKit sharing |
@@ -40,7 +41,9 @@
 - Per-person recipe ratings
 - Grocery list with checked-state persistence
 - Proxy-based API key auth (user-facing key removed; `X-Proxy-Key` header)
-- CloudKit household sharing (share sheet functional; Shannon share pending acceptance)
+- CloudKit zone-level sharing (Option B) — implemented and tested; share link sent to Shannon via iMessage, awaiting acceptance
+- HouseholdShareService.swift deleted (replaced by zone-level approach)
+- Secrets.xcconfig recreated with PROXY_KEY
 
 ---
 
@@ -48,7 +51,8 @@
 
 | Issue | State |
 |-------|-------|
-| Shannon CloudKit share acceptance | Pending (link sent March 16) |
+| Shannon CloudKit share acceptance | Pending (new link sent March 29 via iMessage — zone-level share) |
+| CKRecordNameZoneWideShare fetch | Fixed — bypassed indexing requirement |
 | Data wipe on reinstall | Reported, not yet diagnosed |
 | "0 pages scanned" bug | Fixed via onChange approach; still intermittent |
 | Photo scan cold-start delay (~50s) | Render free tier behavior — known, acceptable |
@@ -57,7 +61,7 @@
 
 ## Pre-App Store Checklist
 
-- [ ] Move `PROXY_KEY` out of hardcode in `AnthropicClient.swift` into gitignored config
+- [x] Move `PROXY_KEY` out of hardcode into `Secrets.xcconfig` (gitignored)
 - [ ] Flip `aps-environment` to production
 - [ ] Confirm photo scan fix holds in TestFlight
 - [ ] Build iPad-native layout (currently scaled phone UI)
@@ -72,6 +76,12 @@
 
 ---
 
-## Git Status (as of audit)
+## Dev Environment Notes
 
-Working tree: clean — no uncommitted changes.
+- Auth conflict resolved 2026-03-29 — Claude Code now billing via claude.ai Max subscription
+
+---
+
+## Git Status (as of 2026-03-29)
+
+Working tree: clean — all changes committed and pushed (6c44c36).
