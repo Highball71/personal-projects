@@ -169,6 +169,11 @@ final class CloudKitSharingService {
 
     /// Fetches the existing zone-level CKShare directly from CloudKit.
     /// Returns nil if no share exists in the Core Data zone.
+    ///
+    /// Uses a direct record fetch with `CKRecordNameZoneWideShare` instead
+    /// of a CKQuery. CKQuery requires the `cloudkit.share` type to be marked
+    /// indexable in the CloudKit schema — which it isn't by default — causing
+    /// "type is not marked indexable" at runtime.
     func fetchExistingZoneShare() async throws -> CKShare? {
         let db = ckContainer.privateCloudDatabase
         let zoneID = CKRecordZone.ID(
@@ -176,25 +181,23 @@ final class CloudKitSharingService {
             ownerName: CKCurrentUserDefaultName
         )
 
-        // Query for CKShare records in the Core Data zone.
-        let query = CKQuery(
-            recordType: CKRecord.SystemType.share,
-            predicate: NSPredicate(value: true)
+        // Zone-level shares use a well-known record name.
+        let shareRecordID = CKRecord.ID(
+            recordName: CKRecordNameZoneWideShare,
+            zoneID: zoneID
         )
-        let (matchResults, _) = try await db.records(
-            matching: query, inZoneWith: zoneID
-        )
-        let shares = matchResults.compactMap { _, result -> CKShare? in
-            try? result.get() as? CKShare
-        }
 
-        if let share = shares.first {
+        do {
+            let record = try await db.record(for: shareRecordID)
+            guard let share = record as? CKShare else { return nil }
             if share["applicationVersion"] as? String != nil {
                 await clearApplicationVersion(from: share, using: ckContainer)
             }
             return share
+        } catch let error as CKError where error.code == .unknownItem {
+            // No zone-level share exists yet.
+            return nil
         }
-        return nil
     }
 
     // MARK: - Delete Share
