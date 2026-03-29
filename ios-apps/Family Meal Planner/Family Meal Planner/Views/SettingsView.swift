@@ -442,9 +442,7 @@ struct SettingsView: View {
         shareTask = Task {
             defer { isLoadingShare = false }
             do {
-                try await CloudKitSharingService.shared.hardResetSharing(
-                    persistentContainer: syncMonitor.persistentContainer
-                )
+                try await CloudKitSharingService.shared.deleteShare()
             } catch is CancellationError {
                 // User tapped Cancel
             } catch {
@@ -486,14 +484,14 @@ struct SettingsView: View {
         }
     }
 
-    /// Cleans up server-side sharing state without touching local stores.
+    /// Deletes the server-side zone share without touching local stores.
     private func performCloudReset() {
         isResettingLocalState = true
 
         Task {
             defer { isResettingLocalState = false }
             do {
-                try await CloudKitSharingService.shared.cleanupServerSharingState()
+                try await CloudKitSharingService.shared.deleteShare()
                 resetSuccessMessage = "CloudKit sharing state has been reset. You can now create a fresh share."
                 showResetSuccessAlert = true
             } catch {
@@ -503,9 +501,8 @@ struct SettingsView: View {
         }
     }
 
-    /// Nuclear option: cleans up CloudKit ghost zones, resets local stores,
-    /// rebuilds container, then attempts the share flow. Useful when the sync
-    /// pipeline is completely stuck due to orphaned share zones.
+    /// Full reset: deletes the server-side share, resets local stores,
+    /// rebuilds container, then attempts the share flow.
     ///
     /// During the local reset, PersistenceController.isResetting removes ALL
     /// views from the hierarchy at the app root level — this prevents stale
@@ -522,10 +519,9 @@ struct SettingsView: View {
             }
 
             do {
-                // 1. Clean up server-side first — delete orphaned share zones
-                //    that cause "Zone Not Found" errors and share hangs.
-                Logger.cloudkit.info("Force clean share: step 1 — cleaning server-side sharing state")
-                try await CloudKitSharingService.shared.cleanupServerSharingState()
+                // 1. Delete the existing zone share (if any).
+                Logger.cloudkit.info("Force clean share: step 1 — deleting server-side share")
+                try await CloudKitSharingService.shared.deleteShare()
                 Logger.cloudkit.info("Force clean share: step 1 — server cleanup complete")
 
                 // 2. Full local reset (handles SyncMonitor lifecycle).
