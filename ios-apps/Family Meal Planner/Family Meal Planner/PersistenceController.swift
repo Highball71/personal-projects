@@ -38,7 +38,7 @@ final class PersistenceController: ObservableObject {
     /// from the hierarchy during the reset window, preventing stale-object
     /// crashes (CDRecipe, CDHouseholdMember, etc. from the old container).
     @Published private(set) var isResetting = false
-
+    private var hasPerformedReset = false
     /// Direct access to the CKContainer for share acceptance.
     let ckContainer: CKContainer
 
@@ -717,6 +717,12 @@ final class PersistenceController: ObservableObject {
     /// - SyncMonitor is reattached to the new container automatically
     /// - A default household is recreated
     func resetLocalStoresAndRebuildContainer(syncMonitor: SyncMonitor? = nil) async throws {
+        guard !hasPerformedReset else {
+            logger.warning("resetLocalStores: already performed, skipping")
+            return
+        }
+
+        hasPerformedReset = true
         logger.info("resetLocalStores: starting tear-down")
 
         // 0. Signal that a reset is in progress.
