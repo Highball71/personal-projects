@@ -78,20 +78,11 @@ final class SyncMonitor: @unchecked Sendable {
         persistentContainer = container
         startCloudKitEventMonitoring()
 
-        #if DEBUG
-        // Push the complete CloudKit schema from the new container.
-        let logger = Logger.cloudkit
-        Task.detached(priority: .background) {
-            do {
-                try container.initializeCloudKitSchema(options: [])
-                logger.info("initializeCloudKitSchema: Development schema updated (after attach)")
-            } catch {
-                logger.warning(
-                    "initializeCloudKitSchema failed: \(error.localizedDescription, privacy: .public)"
-                )
-            }
-        }
-        #endif
+        // Schema initialization moved to PersistenceController.runSchemaInitialization()
+        // which uses a private-only throwaway container. Do NOT call
+        // initializeCloudKitSchema on the production container — it has a
+        // .shared store, and the method tries to create the Core Data zone
+        // in the shared database, which is illegal.
     }
 
     /// Removes the CloudKit event observer and clears the container reference.
@@ -137,10 +128,20 @@ final class SyncMonitor: @unchecked Sendable {
                self?.persistentContainer == nil {
                 self?.persistentContainer = container
 
-                // One-time launch cleanup: clear any stale applicationVersion from the
-                // live CKShare in CloudKit.
-                Task {
-                    _ = await CloudKitSharingService.shared.existingShare(using: container)
+                // One-time launch cleanup: clear any stale applicationVersion from
+                // the existing household share (if any).
+                Task { @MainActor in
+                    let request = CDHousehold.fetchRequest()
+                    request.fetchLimit = 1
+                    if let household = try? container.viewContext.fetch(request).first,
+                       let share = CloudKitSharingService.shared.existingShare(
+                           for: household, container: container
+                       ) {
+                        await CloudKitSharingService.shared.clearApplicationVersion(
+                            from: share,
+                            using: CKContainer(identifier: CloudKitSharingService.containerIdentifier)
+                        )
+                    }
                 }
             }
 

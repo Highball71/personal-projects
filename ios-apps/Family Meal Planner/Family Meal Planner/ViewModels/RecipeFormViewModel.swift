@@ -99,6 +99,11 @@ final class RecipeFormViewModel {
             recipe.sourceDetail = sourceDetail.isEmpty ? nil : sourceDetail
             recipe.addedByName = addedBy
 
+            // Link to the default household so it's included in the share.
+            let householdRequest = CDHousehold.fetchRequest()
+            householdRequest.fetchLimit = 1
+            recipe.household = (try? context.fetch(householdRequest))?.first
+
             // Add ingredients
             for data in validIngredients {
                 let ingredient = CDIngredient(context: context)

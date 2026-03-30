@@ -18,6 +18,11 @@ struct SettingsView: View {
     @EnvironmentObject private var persistence: PersistenceController
 
     @FetchRequest(
+        entity: CDHousehold.entity(),
+        sortDescriptors: []
+    ) private var households: FetchedResults<CDHousehold>
+
+    @FetchRequest(
         entity: CDHouseholdMember.entity(),
         sortDescriptors: [NSSortDescriptor(keyPath: \CDHouseholdMember.name, ascending: true)]
     ) private var members: FetchedResults<CDHouseholdMember>
@@ -354,15 +359,7 @@ struct SettingsView: View {
         #endif
     }
 
-    /// Runs the actual share flow using the new startShareFlow(from:) entry point.
-    ///
-    /// Container resolution priority:
-    /// 1. SyncMonitor's captured container (if available and .synced)
-    /// 2. PersistenceController's container directly (always current)
-    ///
-    /// We do NOT gate on SyncMonitor.syncState == .synced because that only
-    /// reflects the last completed event — it doesn't mean the pipeline is idle.
-    /// Instead, we proceed with the best available container.
+    /// Runs the actual share flow using object-level sharing on CDHousehold.
     private func executeShareFlow() {
         isLoadingShare = true
 
@@ -374,44 +371,23 @@ struct SettingsView: View {
                 return
             }
 
-            // Resolve the best available container.
-            // Prefer SyncMonitor's (it's been validated by CloudKit events),
-            // but fall back to PersistenceController's (always the current one).
-            let targetContainer: NSPersistentCloudKitContainer
+            guard let household = households.first else {
+                shareErrorMessage = CloudKitSharingError.noHouseholdToShare.localizedDescription
+                showingShareError = true
+                return
+            }
 
-            if let monitored = syncMonitor.persistentContainer {
-                // Verify it's the SAME container as PersistenceController's.
-                // After a rebuild they could differ if SyncMonitor hasn't reattached.
-                if monitored === persistence.container {
-                    targetContainer = monitored
-                    Logger.cloudkit.info("executeShareFlow: using SyncMonitor container (matches PersistenceController)")
-                } else {
-                    Logger.cloudkit.warning("executeShareFlow: SyncMonitor container is STALE — using PersistenceController's current container")
-                    targetContainer = persistence.container
-                    // Fix the stale reference.
-                    syncMonitor.attach(to: targetContainer)
-                }
-            } else {
-                // SyncMonitor hasn't captured a container yet.
-                // Wait briefly for a sync event, then use PersistenceController's directly.
-                Logger.cloudkit.info("executeShareFlow: SyncMonitor has no container — waiting briefly")
-                for _ in 0..<10 {
-                    guard !Task.isCancelled else { return }
-                    try? await Task.sleep(for: .milliseconds(500))
-                    if syncMonitor.persistentContainer != nil { break }
-                }
+            let targetContainer = persistence.container
 
-                if let monitored = syncMonitor.persistentContainer {
-                    targetContainer = monitored
-                } else {
-                    Logger.cloudkit.warning("executeShareFlow: SyncMonitor still nil — using PersistenceController container directly")
-                    targetContainer = persistence.container
-                }
+            // Fix stale SyncMonitor reference if needed.
+            if let monitored = syncMonitor.persistentContainer, monitored !== targetContainer {
+                syncMonitor.attach(to: targetContainer)
             }
 
             do {
                 let (share, container) = try await CloudKitSharingService.shared.startShareFlow(
-                    from: targetContainer,
+                    household: household,
+                    container: targetContainer,
                     syncMonitor: syncMonitor
                 )
                 guard !Task.isCancelled else { return }
@@ -441,8 +417,11 @@ struct SettingsView: View {
         isLoadingShare = true
         shareTask = Task {
             defer { isLoadingShare = false }
+            guard let household = households.first else { return }
             do {
-                try await CloudKitSharingService.shared.deleteShare()
+                try await CloudKitSharingService.shared.deleteShare(
+                    for: household, container: persistence.container
+                )
             } catch is CancellationError {
                 // User tapped Cancel
             } catch {
@@ -484,14 +463,20 @@ struct SettingsView: View {
         }
     }
 
-    /// Deletes the server-side zone share without touching local stores.
+    /// Deletes the server-side share without touching local stores.
     private func performCloudReset() {
         isResettingLocalState = true
 
         Task {
             defer { isResettingLocalState = false }
+            guard let household = households.first else {
+                isResettingLocalState = false
+                return
+            }
             do {
-                try await CloudKitSharingService.shared.deleteShare()
+                try await CloudKitSharingService.shared.deleteShare(
+                    for: household, container: persistence.container
+                )
                 resetSuccessMessage = "CloudKit sharing state has been reset. You can now create a fresh share."
                 showResetSuccessAlert = true
             } catch {
@@ -519,13 +504,16 @@ struct SettingsView: View {
             }
 
             do {
-                // 1. Delete the existing zone share (if any).
+                // 1. Delete the existing share (if any).
                 Logger.cloudkit.info("Force clean share: step 1 — deleting server-side share")
-                try await CloudKitSharingService.shared.deleteShare()
+                if let household = households.first {
+                    try await CloudKitSharingService.shared.deleteShare(
+                        for: household, container: persistence.container
+                    )
+                }
                 Logger.cloudkit.info("Force clean share: step 1 — server cleanup complete")
 
                 // 2. Full local reset (handles SyncMonitor lifecycle).
-                //    This clears the container's internal knowledge of the old zones.
                 Logger.cloudkit.info("Force clean share: step 2 — resetting local stores")
                 try await persistence.resetLocalStoresAndRebuildContainer(syncMonitor: syncMonitor)
                 Logger.cloudkit.info("Force clean share: step 2 — local reset complete")
@@ -547,13 +535,20 @@ struct SettingsView: View {
 
                 guard !Task.isCancelled else { return }
 
-                // 5. Use the NEW container directly.
+                // 5. Fetch the fresh household from the new container.
                 let currentContainer = persistence.container
+                let request = CDHousehold.fetchRequest()
+                request.fetchLimit = 1
+                guard let household = try? currentContainer.viewContext.fetch(request).first else {
+                    throw CloudKitSharingError.noHouseholdToShare
+                }
+
                 Logger.cloudkit.info("Force clean share: step 4 — starting share flow")
 
                 // 6. Run the share flow.
                 let (share, container) = try await CloudKitSharingService.shared.startShareFlow(
-                    from: currentContainer,
+                    household: household,
+                    container: currentContainer,
                     syncMonitor: syncMonitor
                 )
                 guard !Task.isCancelled else { return }

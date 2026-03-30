@@ -165,6 +165,10 @@ struct GroceryListView: View {
         }
 
         // Insert fresh items, restoring checked state where applicable
+        let householdRequest = CDHousehold.fetchRequest()
+        householdRequest.fetchLimit = 1
+        let household = (try? viewContext.fetch(householdRequest))?.first
+
         for (key, value) in combined {
             let item = CDGroceryItem(context: viewContext)
             item.id = UUID()
@@ -174,6 +178,7 @@ struct GroceryListView: View {
             item.unitRaw = value.unit.rawValue
             item.weekStart = weekStart
             item.isChecked = previouslyChecked.contains(key)
+            item.household = household
         }
 
         try? viewContext.save()

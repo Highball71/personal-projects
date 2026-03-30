@@ -466,8 +466,30 @@ final class PersistenceController: ObservableObject {
         householdToMembers.inverseRelationship = memberToHousehold
         memberToHousehold.inverseRelationship = householdToMembers
 
+        // CDHousehold -> CDGroceryItem (to-many, cascade)
+        let householdToGroceryItems = NSRelationshipDescription()
+        householdToGroceryItems.name = "groceryItems"
+        householdToGroceryItems.destinationEntity = groceryItemEntity
+        householdToGroceryItems.isOptional = true
+        householdToGroceryItems.minCount = 0
+        householdToGroceryItems.maxCount = 0  // to-many
+        householdToGroceryItems.deleteRule = .cascadeDeleteRule
+
+        // CDGroceryItem -> CDHousehold (to-one, nullify)
+        let groceryItemToHousehold = NSRelationshipDescription()
+        groceryItemToHousehold.name = "household"
+        groceryItemToHousehold.destinationEntity = householdEntity
+        groceryItemToHousehold.isOptional = true
+        groceryItemToHousehold.minCount = 0
+        groceryItemToHousehold.maxCount = 1  // to-one
+        groceryItemToHousehold.deleteRule = .nullifyDeleteRule
+
+        // Wire up household <-> groceryItems inverse.
+        householdToGroceryItems.inverseRelationship = groceryItemToHousehold
+        groceryItemToHousehold.inverseRelationship = householdToGroceryItems
+
         // -- Set entity properties ---
-        householdEntity.properties = [householdID, householdName, householdToRecipes, householdToMembers]
+        householdEntity.properties = [householdID, householdName, householdToRecipes, householdToMembers, householdToGroceryItems]
 
         ingredientEntity.properties = [
             ingredientID, ingredientName, ingredientQuantity, ingredientUnitRaw,
@@ -481,7 +503,8 @@ final class PersistenceController: ObservableObject {
 
         groceryItemEntity.properties = [
             groceryItemID, groceryItemItemID, groceryItemName, groceryItemTotalQuantity,
-            groceryItemUnitRaw, groceryItemIsChecked, groceryItemWeekStart
+            groceryItemUnitRaw, groceryItemIsChecked, groceryItemWeekStart,
+            groceryItemToHousehold
         ]
 
         householdMemberEntity.properties = [
@@ -639,17 +662,37 @@ final class PersistenceController: ObservableObject {
     }
 
     /// Pushes the CloudKit schema in DEBUG builds.
+    ///
+    /// Uses a temporary private-only container because
+    /// `initializeCloudKitSchema` must NOT be called on a container
+    /// that has a `.shared`-scoped store — it would try to create the
+    /// Core Data default zone in the shared database, which is illegal.
     private func runSchemaInitialization(_ container: NSPersistentCloudKitContainer) {
         #if DEBUG
-        let containerForSchema = container
+        let model = managedObjectModel
+        let containerID = Self.cloudKitContainerID
+        let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "", category: "Persistence")
         Task.detached(priority: .background) {
+            let schemaContainer = NSPersistentCloudKitContainer(
+                name: "FamilyMealPlanner-SchemaInit",
+                managedObjectModel: model
+            )
+            guard let desc = schemaContainer.persistentStoreDescriptions.first else { return }
+            desc.url = URL(fileURLWithPath: "/dev/null")
+            let opts = NSPersistentCloudKitContainerOptions(
+                containerIdentifier: containerID
+            )
+            opts.databaseScope = .private
+            desc.cloudKitContainerOptions = opts
+            schemaContainer.persistentStoreDescriptions = [desc]
+            schemaContainer.loadPersistentStores { _, error in
+                if let error { logger.warning("Schema-init store load: \(error.localizedDescription)") }
+            }
             do {
-                try containerForSchema.initializeCloudKitSchema(options: [])
-                Logger(subsystem: Bundle.main.bundleIdentifier ?? "", category: "Persistence")
-                    .info("initializeCloudKitSchema: Development schema updated")
+                try schemaContainer.initializeCloudKitSchema(options: [])
+                logger.info("initializeCloudKitSchema: Development schema updated")
             } catch {
-                Logger(subsystem: Bundle.main.bundleIdentifier ?? "", category: "Persistence")
-                    .warning("initializeCloudKitSchema failed: \(error.localizedDescription)")
+                logger.warning("initializeCloudKitSchema failed: \(error.localizedDescription)")
             }
         }
         #endif
@@ -766,8 +809,59 @@ final class PersistenceController: ObservableObject {
         let household = CDHousehold(context: container.viewContext)
         household.id = UUID()
         household.name = "My Household"
+
+        if let store = privateStore {
+            container.viewContext.assign(household, to: store)
+        }
+
         try? container.viewContext.save()
-        logger.info("ensureDefaultHouseholdExists: created default household")
+        logger.info("Created default household in PRIVATE store")
+    }
+
+    // MARK: - Backfill Orphaned Objects
+
+    /// One-time repair: assigns any CDRecipe or CDGroceryItem with a nil
+    /// household to the default household so they become reachable from
+    /// the shared object graph.
+    ///
+    /// This covers data created before the household relationships were
+    /// consistently wired at creation time. Safe to call on every launch —
+    /// it's a no-op when nothing is orphaned.
+    func backfillOrphanedObjects() {
+        let ctx = container.viewContext
+
+        // Get (or create) the default household.
+        let householdRequest = CDHousehold.fetchRequest()
+        householdRequest.fetchLimit = 1
+        guard let household = (try? ctx.fetch(householdRequest))?.first else {
+            logger.info("backfill: no household found, skipping")
+            return
+        }
+
+        // Orphaned recipes (household == nil).
+        let recipeRequest = CDRecipe.fetchRequest()
+        recipeRequest.predicate = NSPredicate(format: "household == nil")
+        let orphanedRecipes = (try? ctx.fetch(recipeRequest)) ?? []
+
+        for recipe in orphanedRecipes {
+            recipe.household = household
+        }
+
+        // Orphaned grocery items (household == nil).
+        let groceryRequest = CDGroceryItem.fetchRequest()
+        groceryRequest.predicate = NSPredicate(format: "household == nil")
+        let orphanedGroceries = (try? ctx.fetch(groceryRequest)) ?? []
+
+        for item in orphanedGroceries {
+            item.household = household
+        }
+
+        if orphanedRecipes.isEmpty && orphanedGroceries.isEmpty {
+            return
+        }
+
+        logger.info("backfill: linked \(orphanedRecipes.count) recipes and \(orphanedGroceries.count) grocery items to household")
+        try? ctx.save()
     }
 
     // MARK: - Helpers

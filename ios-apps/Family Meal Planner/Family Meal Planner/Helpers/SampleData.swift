@@ -18,10 +18,16 @@ enum SampleData {
         let count = (try? context.count(for: request)) ?? 0
         guard count == 0 else { return }
 
+        // Fetch the default household so sample recipes are linked.
+        let householdRequest = CDHousehold.fetchRequest()
+        householdRequest.fetchLimit = 1
+        let household = (try? context.fetch(householdRequest))?.first
+
         // MARK: - Sample Recipe 1: Spaghetti Bolognese
 
         let spaghetti = CDRecipe(context: context)
         spaghetti.id = UUID()
+        spaghetti.household = household
         spaghetti.name = "Spaghetti Bolognese"
         spaghetti.categoryRaw = RecipeCategory.dinner.rawValue
         spaghetti.servings = 4
@@ -60,6 +66,7 @@ enum SampleData {
 
         let eggs = CDRecipe(context: context)
         eggs.id = UUID()
+        eggs.household = household
         eggs.name = "Scrambled Eggs"
         eggs.categoryRaw = RecipeCategory.breakfast.rawValue
         eggs.servings = 2
@@ -93,6 +100,7 @@ enum SampleData {
 
         let salad = CDRecipe(context: context)
         salad.id = UUID()
+        salad.household = household
         salad.name = "Chicken Caesar Salad"
         salad.categoryRaw = RecipeCategory.lunch.rawValue
         salad.servings = 2

@@ -36,6 +36,9 @@ extension CDGroceryItem {
 
     /// Week start date for this grocery list.
     @NSManaged public var weekStart: Date
+
+    /// The household this grocery item belongs to.
+    @NSManaged public var household: CDHousehold?
 }
 
 // MARK: - Computed Properties

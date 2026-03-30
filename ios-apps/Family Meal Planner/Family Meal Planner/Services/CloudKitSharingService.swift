@@ -3,9 +3,10 @@
 //  Family Meal Planner
 //
 //  THE single source of truth for CloudKit sharing.
-//  Uses ZONE-LEVEL sharing: one CKShare covers the entire private
-//  CloudKit zone, so every entity syncs to share participants
-//  automatically — no need to wire relationship graphs.
+//  Uses OBJECT-LEVEL sharing: a CDHousehold is the root shared object.
+//  All entities reachable via relationships (recipes, ingredients,
+//  meal plans, ratings, suggestions, members, grocery items) are
+//  automatically included in the share by Core Data.
 //
 
 import CloudKit
@@ -14,26 +15,24 @@ import os.log
 
 /// Manages CloudKit sharing for the household recipe library.
 ///
-/// Instead of sharing a specific CDHousehold object (which requires every entity
-/// to be reachable via relationships), we share the ENTIRE default private zone.
-/// This means all records — recipes, ingredients, meal plans, grocery items,
-/// household members — are automatically included in the share.
+/// Shares a single CDHousehold object using NSPersistentCloudKitContainer's
+/// object-sharing API. Because every entity is reachable from CDHousehold
+/// via relationships, Core Data automatically includes the full object graph
+/// in the share.
 ///
 /// Flow:
-/// 1. Head Cook taps "Share" -> `startShareFlow(from:)`
-/// 2. If no zone-level CKShare exists, one is created via the CloudKit API
-/// 3. UICloudSharingController presents the system sharing UI
-/// 4. Head Cook sends the share URL (e.g. via iMessage)
-/// 5. Recipient taps the link -> AppDelegate accepts it -> CloudKit syncs
+/// 1. Head Cook taps "Share" -> `startShareFlow(household:container:)`
+/// 2. If an existing CKShare is found for the household, reuse it
+/// 3. Otherwise create a new share via `container.share(_:to:completion:)`
+/// 4. UICloudSharingController presents the system sharing UI
+/// 5. Head Cook sends the share URL (e.g. via iMessage)
+/// 6. Recipient taps the link -> AppDelegate accepts it -> CloudKit syncs
 @MainActor
 final class CloudKitSharingService {
     static let shared = CloudKitSharingService()
 
     /// The CloudKit container identifier (matches entitlements).
     nonisolated static let containerIdentifier = "iCloud.com.highball71.FamilyMealPlanner"
-
-    /// The zone name Core Data uses for its private database records.
-    private static let coreDataZoneName = "com.apple.coredata.cloudkit.zone"
 
     private let ckContainer: CKContainer
     private let logger = Logger(
@@ -58,32 +57,31 @@ final class CloudKitSharingService {
         }
     }
 
-    // MARK: - Single Entry Point
+    // MARK: - Object-Level Share Flow
 
-    /// The primary sharing entry point. Returns an existing zone-level share,
-    /// or creates a new one covering the entire Core Data private zone.
-    ///
-    /// This replaces the old object-level approach. Zone-level sharing means:
-    /// - Every entity is included automatically (no relationship graph needed)
-    /// - No ghost share zones (there's only one zone, not one per attempt)
-    /// - No need to find/fetch a CDHousehold root object
+    /// The primary sharing entry point. Returns an existing share for the
+    /// household, or creates a new one using Core Data's object-sharing API.
     ///
     /// - Parameters:
-    ///   - persistentContainer: The NSPersistentCloudKitContainer.
+    ///   - household: The CDHousehold root object to share.
+    ///   - container: The NSPersistentCloudKitContainer that owns the store.
     ///   - syncMonitor: Optional SyncMonitor to check if at least one export
-    ///     has completed. If provided and no export has completed yet, this
-    ///     method waits up to 15 seconds for the initial export cycle.
+    ///     has completed. Objects must be exported before they can be shared.
     /// - Returns: (CKShare, CKContainer) ready for UICloudSharingController.
+ 
     func startShareFlow(
-        from persistentContainer: NSPersistentCloudKitContainer,
+        household: CDHousehold,
+        container: NSPersistentCloudKitContainer,
         syncMonitor: SyncMonitor? = nil
     ) async throws -> (CKShare, CKContainer) {
+        logger.info("🚀 startShareFlow: entered")
         guard await isCloudKitAvailable() else {
+            
             throw CloudKitSharingError.accountNotAvailable
         }
-
-        // Step 1: Wait for at least one successful export cycle.
-        // Objects must be exported to CloudKit before the zone can be shared.
+        logger.info("🔍 Checking for existing share")
+        // Wait for at least one successful export cycle.
+        // Objects must be exported to CloudKit before they can be shared.
         if let syncMonitor, !syncMonitor.hasCompletedExport {
             logger.info("startShareFlow: waiting for initial export to complete")
             for i in 0..<30 {
@@ -99,122 +97,92 @@ final class CloudKitSharingService {
                 throw CloudKitSharingError.exportNotReady
             }
         }
-
-        // Step 2: Check for an existing zone-level share.
-        if let existing = try await fetchExistingZoneShare() {
-            logger.info("startShareFlow: reusing existing zone share (URL: \(existing.url?.absoluteString ?? "none", privacy: .public))")
-            await clearApplicationVersion(from: existing, using: ckContainer)
-            return (existing, ckContainer)
-        }
-
-        // Step 3: Create a new zone-level share.
-        logger.info("startShareFlow: creating new zone-level share")
-        let zoneID = CKRecordZone.ID(
-            zoneName: Self.coreDataZoneName,
-            ownerName: CKCurrentUserDefaultName
-        )
-        let share = CKShare(recordZoneID: zoneID)
-        share[CKShare.SystemFieldKey.title] = "Family Meal Planner" as CKRecordValue
-
-        // Save the share to CloudKit with a 30-second timeout.
-        let savedShare: CKShare = try await withThrowingTaskGroup(of: CKShare.self) { group in
-            group.addTask { [logger, ckContainer] in
-                logger.info("startShareFlow: saving zone share to CloudKit")
-                let db = ckContainer.privateCloudDatabase
-                let (saveResults, _) = try await db.modifyRecords(
-                    saving: [share], deleting: []
-                )
-                // Extract the saved CKShare from the results.
-                guard let savedResult = saveResults[share.recordID],
-                      let saved = try? savedResult.get() as? CKShare else {
-                    throw CloudKitSharingError.shareFailed
-                }
-                logger.info("startShareFlow: zone share saved (URL: \(saved.url?.absoluteString ?? "none", privacy: .public))")
-                return saved
+        logger.info("🔍 Checking for existing share")
+        
+        // Check for an existing share on this household.
+        // TEMP: disable share reuse (force clean share)
+        logger.info("🚫 Skipping existing share — forcing new share")
+        // Create a new share for the household object.
+        logger.info("startShareFlow: creating new object-level share for household")
+        logger.info("📡 Calling createShare()")
+        
+        let result = try await withThrowingTaskGroup(of: (CKShare, NSPersistentContainer).self) { group in
+            group.addTask {
+                try await self.createShare(for: household, container: container)
             }
-
-            group.addTask { [logger] in
-                try await Task.sleep(for: .seconds(30))
-                logger.error("startShareFlow: TIMEOUT after 30s")
+            
+            group.addTask {
+                try await Task.sleep(nanoseconds: 15_000_000_000)
+                self.logger.error("⏰ Share creation timed out after 15s")
                 throw CloudKitSharingError.timeout
             }
-
+            
             let result = try await group.next()!
             group.cancelAll()
             return result
         }
-
-        await clearApplicationVersion(from: savedShare, using: ckContainer)
-        return (savedShare, ckContainer)
+        
+        let (share, _) = result
+        share[CKShare.SystemFieldKey.title] = "Family Meal Planner" as CKRecordValue
+        await clearApplicationVersion(from: share, using: self.ckContainer)
+        return (share, self.ckContainer)
     }
 
-    // MARK: - Existing Share
+    // MARK: - Existing Share Lookup
 
-    /// Returns the active zone-level CKShare, or nil if none exists.
+    /// Returns the active CKShare for a household, or nil if none exists.
     ///
-    /// Checks the container's local metadata first (fast), then falls back
-    /// to querying CloudKit directly.
-    func existingShare(using persistentContainer: NSPersistentCloudKitContainer) async -> CKShare? {
-        // Try local metadata first.
-        if let shares = try? persistentContainer.fetchShares(in: nil),
-           let share = shares.first {
-            if share["applicationVersion"] as? String != nil {
-                await clearApplicationVersion(from: share, using: ckContainer)
-            }
-            return share
-        }
-        // Fall back to direct CloudKit query.
-        return try? await fetchExistingZoneShare()
-    }
-
-    /// Fetches the existing zone-level CKShare directly from CloudKit.
-    /// Returns nil if no share exists in the Core Data zone.
-    ///
-    /// Uses a direct record fetch with `CKRecordNameZoneWideShare` instead
-    /// of a CKQuery. CKQuery requires the `cloudkit.share` type to be marked
-    /// indexable in the CloudKit schema — which it isn't by default — causing
-    /// "type is not marked indexable" at runtime.
-    func fetchExistingZoneShare() async throws -> CKShare? {
-        let db = ckContainer.privateCloudDatabase
-        let zoneID = CKRecordZone.ID(
-            zoneName: Self.coreDataZoneName,
-            ownerName: CKCurrentUserDefaultName
-        )
-
-        // Zone-level shares use a well-known record name.
-        let shareRecordID = CKRecord.ID(
-            recordName: CKRecordNameZoneWideShare,
-            zoneID: zoneID
-        )
-
-        do {
-            let record = try await db.record(for: shareRecordID)
-            guard let share = record as? CKShare else { return nil }
-            if share["applicationVersion"] as? String != nil {
-                await clearApplicationVersion(from: share, using: ckContainer)
-            }
-            return share
-        } catch let error as CKError where error.code == .unknownItem {
-            // No zone-level share exists yet.
+    /// Uses Core Data's `fetchShares(matching:)` keyed by the household's
+    /// objectID to find the share metadata locally.
+    func existingShare(
+        for household: CDHousehold,
+        container: NSPersistentCloudKitContainer
+    ) -> CKShare? {
+        guard let shares = try? container.fetchShares(matching: [household.objectID]),
+              let share = shares[household.objectID] else {
             return nil
         }
+        return share
     }
 
     // MARK: - Delete Share
 
-    /// Deletes the zone-level share from CloudKit. Does NOT delete the zone
-    /// or any data — just removes the sharing relationship.
-    func deleteShare() async throws {
-        guard let share = try await fetchExistingZoneShare() else {
+    /// Deletes the share for the given household.
+    func deleteShare(
+        for household: CDHousehold,
+        container: NSPersistentCloudKitContainer
+    ) async throws {
+        guard let share = existingShare(for: household, container: container) else {
             logger.info("deleteShare: no share to delete")
             return
         }
         let db = ckContainer.privateCloudDatabase
         _ = try await db.modifyRecords(saving: [], deleting: [share.recordID])
-        logger.info("deleteShare: zone share deleted")
+        logger.info("deleteShare: household share deleted")
     }
 
     // MARK: - Private helpers
+
+    /// Creates a new CKShare for the household using Core Data's sharing API.
+    private func createShare(
+        for household: CDHousehold,
+        container: NSPersistentCloudKitContainer
+    ) async throws -> (CKShare, NSPersistentContainer) {
+        logger.info("📡 createShare: started")
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(CKShare, NSPersistentCloudKitContainer), Error>) in            container.share([household], to: nil) { objectIDs, share, ckContainer, error in
+                if let error {
+                    self.logger.error("❌ createShare failed: \(error.localizedDescription)")
+                    continuation.resume(throwing: error)
+                } else if let share {
+                    self.logger.info("✅ createShare success")
+                    continuation.resume(returning: (share, container))
+                } else {
+                    self.logger.error("❌ createShare: no share returned")
+                    continuation.resume(throwing: CloudKitSharingError.shareFailed)
+                }
+            }
+        }
+    }
 
     /// Clears the `applicationVersion` field from a CKShare and re-saves it.
     /// TestFlight builds set this, which can block share acceptance for

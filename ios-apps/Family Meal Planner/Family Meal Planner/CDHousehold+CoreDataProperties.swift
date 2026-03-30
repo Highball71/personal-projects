@@ -28,6 +28,9 @@ extension CDHousehold {
 
     /// Members of this household.
     @NSManaged public var members: NSSet?
+
+    /// Grocery items belonging to this household.
+    @NSManaged public var groceryItems: NSSet?
 }
 
 // MARK: - Relationship helpers
@@ -56,6 +59,18 @@ extension CDHousehold {
 
     @objc(removeMembers:)
     @NSManaged public func removeFromMembers(_ values: NSSet)
+
+    @objc(addGroceryItemsObject:)
+    @NSManaged public func addToGroceryItems(_ value: CDGroceryItem)
+
+    @objc(removeGroceryItemsObject:)
+    @NSManaged public func removeFromGroceryItems(_ value: CDGroceryItem)
+
+    @objc(addGroceryItems:)
+    @NSManaged public func addToGroceryItems(_ values: NSSet)
+
+    @objc(removeGroceryItems:)
+    @NSManaged public func removeFromGroceryItems(_ values: NSSet)
 }
 
 extension CDHousehold: Identifiable {}

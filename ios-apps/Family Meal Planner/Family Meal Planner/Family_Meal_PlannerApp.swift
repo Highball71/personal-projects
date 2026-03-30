@@ -78,6 +78,8 @@ struct Family_Meal_PlannerApp: App {
                     .onAppear {
                         // Ensure a default household exists on first launch.
                         persistence.ensureDefaultHouseholdExists()
+                        // Link any orphaned recipes/grocery items to the household.
+                        persistence.backfillOrphanedObjects()
                     }
             }
         }
