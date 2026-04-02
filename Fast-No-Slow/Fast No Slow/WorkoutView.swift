@@ -10,7 +10,12 @@ struct WorkoutView: View {
     @State private var heartScale: CGFloat = 1.0
 
     // MARK: - Color System
-    // emerald/green = in zone, red = too high, orange = drifting, slate = neutral
+    // green = in zone, yellow = drifting high, red = above zone, blue = below zone
+
+    private var isDrifting: Bool {
+        workoutManager.coachingState == .hrDriftingHigh
+    }
+
     private var ringColor: Color {
         switch workoutManager.zoneStatus {
         case .inZone:    return .green
@@ -20,10 +25,16 @@ struct WorkoutView: View {
     }
 
     private var bpmColor: Color {
-        workoutManager.isInZone ? .green : .white
+        if isDrifting { return .yellow }
+        switch workoutManager.zoneStatus {
+        case .inZone:    return .green
+        case .aboveZone: return .red
+        case .belowZone: return .blue
+        }
     }
 
     private var bannerColor: Color {
+        if isDrifting { return .yellow }
         switch workoutManager.zoneStatus {
         case .belowZone: return .blue
         case .inZone:    return .green
@@ -32,6 +43,7 @@ struct WorkoutView: View {
     }
 
     private var bannerIcon: String {
+        if isDrifting { return "arrow.up.forward" }
         switch workoutManager.zoneStatus {
         case .belowZone: return "hare"
         case .inZone:    return "checkmark.circle.fill"
@@ -128,7 +140,7 @@ struct WorkoutView: View {
         return HStack(spacing: 8) {
             Image(systemName: paused ? "pause.fill" : bannerIcon)
                 .font(.title3)
-            Text(paused ? "PAUSED" : workoutManager.zoneStatus.rawValue)
+            Text(paused ? "PAUSED" : isDrifting ? "EASE UP" : workoutManager.zoneStatus.rawValue)
                 .font(.title3)
                 .fontWeight(.bold)
         }
@@ -137,6 +149,7 @@ struct WorkoutView: View {
         .padding(.vertical, 10)
         .background(paused ? Color.orange : bannerColor)
         .animation(.easeInOut(duration: 0.3), value: workoutManager.zoneStatus)
+        .animation(.easeInOut(duration: 0.3), value: workoutManager.coachingState)
         .animation(.easeInOut(duration: 0.3), value: workoutManager.isPaused)
     }
 
