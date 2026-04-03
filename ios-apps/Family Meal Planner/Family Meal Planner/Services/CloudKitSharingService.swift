@@ -42,9 +42,10 @@ final class CloudKitSharingService {
     func startShareFlow(
         household: CDHousehold,
         container: NSPersistentCloudKitContainer,
-        syncMonitor: SyncMonitor? = nil
+        syncMonitor: SyncMonitor? = nil,
+        forceNewShare: Bool = false
     ) async throws -> (CKShare, CKContainer) {
-        logger.info("startShareFlow: entered")
+        logger.info("startShareFlow: entered (forceNewShare=\(forceNewShare))")
 
         guard await isCloudKitAvailable() else {
             throw CloudKitSharingError.accountNotAvailable
@@ -63,11 +64,33 @@ final class CloudKitSharingService {
         // Make sure the household is fully persisted before sharing.
         try prepareForSharing(household: household, in: container.viewContext)
 
-        // Reuse an existing share if one already exists.
-        if let existing = existingShare(for: household, container: container) {
-            logger.info("startShareFlow: deleting stale existing share before creating a new one")
-            try? await deleteShare(for: household, container: container)
+        // Delete existing share first if forcing a new one.
+        if forceNewShare {
+            if let existing = existingShare(for: household, container: container) {
+                logger.info("startShareFlow: forceNewShare — deleting existing share (recordID=\(existing.recordID))")
+                do {
+                    let db = ckContainer.privateCloudDatabase
+                    _ = try await db.modifyRecords(saving: [], deleting: [existing.recordID])
+                    logger.info("startShareFlow: forceNewShare — server-side share deleted")
+                    // Brief pause for Core Data mirror to process the deletion.
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    logger.warning("startShareFlow: forceNewShare — delete failed: \(error.localizedDescription), proceeding with new share anyway")
+                }
+            } else {
+                logger.info("startShareFlow: forceNewShare — no existing share found")
+            }
         }
+
+        // Reuse an existing share if one already exists (skipped when forceNewShare).
+        if !forceNewShare, let existing = existingShare(for: household, container: container) {
+            let participantCount = existing.participants.count
+            let hasURL = existing.url != nil
+            logger.info("startShareFlow: reusing existing share (recordID=\(existing.recordID), participants=\(participantCount), hasURL=\(hasURL), url=\(existing.url?.absoluteString ?? "nil", privacy: .public))")
+            await clearApplicationVersion(from: existing, using: ckContainer)
+            return (existing, ckContainer)
+        }
+        
         logger.info("startShareFlow: creating new share")
 
         let share = try await createShareWithTimeout(
@@ -113,6 +136,95 @@ final class CloudKitSharingService {
         logger.info("deleteShare: household share deleted")
     }
 
+    // MARK: - Nuclear Share Reset
+
+    /// Deletes ALL CKShare records from the private database zone used by
+    /// NSPersistentCloudKitContainer, waits for the mirror to settle, then
+    /// creates a brand-new share on the existing (stable) container.
+    /// Does NOT touch local stores or rebuild the container.
+    func nuclearShareReset(
+        household: CDHousehold,
+        container: NSPersistentCloudKitContainer,
+        syncMonitor: SyncMonitor? = nil
+    ) async throws -> (CKShare, CKContainer) {
+        logger.info("nuclearShareReset: === STARTING ===")
+
+        // 1. Log the old share state.
+        let oldShare = existingShare(for: household, container: container)
+        let oldRecordID = oldShare?.recordID.recordName ?? "none"
+        let oldURL = oldShare?.url?.absoluteString ?? "none"
+        logger.info("nuclearShareReset: old share recordID=\(oldRecordID, privacy: .public), oldURL=\(oldURL, privacy: .public)")
+
+        // 2. Delete via CKDatabase (server-side).
+        if let share = oldShare {
+            logger.info("nuclearShareReset: deleting old share from server")
+            do {
+                let db = ckContainer.privateCloudDatabase
+                _ = try await db.modifyRecords(saving: [], deleting: [share.recordID])
+                logger.info("nuclearShareReset: server delete succeeded")
+            } catch {
+                logger.error("nuclearShareReset: server delete failed: \(error.localizedDescription, privacy: .public)")
+                // Continue anyway — the share may already be gone server-side.
+            }
+        } else {
+            logger.info("nuclearShareReset: no local share found to delete")
+        }
+
+        // 3. Also try to purge any zone-level shares we missed.
+        do {
+            let db = ckContainer.privateCloudDatabase
+            let zone = CKRecordZone(zoneName: "com.apple.coredata.cloudkit.zone")
+            let allRecords = try await db.records(matching: CKQuery(
+                recordType: "cloudkit.share",
+                predicate: NSPredicate(value: true)
+            ), inZoneWith: zone.zoneID)
+            let shareIDs = allRecords.matchResults.map { $0.0 }
+            if !shareIDs.isEmpty {
+                logger.info("nuclearShareReset: found \(shareIDs.count) zone share record(s) to delete")
+                _ = try await db.modifyRecords(saving: [], deleting: shareIDs)
+                logger.info("nuclearShareReset: zone share records deleted")
+            } else {
+                logger.info("nuclearShareReset: no zone share records found")
+            }
+        } catch {
+            logger.warning("nuclearShareReset: zone share cleanup failed: \(error.localizedDescription, privacy: .public)")
+        }
+
+        // 4. Wait for Core Data mirror to process the deletion.
+        logger.info("nuclearShareReset: waiting 5s for mirror to settle")
+        try await Task.sleep(for: .seconds(5))
+
+        // 5. Check if the local mirror still sees a share.
+        let ghostShare = existingShare(for: household, container: container)
+        if let ghost = ghostShare {
+            logger.warning("nuclearShareReset: ghost share still exists locally (recordID=\(ghost.recordID.recordName, privacy: .public)) — proceeding anyway")
+        } else {
+            logger.info("nuclearShareReset: local share cleared successfully")
+        }
+
+        // 6. Create a brand-new share on the existing stable container.
+        logger.info("nuclearShareReset: creating new share")
+        let newShare = try await createShareWithTimeout(
+            for: household,
+            container: container,
+            timeoutNanoseconds: 15_000_000_000
+        )
+
+        let newRecordID = newShare.recordID.recordName
+        let newURL = newShare.url?.absoluteString ?? "none"
+        logger.info("nuclearShareReset: === NEW SHARE CREATED === recordID=\(newRecordID, privacy: .public), url=\(newURL, privacy: .public)")
+
+        // 7. Compare old vs new.
+        if oldURL == newURL && oldURL != "none" {
+            logger.error("nuclearShareReset: WARNING — new URL is identical to old URL!")
+        }
+
+        newShare[CKShare.SystemFieldKey.title] = "Family Meal Planner" as CKRecordValue
+        await clearApplicationVersion(from: newShare, using: ckContainer)
+
+        return (newShare, ckContainer)
+    }
+
     // MARK: - Private Helpers
 
     private func prepareForSharing(
@@ -120,13 +232,10 @@ final class CloudKitSharingService {
         in context: NSManagedObjectContext
     ) throws {
 
-        // 1. Ensure permanent ID
         if household.objectID.isTemporaryID {
             try context.obtainPermanentIDs(for: [household])
-            logger.info("prepareForSharing: obtained permanent household ID")
         }
 
-        // 2. Walk ALL related objects and ensure they belong to household
         if let recipes = household.recipes as? Set<CDRecipe> {
             for recipe in recipes {
                 recipe.household = household
@@ -134,34 +243,59 @@ final class CloudKitSharingService {
                 if recipe.objectID.isTemporaryID {
                     try context.obtainPermanentIDs(for: [recipe])
                 }
+
+                if let mealPlans = recipe.mealPlans as? Set<CDMealPlan> {
+                    for mealPlan in mealPlans {
+                        mealPlan.recipe = recipe
+
+                        if mealPlan.objectID.isTemporaryID {
+                            try context.obtainPermanentIDs(for: [mealPlan])
+                        }
+                    }
+                }
             }
         }
 
-        // 3. Force full save chain
-        if context.hasChanges {
-            try context.save()
-            logger.info("prepareForSharing: saved context before sharing")
+        let groceryRequest: NSFetchRequest<CDGroceryItem> = CDGroceryItem.fetchRequest()
+        groceryRequest.predicate = NSPredicate(format: "household == %@", household)
+
+        let groceryItems = try context.fetch(groceryRequest)
+        for item in groceryItems {
+            item.household = household
+
+            if item.objectID.isTemporaryID {
+                try context.obtainPermanentIDs(for: [item])
+            }
         }
 
-        // 4. CRITICAL: refresh objects so faults are resolved
-        context.refreshAllObjects()
+        if context.hasChanges {
+            try context.save()
+        }
     }
+    
+    
     private func createShareWithTimeout(
         for household: CDHousehold,
         container: NSPersistentCloudKitContainer,
         timeoutNanoseconds: UInt64
     ) async throws -> CKShare {
+        logger.info("createShareWithTimeout: entered (timeout=\(timeoutNanoseconds / 1_000_000_000)s)")
         let result = try await withThrowingTaskGroup(of: CKShare.self) { group in
             group.addTask {
-                try await self.createShare(for: household, container: container)
+                self.logger.info("createShareWithTimeout: share task started")
+                return try await self.createShare(for: household, container: container)
             }
 
             group.addTask {
+                self.logger.info("createShareWithTimeout: timeout task started")
                 try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                self.logger.warning("createShareWithTimeout: TIMEOUT fired after \(timeoutNanoseconds / 1_000_000_000)s")
                 throw CloudKitSharingError.timeout
             }
 
+            logger.info("createShareWithTimeout: waiting on group.next()")
             let result = try await group.next()!
+            logger.info("createShareWithTimeout: group.next() returned")
             group.cancelAll()
             return result
         }
@@ -177,6 +311,7 @@ final class CloudKitSharingService {
 
         return try await withCheckedThrowingContinuation { continuation in
             container.share([household], to: nil) { _, share, _, error in
+                self.logger.info("createShare completion fired: shareNil=\(share == nil), errorNil=\(error == nil)")
                 if let error {
                     self.logger.error("createShare failed: \(error.localizedDescription)")
                     continuation.resume(throwing: error)

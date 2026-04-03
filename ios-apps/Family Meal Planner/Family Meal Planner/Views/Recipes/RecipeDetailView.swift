@@ -10,29 +10,169 @@ import CoreData
 
 /// Read-only detail view showing a recipe's info, ingredients, and instructions.
 /// Has an Edit button that opens AddEditRecipeView in edit mode.
+/// Primary action: "Add to Tonight" assigns the recipe to today's dinner.
 struct RecipeDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(MealPlanningStore.self) private var mealPlanningStore
     @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \CDHouseholdMember.name, ascending: true)]) private var members: FetchedResults<CDHouseholdMember>
+    // Kept for reactive isAlreadyTonight check — mutations go through the store
+    @FetchRequest(
+        entity: CDMealPlan.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CDMealPlan.date, ascending: true)]
+    ) private var allMealPlans: FetchedResults<CDMealPlan>
 
     let recipe: CDRecipe
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
+    @State private var showAddedConfirmation = false
+    @State private var showingMealPlanPicker = false
 
     // Device-local identity — matches the "You are" picker in Settings
     @AppStorage("currentUserName") private var currentUserName: String = ""
 
+    /// Tags derived from existing recipe data (no new Core Data fields needed)
+    private var tags: [String] {
+        var result: [String] = [recipe.category.rawValue]
+        let totalTime = Int(recipe.prepTimeMinutes) + Int(recipe.cookTimeMinutes)
+        if totalTime > 0 && totalTime <= 30 {
+            result.append("Quick")
+        }
+        return result
+    }
+
+    /// Whether this recipe is already assigned to tonight's dinner
+    private var isAlreadyTonight: Bool {
+        let today = DateHelper.stripTime(from: Date())
+        return allMealPlans.contains { plan in
+            DateHelper.stripTime(from: plan.date) == today
+                && plan.mealTypeRaw == MealType.dinner.rawValue
+                && plan.recipe == recipe
+        }
+    }
+
+    /// The meal plan entry for this recipe tomorrow, if any.
+    /// Used to offer "Move to Tonight" instead of "Add to Tonight".
+    private var tomorrowPlan: CDMealPlan? {
+        let today = DateHelper.stripTime(from: Date())
+        guard let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today) else {
+            return nil
+        }
+        return allMealPlans.first(where: {
+            DateHelper.stripTime(from: $0.date) == tomorrow && $0.recipe == recipe
+        })
+    }
+
+    /// Label for the primary action button — reflects current planning state.
+    private var tonightButtonLabel: String {
+        if isAlreadyTonight { return "Tonight's Dinner" }
+        if tomorrowPlan != nil { return "Move to Tonight" }
+        return "Add to Tonight"
+    }
+
+    /// A short status string if this recipe is planned for today or tomorrow.
+    /// Returns nil when not planned — the label is hidden entirely.
+    private var plannedStatus: String? {
+        let today = DateHelper.stripTime(from: Date())
+        guard let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today) else {
+            return nil
+        }
+
+        // Today — dinner first since it's the most prominent slot
+        let todayPlans = allMealPlans.filter {
+            DateHelper.stripTime(from: $0.date) == today && $0.recipe == recipe
+        }
+        if let dinner = todayPlans.first(where: { $0.mealType == .dinner }) {
+            _ = dinner // prioritize dinner
+            return "Planned for tonight"
+        }
+        if let other = todayPlans.first {
+            return "Planned for today's \(other.mealType.rawValue.lowercased())"
+        }
+
+        // Tomorrow
+        if let tomorrowPlan = allMealPlans.first(where: {
+            DateHelper.stripTime(from: $0.date) == tomorrow && $0.recipe == recipe
+        }) {
+            return "Planned for tomorrow's \(tomorrowPlan.mealType.rawValue.lowercased())"
+        }
+
+        return nil
+    }
+
     var body: some View {
         List {
-            Section("Details") {
-                LabeledContent("Category", value: recipe.category.rawValue)
-                LabeledContent("Servings", value: "\(recipe.servings)")
-                LabeledContent("Prep Time", value: "\(recipe.prepTimeMinutes) minutes")
-                if recipe.cookTimeMinutes > 0 {
-                    LabeledContent("Cook Time", value: "\(recipe.cookTimeMinutes) minutes")
+            // MARK: - Tags + planned status
+            Section {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(tags, id: \.self) { tag in
+                            Text(tag)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.fluffyAccent.opacity(0.15))
+                                .foregroundStyle(Color.fluffyAccent)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+
+                if let status = plannedStatus {
+                    Label(status, systemImage: "calendar")
+                        .font(.caption)
+                        .foregroundStyle(Color.fluffySecondary)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
                 }
             }
 
+            // MARK: - Actions
+            Section {
+                // Primary: Add/Move to Tonight
+                Button(action: addToTonight) {
+                    HStack {
+                        Spacer()
+                        Label(
+                            tonightButtonLabel,
+                            systemImage: isAlreadyTonight ? "checkmark.circle.fill" : "moon.stars"
+                        )
+                        .font(.headline)
+                        Spacer()
+                    }
+                    .padding(.vertical, 6)
+                }
+                .disabled(isAlreadyTonight)
+                .listRowBackground(isAlreadyTonight ? Color.fluffySecondary.opacity(0.2) : Color.fluffyAccent)
+                .foregroundStyle(isAlreadyTonight ? Color.fluffySecondary : .white)
+
+                // Secondary: Add to Meal Plan (pick date + meal type)
+                Button(action: { showingMealPlanPicker = true }) {
+                    HStack {
+                        Spacer()
+                        Label("Add to Meal Plan", systemImage: "calendar.badge.plus")
+                            .font(.subheadline)
+                        Spacer()
+                    }
+                    .padding(.vertical, 2)
+                }
+                .foregroundStyle(Color.fluffyAccent)
+                .listRowBackground(Color.fluffyCard)
+            }
+
+            // MARK: - Details
+            Section("Details") {
+                LabeledContent("Servings", value: "\(recipe.servings)")
+                LabeledContent("Prep Time", value: "\(recipe.prepTimeMinutes) min")
+                if recipe.cookTimeMinutes > 0 {
+                    LabeledContent("Cook Time", value: "\(recipe.cookTimeMinutes) min")
+                }
+            }
+
+            // MARK: - Ingredients
             Section("Ingredients") {
                 if recipe.ingredientsList.isEmpty {
                     Text("No ingredients added")
@@ -44,6 +184,7 @@ struct RecipeDetailView: View {
                 }
             }
 
+            // MARK: - Instructions
             if !recipe.instructions.isEmpty {
                 Section("Instructions") {
                     Text(recipe.instructions)
@@ -147,6 +288,9 @@ struct RecipeDetailView: View {
         .sheet(isPresented: $showingEditSheet) {
             AddEditRecipeView(recipeToEdit: recipe)
         }
+        .sheet(isPresented: $showingMealPlanPicker) {
+            MealPlanPickerSheet(recipe: recipe)
+        }
         .alert("Delete this recipe?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 viewContext.delete(recipe)
@@ -157,7 +301,40 @@ struct RecipeDetailView: View {
         } message: {
             Text("This can't be undone.")
         }
+        // Confirmation toast overlay
+        .overlay(alignment: .bottom) {
+            if showAddedConfirmation {
+                Label("Tonight: \(recipe.name)", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.bottom, 32)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: showAddedConfirmation)
     }
+
+    // MARK: - Add to Tonight
+
+    /// Assigns this recipe to today's dinner slot via the central store.
+    /// If the recipe was planned for tomorrow, clears that slot (a "move").
+    private func addToTonight() {
+        if let plan = tomorrowPlan {
+            mealPlanningStore.clearMealSlot(date: plan.date, mealType: plan.mealType)
+        }
+        mealPlanningStore.assignRecipeToTonight(recipe)
+
+        showAddedConfirmation = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            showAddedConfirmation = false
+        }
+    }
+
+    // MARK: - Source Attribution
 
     /// Build a subtle "From: ..." attribution string, or nil for manual recipes.
     private var sourceAttribution: String? {
@@ -165,16 +342,13 @@ struct RecipeDetailView: View {
 
         switch sourceType {
         case .photo:
-            // Photo scan — show cookbook name if Claude identified one
             if let detail = recipe.sourceDetail, !detail.isEmpty {
                 return "From: \(detail)"
             }
             return nil
         case .url:
-            // URL import or search — extract just the domain name
             if let detail = recipe.sourceDetail, !detail.isEmpty,
                let url = URL(string: detail), let host = url.host {
-                // Strip "www." prefix for cleaner display
                 let domain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
                 return "From: \(domain)"
             }
@@ -192,13 +366,14 @@ struct RecipeDetailView: View {
         }
     }
 
+    // MARK: - Ratings Helpers
+
     /// The name used for storing ratings — uses the device identity if set,
     /// or a fixed solo label when no household members exist.
     private var effectiveRaterName: String {
         if !currentUserName.isEmpty {
             return currentUserName
         }
-        // Solo mode: no household, use a fixed key so it persists
         return members.isEmpty ? "_solo" : ""
     }
 
@@ -215,7 +390,6 @@ struct RecipeDetailView: View {
         let name = effectiveRaterName
         guard !name.isEmpty else { return }
 
-        // Look for an existing rating from this person
         if let existing = recipe.ratingsList.first(where: {
             $0.raterName.lowercased() == name.lowercased()
         }) {
@@ -245,6 +419,50 @@ struct RecipeDetailView: View {
             return "\(qty) \(ingredient.name)"
         }
         return "\(qty) \(ingredient.unit.displayName) \(ingredient.name)"
+    }
+}
+
+// MARK: - Meal Plan Picker Sheet
+
+/// Simple sheet for picking a date and meal type to assign a recipe.
+private struct MealPlanPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(MealPlanningStore.self) private var mealPlanningStore
+
+    let recipe: CDRecipe
+    @State private var selectedDate = Date()
+    @State private var selectedMealType: MealType = .dinner
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
+                Picker("Meal", selection: $selectedMealType) {
+                    ForEach(MealType.allCases) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
+            }
+            .navigationTitle("Add to Meal Plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        mealPlanningStore.assignRecipe(
+                            recipe,
+                            on: selectedDate,
+                            mealType: selectedMealType
+                        )
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 

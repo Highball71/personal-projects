@@ -64,6 +64,7 @@ struct MealPlanView: View {
     ) private var members: FetchedResults<CDHouseholdMember>
 
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(MealPlanningStore.self) private var mealPlanningStore
 
     // Device-local identity — matches the "You are" picker in Settings
     @AppStorage("currentUserName") private var currentUserName: String = ""
@@ -118,13 +119,13 @@ struct MealPlanView: View {
                                 showingSlotOptions = true
                             },
                             onSlotCleared: { mealType in
-                                clearMealSlot(date: day, mealType: mealType)
+                                mealPlanningStore.clearMealSlot(date: day, mealType: mealType)
                             },
                             onApproveSuggestion: { suggestion in
-                                approveSuggestion(suggestion)
+                                mealPlanningStore.approveSuggestion(suggestion)
                             },
                             onRejectSuggestion: { suggestion in
-                                rejectSuggestion(suggestion)
+                                mealPlanningStore.rejectSuggestion(suggestion)
                             }
                         )
                     }
@@ -140,17 +141,30 @@ struct MealPlanView: View {
                     }
                 }
             }
-            // "Pick a Recipe" vs "Surprise Me" choice when tapping a slot
+            // Different options depending on whether the slot already has a recipe
             .confirmationDialog(
-                "",
+                selectedSlotRecipeName,
                 isPresented: $showingSlotOptions,
+                titleVisibility: selectedSlotRecipeName.isEmpty ? .hidden : .visible,
                 presenting: selectedSlot
             ) { slot in
-                Button("Pick a Recipe") {
-                    activeSheet = .pickRecipe(slot)
-                }
-                Button("Surprise Me") {
-                    activeSheet = .surpriseMe(slot)
+                if slotHasRecipe(slot) {
+                    Button("Replace Recipe") {
+                        activeSheet = .pickRecipe(slot)
+                    }
+                    Button("Surprise Me") {
+                        activeSheet = .surpriseMe(slot)
+                    }
+                    Button("Clear Slot", role: .destructive) {
+                        mealPlanningStore.clearMealSlot(date: slot.date, mealType: slot.mealType)
+                    }
+                } else {
+                    Button("Pick a Recipe") {
+                        activeSheet = .pickRecipe(slot)
+                    }
+                    Button("Surprise Me") {
+                        activeSheet = .surpriseMe(slot)
+                    }
                 }
             }
             // Single sheet modifier handles all presentation
@@ -231,75 +245,38 @@ struct MealPlanView: View {
         return Array(allSuggestions).filter { DateHelper.stripTime(from: $0.date) == dayStart }
     }
 
+    // MARK: - Slot State Helpers
+
+    /// Whether the selected slot already has a recipe assigned.
+    private func slotHasRecipe(_ slot: MealSlotSelection) -> Bool {
+        let dayStart = DateHelper.stripTime(from: slot.date)
+        return allMealPlans.contains {
+            DateHelper.stripTime(from: $0.date) == dayStart
+                && $0.mealTypeRaw == slot.mealType.rawValue
+        }
+    }
+
+    /// The recipe name for the currently selected slot, used as the dialog title.
+    private var selectedSlotRecipeName: String {
+        guard let slot = selectedSlot else { return "" }
+        let dayStart = DateHelper.stripTime(from: slot.date)
+        return allMealPlans.first(where: {
+            DateHelper.stripTime(from: $0.date) == dayStart
+                && $0.mealTypeRaw == slot.mealType.rawValue
+        })?.recipe?.name ?? ""
+    }
+
     // MARK: - Recipe Selection Logic
 
     /// Decides whether to assign directly or create a suggestion based on
     /// whether a Head Cook is set and who the current user is.
     private func handleRecipeSelection(_ recipe: CDRecipe, for slot: MealSlotSelection) {
         if approvalFlowActive && !isCurrentUserHeadCook {
-            // Non-Head-Cook user: create a suggestion for the Head Cook to review
-            createSuggestion(recipe, for: slot)
+            mealPlanningStore.createSuggestion(
+                recipe, on: slot.date, mealType: slot.mealType, suggestedBy: currentUserName
+            )
         } else {
-            // No Head Cook set, or current user IS the Head Cook: assign directly
-            assignRecipe(recipe, to: slot.date, for: slot.mealType)
-        }
-    }
-
-    /// Assign a recipe to a specific day and meal type.
-    /// If a slot already has a recipe, it gets replaced.
-    private func assignRecipe(_ recipe: CDRecipe, to date: Date, for mealType: MealType) {
-        let dayStart = DateHelper.stripTime(from: date)
-
-        // Check if there's already a meal plan for this slot
-        if let existing = Array(allMealPlans).first(where: {
-            DateHelper.stripTime(from: $0.date) == dayStart && $0.mealTypeRaw == mealType.rawValue
-        }) {
-            existing.recipe = recipe
-        } else {
-            let mealPlan = CDMealPlan(context: viewContext)
-            mealPlan.id = UUID()
-            mealPlan.date = dayStart
-            mealPlan.mealTypeRaw = mealType.rawValue
-            mealPlan.recipe = recipe
-        }
-        try? viewContext.save()
-    }
-
-    /// Create a suggestion instead of directly assigning.
-    private func createSuggestion(_ recipe: CDRecipe, for slot: MealSlotSelection) {
-        let dayStart = DateHelper.stripTime(from: slot.date)
-        let suggestion = CDMealSuggestion(context: viewContext)
-        suggestion.id = UUID()
-        suggestion.date = dayStart
-        suggestion.mealTypeRaw = slot.mealType.rawValue
-        suggestion.suggestedBy = currentUserName
-        suggestion.dateCreated = Date()
-        suggestion.recipe = recipe
-        try? viewContext.save()
-    }
-
-    /// Head Cook approves a suggestion: promotes it to a MealPlan entry.
-    private func approveSuggestion(_ suggestion: CDMealSuggestion) {
-        guard let recipe = suggestion.recipe else { return }
-        assignRecipe(recipe, to: suggestion.date, for: suggestion.mealType)
-        viewContext.delete(suggestion)
-        try? viewContext.save()
-    }
-
-    /// Head Cook rejects a suggestion: removes it.
-    private func rejectSuggestion(_ suggestion: CDMealSuggestion) {
-        viewContext.delete(suggestion)
-        try? viewContext.save()
-    }
-
-    /// Remove the recipe from a meal slot
-    private func clearMealSlot(date: Date, mealType: MealType) {
-        let dayStart = DateHelper.stripTime(from: date)
-        if let existing = Array(allMealPlans).first(where: {
-            DateHelper.stripTime(from: $0.date) == dayStart && $0.mealTypeRaw == mealType.rawValue
-        }) {
-            viewContext.delete(existing)
-            try? viewContext.save()
+            mealPlanningStore.assignRecipe(recipe, on: slot.date, mealType: slot.mealType)
         }
     }
 }

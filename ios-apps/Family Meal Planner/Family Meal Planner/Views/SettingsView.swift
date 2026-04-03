@@ -50,10 +50,6 @@ struct SettingsView: View {
     @State private var showResetSuccessAlert = false
     @State private var resetSuccessMessage = ""
 
-    #if DEBUG
-    @State private var showDiagAlert = false
-    @State private var diagAlertMessage = ""
-    #endif
 
     var body: some View {
         NavigationStack {
@@ -123,14 +119,6 @@ struct SettingsView: View {
             } message: {
                 Text("This deletes all CKShare records from CloudKit. Household members will lose access until you re-share.")
             }
-            #if DEBUG
-            .alert("Container Diagnostic", isPresented: $showDiagAlert) {
-                Button("Continue") { executeShareFlow() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text(diagAlertMessage)
-            }
-            #endif
         }
     }
 
@@ -254,6 +242,7 @@ struct SettingsView: View {
         Section {
             // Tapping while the spinner is showing cancels the in-flight operation.
             Button {
+                Logger.cloudkit.info("Share button tapped — isLoadingShare=\(isLoadingShare)")
                 if isLoadingShare { cancelShare() } else { generateShareURL() }
             } label: {
                 HStack {
@@ -347,13 +336,18 @@ struct SettingsView: View {
     // MARK: - Share Flow
 
     private func generateShareURL() {
+        Logger.cloudkit.info("generateShareURL: entered")
         #if DEBUG
         let monitorContainer = syncMonitor.persistentContainer
         let isSame = monitorContainer === persistence.container
-        diagAlertMessage = monitorContainer == nil
-            ? "SyncMonitor container: nil\nWill use PersistenceController container directly."
-            : "SyncMonitor container: available\nMatches PersistenceController: \(isSame ? "YES" : "NO — will fix stale reference")"
-        showDiagAlert = true
+        let message: String
+        if monitorContainer == nil {
+            message = "SyncMonitor container: nil\nWill use PersistenceController container directly."
+        } else {
+            message = "SyncMonitor container: available\nMatches PersistenceController: \(isSame ? "YES" : "NO — will fix stale reference")"
+        }
+        Logger.cloudkit.info("Container Diagnostic: \(message, privacy: .public)")
+        executeShareFlow()
         #else
         executeShareFlow()
         #endif
@@ -361,37 +355,50 @@ struct SettingsView: View {
 
     /// Runs the actual share flow using object-level sharing on CDHousehold.
     private func executeShareFlow() {
+        Logger.cloudkit.info("executeShareFlow: entered — isLoadingShare=\(isLoadingShare), shareTask=\(shareTask == nil ? "nil" : "exists")")
         isLoadingShare = true
 
         shareTask = Task {
             defer { isLoadingShare = false }
 
+            Logger.cloudkit.info("executeShareFlow: Task started, checking iCloud availability")
             guard await CloudKitSharingService.shared.isCloudKitAvailable() else {
+                Logger.cloudkit.warning("executeShareFlow: iCloud NOT available — bailing out")
                 showCloudKitAlert = true
                 return
             }
+            Logger.cloudkit.info("executeShareFlow: iCloud available, checking households (count=\(households.count))")
 
             guard let household = households.first else {
+                Logger.cloudkit.warning("executeShareFlow: no household found — bailing out")
                 shareErrorMessage = CloudKitSharingError.noHouseholdToShare.localizedDescription
                 showingShareError = true
                 return
             }
+            Logger.cloudkit.info("executeShareFlow: household found — \(household.objectID)")
 
             let targetContainer = persistence.container
 
             // Fix stale SyncMonitor reference if needed.
             if let monitored = syncMonitor.persistentContainer, monitored !== targetContainer {
+                Logger.cloudkit.info("executeShareFlow: fixing stale SyncMonitor container reference")
                 syncMonitor.attach(to: targetContainer)
             }
 
             do {
+                Logger.cloudkit.info("executeShareFlow: calling startShareFlow — Task.isCancelled=\(Task.isCancelled)")
                 let (share, container) = try await CloudKitSharingService.shared.startShareFlow(
                     household: household,
                     container: targetContainer,
                     syncMonitor: syncMonitor
                 )
                 guard !Task.isCancelled else { return }
-                presentCloudSharingController(share: share, container: container)
+                await MainActor.run {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        presentCloudSharingController(share: share, container: container)
+                    }
+                }
             } catch is CancellationError {
                 // User tapped Cancel
             } catch {
@@ -486,135 +493,164 @@ struct SettingsView: View {
         }
     }
 
-    /// Full reset: deletes the server-side share, resets local stores,
-    /// rebuilds container, then attempts the share flow.
-    ///
-    /// During the local reset, PersistenceController.isResetting removes ALL
-    /// views from the hierarchy at the app root level — this prevents stale
-    /// @FetchRequest crashes across every view (not just SettingsView).
-    /// The share controller is presented via UIKit after the reset.
+    /// Nuclear share reset: deletes ALL server-side shares, waits for
+    /// the mirror to settle, then creates a brand-new share on the EXISTING
+    /// stable container. Does NOT destroy local stores or rebuild the container
+    /// (that was causing container.share(...) to hang indefinitely).
     private func performForceCleanShare() {
-        isResettingLocalState = true
+        Logger.cloudkit.info("performForceCleanShare: entered — isLoadingShare=\(isLoadingShare)")
         isLoadingShare = true
 
         shareTask = Task {
-            defer {
-                isResettingLocalState = false
-                isLoadingShare = false
+            defer { isLoadingShare = false }
+
+            guard let household = households.first else {
+                Logger.cloudkit.error("performForceCleanShare: no household")
+                shareErrorMessage = CloudKitSharingError.noHouseholdToShare.localizedDescription
+                showingShareError = true
+                return
             }
 
             do {
-                // 1. Delete the existing share (if any).
-                Logger.cloudkit.info("Force clean share: step 1 — deleting server-side share")
-                if let household = households.first {
-                    try await CloudKitSharingService.shared.deleteShare(
-                        for: household, container: persistence.container
-                    )
-                }
-                Logger.cloudkit.info("Force clean share: step 1 — server cleanup complete")
-
-                // 2. Full local reset (handles SyncMonitor lifecycle).
-                Logger.cloudkit.info("Force clean share: step 2 — resetting local stores")
-                try await persistence.resetLocalStoresAndRebuildContainer(syncMonitor: syncMonitor)
-                Logger.cloudkit.info("Force clean share: step 2 — local reset complete")
-
-                // 3. PersistenceController.isResetting already removed all views
-                //    from the hierarchy (including this sheet). No dismiss needed.
-                //    This Task continues running even though SettingsView is gone.
-
-                // 4. Wait for CloudKit to set up + export with the fresh container.
-                Logger.cloudkit.info("Force clean share: step 3 — waiting for initial sync cycle")
-                for i in 0..<30 {
-                    guard !Task.isCancelled else { return }
-                    try await Task.sleep(for: .seconds(1))
-                    if syncMonitor.hasCompletedExport {
-                        Logger.cloudkit.info("Force clean share: step 3 — export ready after \(i)s")
-                        break
-                    }
-                }
-
-                guard !Task.isCancelled else { return }
-
-                // 5. Fetch the fresh household from the new container.
-                let currentContainer = persistence.container
-                let request = CDHousehold.fetchRequest()
-                request.fetchLimit = 1
-                guard let household = try? currentContainer.viewContext.fetch(request).first else {
-                    throw CloudKitSharingError.noHouseholdToShare
-                }
-
-                Logger.cloudkit.info("Force clean share: step 4 — starting share flow")
-
-                // 6. Run the share flow.
-                let (share, container) = try await CloudKitSharingService.shared.startShareFlow(
+                let (share, container) = try await CloudKitSharingService.shared.nuclearShareReset(
                     household: household,
-                    container: currentContainer,
+                    container: persistence.container,
                     syncMonitor: syncMonitor
                 )
                 guard !Task.isCancelled else { return }
 
-                // 7. Present the sharing controller from root VC
-                //    (SettingsView is already dismissed).
-                presentCloudSharingController(share: share, container: container)
+                await MainActor.run {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        presentCloudSharingController(share: share, container: container)
+                    }
+                }
 
             } catch is CancellationError {
                 // User cancelled
             } catch {
                 guard !Task.isCancelled else { return }
-                Logger.cloudkit.error("Force clean share failed: \(error.localizedDescription, privacy: .public)")
-                // SettingsView is gone at this point, so show the error via UIKit directly.
-                await MainActor.run {
-                    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                          let window = windowScene.windows.first,
-                          let rootVC = window.rootViewController else { return }
-
-                    var presenter = rootVC
-                    while let presented = presenter.presentedViewController {
-                        presenter = presented
-                    }
-
-                    let alert = UIAlertController(
-                        title: "Sharing Failed",
-                        message: error.localizedDescription,
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    presenter.present(alert, animated: true)
-                }
+                Logger.cloudkit.error("performForceCleanShare failed: \(error.localizedDescription, privacy: .public)")
+                shareErrorMessage = "Clean share failed: \(error.localizedDescription)"
+                showingShareError = true
             }
         }
     }
 
-    /// Presents UICloudSharingController imperatively via UIKit.
-    private func presentCloudSharingController(share: CKShare, container: CKContainer) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first,
+    /// Walks the UIKit hierarchy to find the top-most view controller
+    /// whose view is actually in a window. Handles UINavigationController
+    /// and UITabBarController containers along the way.
+    @MainActor
+    private func findTopViewController() -> UIViewController? {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }),
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }),
               let rootVC = window.rootViewController else {
+            return nil
+        }
+
+        var candidate = rootVC
+        while true {
+            if let nav = candidate as? UINavigationController,
+               let visible = nav.visibleViewController {
+                candidate = visible
+            } else if let tab = candidate as? UITabBarController,
+                      let selected = tab.selectedViewController {
+                candidate = selected
+            } else if let presented = candidate.presentedViewController,
+                      presented.view.window != nil {
+                candidate = presented
+            } else {
+                break
+            }
+        }
+
+        // Reject PresentationHostingController — it's a SwiftUI sheet host that
+        // may be mid-dismissal and not suitable for presenting new controllers.
+        let typeName = String(describing: type(of: candidate))
+        if typeName.contains("PresentationHostingController") {
+            Logger.cloudkit.info("findTopViewController: rejected stale PresentationHostingController, using rootVC instead")
+            return rootVC.view.window != nil ? rootVC : nil
+        }
+
+        // If the candidate ended up detached, fall back to rootVC.
+        if candidate.view.window == nil {
+            return rootVC.view.window != nil ? rootVC : nil
+        }
+        return candidate
+    }
+
+    /// Presents share link alert (existing share) or UICloudSharingController (new share).
+    @MainActor
+    private func presentCloudSharingController(share: CKShare, container: CKContainer) {
+        Logger.cloudkit.info("presentCloudSharingController: entered (shareURL=\(share.url?.absoluteString ?? "nil", privacy: .public))")
+
+        if let shareURL = share.url {
+            // Existing share with URL — copy to clipboard and show alert.
+            Logger.cloudkit.info("presentCloudSharingController: existing share URL — copying to clipboard")
+            UIPasteboard.general.url = shareURL
+            Logger.cloudkit.info("presentCloudSharingController: clipboard copy done (hasURL=\(UIPasteboard.general.hasURLs))")
+
+            let alert = UIAlertController(
+                title: "Share Link Ready",
+                message: "The household share link has been copied to the clipboard.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            alert.addAction(UIAlertAction(title: "Open Link", style: .default) { _ in
+                UIApplication.shared.open(shareURL)
+            })
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard let presenter = self.findTopViewController() else {
+                    Logger.cloudkit.error("presentCloudSharingController: no live presenter found")
+                    return
+                }
+                Logger.cloudkit.info("presentCloudSharingController: presenting share link alert from \(String(describing: type(of: presenter)))")
+                presenter.present(alert, animated: true)
+            }
             return
         }
 
+        // New share — use UICloudSharingController.
+        Logger.cloudkit.info("presentCloudSharingController: no share URL — using UICloudSharingController")
         let sharingController = UICloudSharingController(share: share, container: container)
+        sharingController.modalPresentationStyle = .formSheet
         sharingController.availablePermissions = [.allowReadWrite, .allowPrivate]
 
         let delegate = CloudSharingDelegate(container: container)
         sharingDelegate = delegate
         sharingController.delegate = delegate
 
-        if let popover = sharingController.popoverPresentationController {
-            popover.sourceView = rootVC.view
-            popover.sourceRect = CGRect(
-                x: rootVC.view.bounds.midX,
-                y: rootVC.view.bounds.midY,
-                width: 0, height: 0
-            )
-            popover.permittedArrowDirections = []
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            guard let presenter = self.findTopViewController() else {
+                Logger.cloudkit.error("presentCloudSharingController: no live presenter found")
+                return
+            }
 
-        var presenter = rootVC
-        while let presented = presenter.presentedViewController {
-            presenter = presented
+            Logger.cloudkit.info("presentCloudSharingController: live presenter=\(String(describing: type(of: presenter))), inWindow=\(presenter.view.window != nil)")
+
+            guard presenter.view.window != nil else {
+                Logger.cloudkit.error("presentCloudSharingController: live presenter not in window hierarchy")
+                return
+            }
+
+            if let popover = sharingController.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(
+                    x: presenter.view.bounds.midX,
+                    y: presenter.view.bounds.midY,
+                    width: 0,
+                    height: 0
+                )
+                popover.permittedArrowDirections = []
+            }
+
+            Logger.cloudkit.info("presentCloudSharingController: about to present UICloudSharingController")
+            presenter.present(sharingController, animated: true)
+            Logger.cloudkit.info("presentCloudSharingController: present(...) returned")
         }
-        presenter.present(sharingController, animated: true)
     }
 
     // MARK: - Household Actions
@@ -741,10 +777,12 @@ final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
 
     init(container: CKContainer) {
         self.container = container
+        Logger.cloudkit.info("CloudSharingDelegate: initialized")
     }
 
     func itemTitle(for csc: UICloudSharingController) -> String? {
-        "Family Meal Planner"
+        Logger.cloudkit.info("CloudSharingDelegate: itemTitle called")
+        return "Family Meal Planner"
     }
 
     func cloudSharingController(
@@ -752,17 +790,25 @@ final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
         failedToSaveShareWithError error: Error
     ) {
         Logger.cloudkit.error(
-            "UICloudSharingController save failed: \(error.localizedDescription, privacy: .public)"
+            "CloudSharingDelegate: failedToSaveShare — \(error.localizedDescription, privacy: .public)"
         )
     }
 
     func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
-        guard let share = csc.share else { return }
+        Logger.cloudkit.info("CloudSharingDelegate: didSaveShare")
+        guard let share = csc.share else {
+            Logger.cloudkit.warning("CloudSharingDelegate: didSaveShare but share is nil")
+            return
+        }
         Task { @MainActor in
             await CloudKitSharingService.shared.clearApplicationVersion(
                 from: share, using: container
             )
         }
+    }
+
+    func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
+        Logger.cloudkit.info("CloudSharingDelegate: didStopSharing")
     }
 }
 

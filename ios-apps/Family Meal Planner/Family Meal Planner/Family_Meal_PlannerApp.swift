@@ -46,6 +46,9 @@ struct Family_Meal_PlannerApp: App {
     
     /// Single SyncMonitor instance shared across the app.
     @State private var syncMonitor = SyncMonitor()
+
+    /// Central store for meal plan mutations (assign, clear, suggest).
+    @State private var mealPlanningStore = MealPlanningStore()
     private let performStartupReset = false
     @State private var didRunStartupTasks = false
     var body: some Scene {
@@ -76,6 +79,7 @@ struct Family_Meal_PlannerApp: App {
                          persistence.container.viewContext
                     )
                     .environment(syncMonitor)
+                    .environment(mealPlanningStore)
                     .environmentObject(persistence)
                 
             }

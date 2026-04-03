@@ -135,21 +135,30 @@ struct RecipeListView: View {
                 IngredientSearchView()
             }
             // Show a helpful message when there are no recipes
-            .overlay {
-                if recipes.isEmpty {
-                    ContentUnavailableView(
-                        "No Recipes Yet",
-                        systemImage: "book",
-                        description: Text("Tap + to add your first recipe")
-                    )
-                } else if filteredRecipes.isEmpty {
-                    ContentUnavailableView(
-                        "No Matches",
-                        systemImage: "magnifyingglass",
-                        description: Text("Try a different filter or search term")
-                    )
+            .overlay { emptyStateOverlay }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStateOverlay: some View {
+        if recipes.isEmpty {
+            ContentUnavailableView {
+                Label("Start by adding your first recipe", systemImage: "book")
+            } description: {
+                Text("Scan a cookbook, paste a link, or add one manually")
+            } actions: {
+                Button("Add Recipe") {
+                    showingAddRecipe = true
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.fluffyAccent)
             }
+        } else if filteredRecipes.isEmpty {
+            ContentUnavailableView(
+                "No Matches",
+                systemImage: "magnifyingglass",
+                description: Text("Try a different filter or search term")
+            )
         }
     }
 
