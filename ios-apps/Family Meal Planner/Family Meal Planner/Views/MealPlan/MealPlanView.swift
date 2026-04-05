@@ -138,11 +138,17 @@ struct MealPlanView: View {
             .onAppear {
                 resyncWeekIfStale()
                 // Heal any duplicate CDMealPlan / CDMealSuggestion rows
-                // left behind by earlier builds where sub-second Date
-                // drift or stacking Suggest runs created extras. Safe
-                // no-ops when nothing is duplicated.
-                mealPlanningStore.dedupeMealPlans()
-                mealPlanningStore.dedupeSuggestions()
+                // left behind by earlier builds. Gated behind a UserDefaults
+                // flag so it only runs once per install. Key is `V2` because
+                // the V1 pass used a floating-point timeIntervalSince1970
+                // key which could miss some duplicates; V2 uses an ISO
+                // yyyy-MM-dd string key that's always stable.
+                let dedupeKey = "hasRunDedupeV2"
+                if !UserDefaults.standard.bool(forKey: dedupeKey) {
+                    mealPlanningStore.dedupeMealPlans()
+                    mealPlanningStore.dedupeSuggestions()
+                    UserDefaults.standard.set(true, forKey: dedupeKey)
+                }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { resyncWeekIfStale() }

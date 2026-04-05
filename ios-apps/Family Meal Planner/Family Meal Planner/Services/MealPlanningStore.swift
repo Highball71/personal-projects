@@ -16,6 +16,16 @@ import Foundation
 @MainActor @Observable
 final class MealPlanningStore {
 
+    /// Formatter used to build stable `yyyy-MM-dd` keys for dedup grouping.
+    /// Using a string key avoids the floating-point rounding that
+    /// `timeIntervalSince1970` introduces, which could cause two dates
+    /// one microsecond apart to produce different keys and miss duplicates.
+    private static let dedupeFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate]
+        return f
+    }()
+
     private let persistence: PersistenceController
 
     private var viewContext: NSManagedObjectContext {
@@ -73,7 +83,11 @@ final class MealPlanningStore {
             mealPlan.mealTypeRaw = mealType.rawValue
             mealPlan.recipe = recipe
         }
-        try? viewContext.save()
+        do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
     }
 
     /// Removes the recipe from a meal slot. Deletes ALL CDMealPlan rows
@@ -88,7 +102,11 @@ final class MealPlanningStore {
             viewContext.delete(plan)
         }
         if !existing.isEmpty {
-            try? viewContext.save()
+            do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
         }
     }
 
@@ -129,7 +147,11 @@ final class MealPlanningStore {
         suggestion.suggestedBy = suggestedBy
         suggestion.dateCreated = Date()
         suggestion.recipe = recipe
-        try? viewContext.save()
+        do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
     }
 
     /// Head Cook approves a suggestion — promotes it to a real MealPlan entry
@@ -138,13 +160,21 @@ final class MealPlanningStore {
         guard let recipe = suggestion.recipe else { return }
         assignRecipe(recipe, on: suggestion.date, mealType: suggestion.mealType)
         viewContext.delete(suggestion)
-        try? viewContext.save()
+        do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
     }
 
     /// Head Cook rejects a suggestion — deletes it.
     func rejectSuggestion(_ suggestion: CDMealSuggestion) {
         viewContext.delete(suggestion)
-        try? viewContext.save()
+        do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
     }
 
     // MARK: - Deduplication
@@ -163,8 +193,12 @@ final class MealPlanningStore {
         var seen: [String: CDMealPlan] = [:]
         var duplicatesDeleted = 0
         for plan in all {
-            let dayStart = DateHelper.stripTime(from: plan.date)
-            let key = "\(dayStart.timeIntervalSince1970)|\(plan.mealTypeRaw)"
+            // `date` is declared non-optional in Swift but the Core Data
+            // model marks it optional — a CloudKit-synced row could have
+            // nil. Read via KVC so we can safely default to distantPast.
+            let rawDate = (plan.value(forKey: "date") as? Date) ?? Date.distantPast
+            let dayStart = DateHelper.stripTime(from: rawDate)
+            let key = "\(Self.dedupeFormatter.string(from: dayStart))|\(plan.mealTypeRaw)"
             if seen[key] != nil {
                 viewContext.delete(plan)
                 duplicatesDeleted += 1
@@ -177,7 +211,11 @@ final class MealPlanningStore {
         // TEMP DEBUG — remove before release
         print("[TEMP DEBUG] dedupeMealPlans — scanned=\(all.count) unique=\(seen.count) duplicatesDeleted=\(duplicatesDeleted)")
         if duplicatesDeleted > 0 {
-            try? viewContext.save()
+            do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
         }
     }
 
@@ -193,8 +231,11 @@ final class MealPlanningStore {
         var seen: [String: CDMealSuggestion] = [:]
         var duplicatesDeleted = 0
         for suggestion in all {
-            let dayStart = DateHelper.stripTime(from: suggestion.date)
-            let key = "\(dayStart.timeIntervalSince1970)|\(suggestion.mealTypeRaw)|\(suggestion.suggestedBy.lowercased())"
+            // Same KVC-read safeguard as dedupeMealPlans() — the Core Data
+            // model marks `date` optional, so a synced row could be nil.
+            let rawDate = (suggestion.value(forKey: "date") as? Date) ?? Date.distantPast
+            let dayStart = DateHelper.stripTime(from: rawDate)
+            let key = "\(Self.dedupeFormatter.string(from: dayStart))|\(suggestion.mealTypeRaw)|\(suggestion.suggestedBy.lowercased())"
             if seen[key] != nil {
                 viewContext.delete(suggestion)
                 duplicatesDeleted += 1
@@ -206,7 +247,11 @@ final class MealPlanningStore {
         // TEMP DEBUG — remove before release
         print("[TEMP DEBUG] dedupeSuggestions — scanned=\(all.count) unique=\(seen.count) duplicatesDeleted=\(duplicatesDeleted)")
         if duplicatesDeleted > 0 {
-            try? viewContext.save()
+            do {
+            try viewContext.save()
+        } catch {
+            print("[ERROR] Core Data save failed: \(error)")
+        }
         }
     }
 
