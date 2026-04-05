@@ -128,10 +128,28 @@ struct SuggestMealsView: View {
 
     private var proteinSelectionView: some View {
         VStack(spacing: 24) {
-            Text("What proteins do you have?")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .padding(.top, 8)
+            // TEMPORARY DEBUG — remove before release
+            Text("DEBUG: New protein filter active")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Color.red)
+                .padding(.top, 4)
+
+            VStack(spacing: 6) {
+                Text("What proteins do you have?")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text("We'll fill the week with 7 dinners that match.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 8)
+            .padding(.horizontal)
 
             // 2-column grid of protein chips
             LazyVGrid(columns: [
@@ -169,7 +187,7 @@ struct SuggestMealsView: View {
 
             // Primary action button
             Button(action: generateSuggestions) {
-                Text("Suggest Meals")
+                Text("Suggest 7 Dinners")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -182,7 +200,7 @@ struct SuggestMealsView: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
-        .navigationTitle("Suggest Meals")
+        .navigationTitle("Suggest Week")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

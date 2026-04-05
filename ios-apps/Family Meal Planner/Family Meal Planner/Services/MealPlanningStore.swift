@@ -40,12 +40,32 @@ final class MealPlanningStore {
     }
 
     /// Assigns a recipe to a specific date and meal type.
-    /// If the slot already has a recipe, it gets replaced.
+    /// If the slot already has any plans (one or many duplicates), keeps one
+    /// and deletes the rest, then updates that row's recipe. Invariant:
+    /// after this call, exactly one CDMealPlan exists for (dayStart, mealType).
     func assignRecipe(_ recipe: CDRecipe, on date: Date, mealType: MealType) {
         let dayStart = DateHelper.stripTime(from: date)
 
-        if let existing = fetchMealPlan(for: dayStart, mealType: mealType) {
-            existing.recipe = recipe
+        // TEMP DEBUG — remove before release
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        fmt.timeZone = TimeZone.current
+        print("[TEMP DEBUG] assignRecipe — incoming date=\(fmt.string(from: date)) normalized=\(fmt.string(from: dayStart)) mealType=\(mealType.rawValue) recipe=\"\(recipe.name)\"")
+
+        let existing = fetchMealPlans(for: dayStart, mealType: mealType)
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] assignRecipe — found \(existing.count) existing plan(s) for this slot")
+        if existing.count > 1 {
+            print("[TEMP DEBUG] assignRecipe — DUPLICATES detected, collapsing to 1")
+        }
+
+        if let keeper = existing.first {
+            // Keep one row, update it, delete any duplicates.
+            keeper.date = dayStart
+            keeper.recipe = recipe
+            for dup in existing.dropFirst() {
+                viewContext.delete(dup)
+            }
         } else {
             let mealPlan = CDMealPlan(context: viewContext)
             mealPlan.id = UUID()
@@ -56,18 +76,27 @@ final class MealPlanningStore {
         try? viewContext.save()
     }
 
-    /// Removes the recipe from a meal slot.
+    /// Removes the recipe from a meal slot. Deletes ALL CDMealPlan rows
+    /// for (date, mealType) — not just one — so duplicates from older
+    /// builds get fully cleared in a single tap.
     func clearMealSlot(date: Date, mealType: MealType) {
         let dayStart = DateHelper.stripTime(from: date)
-        if let existing = fetchMealPlan(for: dayStart, mealType: mealType) {
-            viewContext.delete(existing)
+        let existing = fetchMealPlans(for: dayStart, mealType: mealType)
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] clearMealSlot — deleting \(existing.count) plan(s) for \(mealType.rawValue) on \(dayStart)")
+        for plan in existing {
+            viewContext.delete(plan)
+        }
+        if !existing.isEmpty {
             try? viewContext.save()
         }
     }
 
     // MARK: - Suggestions (Head Cook Flow)
 
-    /// Creates a suggestion for the Head Cook to review.
+    /// Creates a suggestion for the Head Cook to review. A given person can
+    /// only have one pending suggestion per slot — re-suggesting replaces
+    /// their earlier pick instead of stacking a new row.
     func createSuggestion(
         _ recipe: CDRecipe,
         on date: Date,
@@ -75,6 +104,24 @@ final class MealPlanningStore {
         suggestedBy: String
     ) {
         let dayStart = DateHelper.stripTime(from: date)
+
+        // Remove this user's existing suggestion(s) for this slot so we
+        // don't stack duplicates every time SuggestMealsView is applied.
+        let request = CDMealSuggestion.fetchRequest()
+        guard let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else { return }
+        request.predicate = NSPredicate(
+            format: "date >= %@ AND date < %@ AND mealTypeRaw == %@ AND suggestedBy ==[c] %@",
+            dayStart as NSDate,
+            nextDayStart as NSDate,
+            mealType.rawValue,
+            suggestedBy
+        )
+        if let prior = try? viewContext.fetch(request) {
+            // TEMP DEBUG — remove before release
+            print("[TEMP DEBUG] createSuggestion — removing \(prior.count) prior suggestion(s) from \"\(suggestedBy)\" for this slot")
+            for s in prior { viewContext.delete(s) }
+        }
+
         let suggestion = CDMealSuggestion(context: viewContext)
         suggestion.id = UUID()
         suggestion.date = dayStart
@@ -100,17 +147,87 @@ final class MealPlanningStore {
         try? viewContext.save()
     }
 
+    // MARK: - Deduplication
+
+    /// Heals existing data by collapsing duplicate CDMealPlan rows for the
+    /// same (day, mealType) down to one. Call this once on app/session
+    /// entry; it's a no-op when nothing is duplicated. Needed because
+    /// earlier builds could create duplicates when sub-second Date drift
+    /// defeated the exact-equality uniqueness check.
+    func dedupeMealPlans() {
+        let request = CDMealPlan.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMealPlan.date, ascending: true)]
+        guard let all = try? viewContext.fetch(request) else { return }
+
+        // Group by (stripped day, mealTypeRaw). Keep first, delete rest.
+        var seen: [String: CDMealPlan] = [:]
+        var duplicatesDeleted = 0
+        for plan in all {
+            let dayStart = DateHelper.stripTime(from: plan.date)
+            let key = "\(dayStart.timeIntervalSince1970)|\(plan.mealTypeRaw)"
+            if seen[key] != nil {
+                viewContext.delete(plan)
+                duplicatesDeleted += 1
+            } else {
+                // Normalize the keeper's date in case it had drifted.
+                plan.date = dayStart
+                seen[key] = plan
+            }
+        }
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] dedupeMealPlans — scanned=\(all.count) unique=\(seen.count) duplicatesDeleted=\(duplicatesDeleted)")
+        if duplicatesDeleted > 0 {
+            try? viewContext.save()
+        }
+    }
+
+    /// Heals existing data by collapsing duplicate CDMealSuggestion rows
+    /// where the same person suggested multiple recipes for the same slot.
+    /// Keeps the most recently created one per (suggestedBy, day, mealType).
+    /// Preserves distinct suggestions from different household members.
+    func dedupeSuggestions() {
+        let request = CDMealSuggestion.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMealSuggestion.dateCreated, ascending: false)]
+        guard let all = try? viewContext.fetch(request) else { return }
+
+        var seen: [String: CDMealSuggestion] = [:]
+        var duplicatesDeleted = 0
+        for suggestion in all {
+            let dayStart = DateHelper.stripTime(from: suggestion.date)
+            let key = "\(dayStart.timeIntervalSince1970)|\(suggestion.mealTypeRaw)|\(suggestion.suggestedBy.lowercased())"
+            if seen[key] != nil {
+                viewContext.delete(suggestion)
+                duplicatesDeleted += 1
+            } else {
+                suggestion.date = dayStart
+                seen[key] = suggestion
+            }
+        }
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] dedupeSuggestions — scanned=\(all.count) unique=\(seen.count) duplicatesDeleted=\(duplicatesDeleted)")
+        if duplicatesDeleted > 0 {
+            try? viewContext.save()
+        }
+    }
+
     // MARK: - Private
 
-    /// Fetches the existing meal plan for a specific day and meal type, if any.
-    private func fetchMealPlan(for dayStart: Date, mealType: MealType) -> CDMealPlan? {
+    /// Fetches ALL existing meal plans for a specific day and meal type.
+    /// Uses a half-open date range [dayStart, nextDay) instead of exact
+    /// `date == %@` equality, so sub-second Date drift can't defeat the
+    /// lookup and accidentally create a duplicate row.
+    private func fetchMealPlans(for dayStart: Date, mealType: MealType) -> [CDMealPlan] {
+        guard let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else {
+            return []
+        }
         let request = CDMealPlan.fetchRequest()
         request.predicate = NSPredicate(
-            format: "date == %@ AND mealTypeRaw == %@",
+            format: "date >= %@ AND date < %@ AND mealTypeRaw == %@",
             dayStart as NSDate,
+            nextDayStart as NSDate,
             mealType.rawValue
         )
-        request.fetchLimit = 1
-        return try? viewContext.fetch(request).first
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMealPlan.date, ascending: true)]
+        return (try? viewContext.fetch(request)) ?? []
     }
 }

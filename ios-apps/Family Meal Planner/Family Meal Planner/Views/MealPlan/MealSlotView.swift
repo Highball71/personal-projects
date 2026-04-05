@@ -17,7 +17,6 @@ struct MealSlotView: View {
     let recipeName: String?
     var isToday: Bool = false
     let onTap: () -> Void
-    let onClear: () -> Void
 
     /// Tonight's dinner gets special treatment — it's the slot people care about most.
     private var isTonightDinner: Bool {
@@ -51,12 +50,15 @@ struct MealSlotView: View {
 
                 Spacer()
 
-                // X button to clear this slot
-                Button(action: onClear) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+                // Chevron signals the row opens an options sheet
+                // (Pick a Different Recipe / Surprise Me / Remove from Plan).
+                // Replaces the previous X-only control so the tappable
+                // area is obvious and the destructive action lives inside
+                // the sheet rather than on a tiny icon.
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             } else {
                 // Empty slot — tonight's dinner gets a warmer prompt
                 if isTonightDinner {
@@ -80,10 +82,10 @@ struct MealSlotView: View {
 
 #Preview {
     VStack {
-        MealSlotView(mealType: .breakfast, recipeName: "Scrambled Eggs", onTap: {}, onClear: {})
-        MealSlotView(mealType: .lunch, recipeName: nil, onTap: {}, onClear: {})
-        MealSlotView(mealType: .dinner, recipeName: "Spaghetti Bolognese", isToday: true, onTap: {}, onClear: {})
-        MealSlotView(mealType: .dinner, recipeName: nil, isToday: true, onTap: {}, onClear: {})
+        MealSlotView(mealType: .breakfast, recipeName: "Scrambled Eggs", onTap: {})
+        MealSlotView(mealType: .lunch, recipeName: nil, onTap: {})
+        MealSlotView(mealType: .dinner, recipeName: "Spaghetti Bolognese", isToday: true, onTap: {})
+        MealSlotView(mealType: .dinner, recipeName: nil, isToday: true, onTap: {})
     }
     .padding()
 }

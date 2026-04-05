@@ -209,12 +209,20 @@ struct SurpriseMealView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
-            } else {
+            } else if allRecipes.isEmpty {
                 // No recipes in the library at all
                 ContentUnavailableView(
                     "No Recipes Yet",
                     systemImage: "book",
                     description: Text("Add some recipes first, then come back for suggestions!")
+                )
+            } else {
+                // Library has recipes, but none match the selected protein(s)
+                let phrase = selectedProteinsPhrase
+                ContentUnavailableView(
+                    "No \(phrase) recipes in your library",
+                    systemImage: "magnifyingglass",
+                    description: Text("Try another protein or add a recipe with \(phrase).")
                 )
             }
         }
@@ -229,6 +237,21 @@ struct SurpriseMealView: View {
 
     // MARK: - Suggestion Logic
 
+    /// Human-readable list of the currently selected proteins, e.g.
+    /// "Beef", "Beef or Chicken", "Beef, Chicken, or Pork".
+    /// Used in the no-match empty state.
+    private var selectedProteinsPhrase: String {
+        let names = selectedProteins.map(\.rawValue).sorted()
+        switch names.count {
+        case 0: return ""
+        case 1: return names[0]
+        case 2: return "\(names[0]) or \(names[1])"
+        default:
+            let head = names.dropLast().joined(separator: ", ")
+            return "\(head), or \(names.last!)"
+        }
+    }
+
     private func suggestWithNoPreference() {
         currentPool = Array(allRecipes)
         pickRandomRecipe()
@@ -239,12 +262,23 @@ struct SurpriseMealView: View {
         // Match on each recipe's detected primary protein (see
         // ProteinOption.detect) rather than any keyword hit in any
         // ingredient, so flavorings like "beef broth" can't misclassify.
+        let selected = selectedProteins
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] Surprise Me filter — selected=\(selected.map(\.rawValue).sorted()) library=\(recipes.count) recipes")
         let matching = recipes.filter { recipe in
-            guard let detected = ProteinOption.detect(in: recipe) else { return false }
-            return selectedProteins.contains(detected)
+            let detected = ProteinOption.detect(in: recipe)
+            let didMatch = detected.map { selected.contains($0) } ?? false
+            // TEMP DEBUG — remove before release
+            print("[TEMP DEBUG]   \"\(recipe.name)\" detected=\(detected?.rawValue ?? "nil") matched=\(didMatch)")
+            return didMatch
         }
-        // If no matches for the selected proteins, fall back to all recipes
-        currentPool = matching.isEmpty ? recipes : matching
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] Surprise Me filter — \(matching.count) of \(recipes.count) matched; showing empty state if zero")
+
+        // No fallback to the full library — if nothing matches the selected
+        // protein, show an empty state. Falling back would surface any recipe
+        // (including the wrong proteins), which is the exact bug being fixed.
+        currentPool = matching
         pickRandomRecipe()
     }
 

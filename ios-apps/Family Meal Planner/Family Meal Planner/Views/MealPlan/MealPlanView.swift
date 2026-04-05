@@ -65,11 +65,15 @@ struct MealPlanView: View {
 
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(MealPlanningStore.self) private var mealPlanningStore
+    @Environment(\.scenePhase) private var scenePhase
 
     // Device-local identity — matches the "You are" picker in Settings
     @AppStorage("currentUserName") private var currentUserName: String = ""
 
-    // The first day of the currently displayed week
+    // The first day of the currently displayed week.
+    // Initialized once to today's week; we also auto-resync it when the view
+    // appears or the app returns to the foreground so it can't go stale if
+    // the app was left open across a day boundary.
     @State private var weekStartDate = DateHelper.startOfWeek(containing: Date())
 
     // The slot the user just tapped — drives the confirmation dialog
@@ -118,9 +122,6 @@ struct MealPlanView: View {
                                 selectedSlot = MealSlotSelection(date: day, mealType: mealType)
                                 showingSlotOptions = true
                             },
-                            onSlotCleared: { mealType in
-                                mealPlanningStore.clearMealSlot(date: day, mealType: mealType)
-                            },
                             onApproveSuggestion: { suggestion in
                                 mealPlanningStore.approveSuggestion(suggestion)
                             },
@@ -134,28 +135,45 @@ struct MealPlanView: View {
             }
             .background(Color.fluffyBackground)
             .navigationTitle("Meal Plan")
+            .onAppear {
+                resyncWeekIfStale()
+                // Heal any duplicate CDMealPlan / CDMealSuggestion rows
+                // left behind by earlier builds where sub-second Date
+                // drift or stacking Suggest runs created extras. Safe
+                // no-ops when nothing is duplicated.
+                mealPlanningStore.dedupeMealPlans()
+                mealPlanningStore.dedupeSuggestions()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { resyncWeekIfStale() }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { activeSheet = .suggestWeek }) {
-                        Image(systemName: "die.face.5")
+                    // Labeled button (icon + text) so it's obvious this plans the week,
+                    // rather than a bare dice icon.
+                    Button {
+                        activeSheet = .suggestWeek
+                    } label: {
+                        Label("Suggest Week", systemImage: "wand.and.stars")
                     }
+                    .accessibilityLabel("Suggest meals for the whole week")
                 }
             }
             // Different options depending on whether the slot already has a recipe
             .confirmationDialog(
-                selectedSlotRecipeName,
+                confirmationDialogTitle,
                 isPresented: $showingSlotOptions,
-                titleVisibility: selectedSlotRecipeName.isEmpty ? .hidden : .visible,
+                titleVisibility: .visible,
                 presenting: selectedSlot
             ) { slot in
                 if slotHasRecipe(slot) {
-                    Button("Replace Recipe") {
+                    Button("Pick a Different Recipe") {
                         activeSheet = .pickRecipe(slot)
                     }
                     Button("Surprise Me") {
                         activeSheet = .surpriseMe(slot)
                     }
-                    Button("Clear Slot", role: .destructive) {
+                    Button("Remove from Plan", role: .destructive) {
                         mealPlanningStore.clearMealSlot(date: slot.date, mealType: slot.mealType)
                     }
                 } else {
@@ -165,6 +183,12 @@ struct MealPlanView: View {
                     Button("Surprise Me") {
                         activeSheet = .surpriseMe(slot)
                     }
+                }
+            } message: { slot in
+                if let name = recipeName(for: slot) {
+                    Text("Currently assigned: \(name)")
+                } else {
+                    Text("Choose how to fill this slot.")
                 }
             }
             // Single sheet modifier handles all presentation
@@ -231,18 +255,54 @@ struct MealPlanView: View {
         ) ?? weekStartDate
     }
 
+    /// Snaps `weekStartDate` forward to the week containing today if the
+    /// currently visible week no longer contains today. This prevents an
+    /// @State value that was initialized on a previous day from silently
+    /// writing meal-plan dates into the wrong week. Respects intentional
+    /// in-session navigation: if the user chevroned to an adjacent week
+    /// that still contains today, nothing changes.
+    private func resyncWeekIfStale() {
+        let today = DateHelper.stripTime(from: Date())
+        let visibleStart = DateHelper.stripTime(from: weekStartDate)
+        guard let visibleEnd = Calendar.current.date(byAdding: .day, value: 7, to: visibleStart) else {
+            return
+        }
+        let todayIsInVisibleWeek = today >= visibleStart && today < visibleEnd
+        if !todayIsInVisibleWeek {
+            let fresh = DateHelper.startOfWeek(containing: Date())
+            // TEMP DEBUG — remove before release
+            print("[TEMP DEBUG] MealPlan resync — visible was \(visibleStart) (today=\(today)), snapping to \(fresh)")
+            weekStartDate = fresh
+        } else {
+            // TEMP DEBUG — remove before release
+            print("[TEMP DEBUG] MealPlan resync — visible \(visibleStart) already contains today \(today), keeping")
+        }
+    }
+
     // MARK: - Meal Plan Data
 
     /// Get just the meal plans for a specific day
     private func mealPlans(for date: Date) -> [CDMealPlan] {
         let dayStart = DateHelper.stripTime(from: date)
-        return Array(allMealPlans).filter { DateHelper.stripTime(from: $0.date) == dayStart }
+        guard let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else {
+            return []
+        }
+        // Half-open [dayStart, nextDayStart) — tolerant of any sub-second
+        // drift in plan.date (same fix applied to the grocery filter).
+        return Array(allMealPlans).filter { plan in
+            plan.date >= dayStart && plan.date < nextDayStart
+        }
     }
 
     /// Get pending suggestions for a specific day
     private func suggestions(for date: Date) -> [CDMealSuggestion] {
         let dayStart = DateHelper.stripTime(from: date)
-        return Array(allSuggestions).filter { DateHelper.stripTime(from: $0.date) == dayStart }
+        guard let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else {
+            return []
+        }
+        return Array(allSuggestions).filter { suggestion in
+            suggestion.date >= dayStart && suggestion.date < nextDayStart
+        }
     }
 
     // MARK: - Slot State Helpers
@@ -250,20 +310,36 @@ struct MealPlanView: View {
     /// Whether the selected slot already has a recipe assigned.
     private func slotHasRecipe(_ slot: MealSlotSelection) -> Bool {
         let dayStart = DateHelper.stripTime(from: slot.date)
-        return allMealPlans.contains {
-            DateHelper.stripTime(from: $0.date) == dayStart
-                && $0.mealTypeRaw == slot.mealType.rawValue
+        guard let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else {
+            return false
+        }
+        return allMealPlans.contains { plan in
+            plan.date >= dayStart
+                && plan.date < nextDayStart
+                && plan.mealTypeRaw == slot.mealType.rawValue
         }
     }
 
-    /// The recipe name for the currently selected slot, used as the dialog title.
-    private var selectedSlotRecipeName: String {
-        guard let slot = selectedSlot else { return "" }
+    /// The recipe assigned to a specific slot, if any.
+    private func recipeName(for slot: MealSlotSelection) -> String? {
         let dayStart = DateHelper.stripTime(from: slot.date)
-        return allMealPlans.first(where: {
-            DateHelper.stripTime(from: $0.date) == dayStart
-                && $0.mealTypeRaw == slot.mealType.rawValue
-        })?.recipe?.name ?? ""
+        guard let nextDayStart = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else {
+            return nil
+        }
+        return allMealPlans.first(where: { plan in
+            plan.date >= dayStart
+                && plan.date < nextDayStart
+                && plan.mealTypeRaw == slot.mealType.rawValue
+        })?.recipe?.name
+    }
+
+    /// Title for the slot confirmation dialog — "Monday Dinner" style so the
+    /// user knows which slot they tapped before choosing an action.
+    private var confirmationDialogTitle: String {
+        guard let slot = selectedSlot else { return "" }
+        let day = DateHelper.shortDayName(for: slot.date)
+        let meal = slot.mealType.rawValue
+        return "\(day) \(meal)"
     }
 
     // MARK: - Recipe Selection Logic

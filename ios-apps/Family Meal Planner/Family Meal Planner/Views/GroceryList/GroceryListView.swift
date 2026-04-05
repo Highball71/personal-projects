@@ -43,6 +43,30 @@ struct GroceryListView: View {
         currentWeekItems.contains { $0.isChecked }
     }
 
+    /// A stable signature of this week's meal plans (date + meal type + recipe).
+    /// Drives reactive regeneration: when this value changes — because a recipe
+    /// was assigned, replaced, or cleared — SwiftUI fires the `.onChange`
+    /// handler on the view and we regenerate the grocery list. Without this,
+    /// the list would only refresh on tab appearance, missing some updates.
+    ///
+    /// Uses the same half-open [weekStart, weekEnd) range check that
+    /// regenerateFromMealPlan uses, so the reactive trigger and the actual
+    /// regeneration agree on which plans count as "this week".
+    private var weekMealPlanSignature: String {
+        let weekStart = DateHelper.stripTime(from: weekStartDate)
+        guard let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) else {
+            return ""
+        }
+        return allMealPlans
+            .filter { $0.date >= weekStart && $0.date < weekEnd }
+            .map { plan -> String in
+                let recipeKey = plan.recipe?.objectID.uriRepresentation().absoluteString ?? "nil"
+                return "\(plan.date.timeIntervalSince1970)|\(plan.mealTypeRaw)|\(recipeKey)"
+            }
+            .sorted()
+            .joined(separator: ",")
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -65,6 +89,17 @@ struct GroceryListView: View {
                 }
             }
             .navigationTitle("Grocery List")
+            // TEMPORARY DEBUG — remove before release
+            .safeAreaInset(edge: .top) {
+                Text("DEBUG: Grocery regeneration active")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red)
+            }
             // Offline banner — shown as a persistent inset above the content
             .safeAreaInset(edge: .top) {
                 if syncMonitor.isOffline {
@@ -82,6 +117,11 @@ struct GroceryListView: View {
                 }
             }
             .onAppear { generateIfNeeded() }
+            // Regenerate whenever this week's meal plans change — catches
+            // assignments made on another tab without requiring a tab switch.
+            .onChange(of: weekMealPlanSignature, initial: false) { _, _ in
+                generateIfNeeded()
+            }
             .toolbar {
                 if !currentWeekItems.isEmpty {
                     Menu {
@@ -137,12 +177,29 @@ struct GroceryListView: View {
     /// churn Core Data (or CloudKit) on every tab switch.
     private func regenerateFromMealPlan() {
         let weekStart = DateHelper.stripTime(from: weekStartDate)
-        let weekDays = DateHelper.weekDays(startingFrom: weekStartDate)
-        let dayStarts = Set(weekDays.map { DateHelper.stripTime(from: $0) })
+        guard let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) else {
+            return
+        }
 
-        // Gather this week's meal plan ingredients
+        // Half-open range [weekStart, weekEnd) — tolerant of any sub-second
+        // drift that the earlier Set-based equality check couldn't handle.
         let thisWeekPlans = allMealPlans.filter { plan in
-            dayStarts.contains(DateHelper.stripTime(from: plan.date))
+            plan.date >= weekStart && plan.date < weekEnd
+        }
+
+        // TEMP DEBUG — remove before release
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        fmt.timeZone = TimeZone.current
+        print("[TEMP DEBUG] Grocery regen — weekStart=\(fmt.string(from: weekStart)) weekEnd=\(fmt.string(from: weekEnd))")
+        print("[TEMP DEBUG] Grocery regen — allMealPlans=\(allMealPlans.count) thisWeek=\(thisWeekPlans.count)")
+        // Dump every plan so we can see WHICH ones are being excluded and why.
+        for plan in allMealPlans {
+            let inRange = plan.date >= weekStart && plan.date < weekEnd
+            let marker = inRange ? "IN " : "OUT"
+            let recipeName = plan.recipe?.name ?? "<nil recipe>"
+            let ingCount = plan.recipe?.ingredientsList.count ?? 0
+            print("[TEMP DEBUG]   [\(marker)] plan.date=\(fmt.string(from: plan.date)) type=\(plan.mealTypeRaw) recipe=\"\(recipeName)\" ingredients=\(ingCount)")
         }
 
         // Combine duplicates: same name + same unit = summed quantity
@@ -160,6 +217,9 @@ struct GroceryListView: View {
             }
         }
 
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] Grocery regen — combined items=\(combined.count) existing=\(currentWeekItems.count)")
+
         // Early out if the existing list already matches the target,
         // so we only touch Core Data when there's a real change.
         let existingSignature = Set(currentWeekItems.map { item in
@@ -168,7 +228,14 @@ struct GroceryListView: View {
         let targetSignature = Set(combined.map { key, value in
             "\(key)|\(value.qty)"
         })
-        if existingSignature == targetSignature { return }
+        if existingSignature == targetSignature {
+            // TEMP DEBUG — remove before release
+            print("[TEMP DEBUG] Grocery regen — signatures match, early-out")
+            return
+        }
+
+        // TEMP DEBUG — remove before release
+        print("[TEMP DEBUG] Grocery regen — writing \(combined.count) items to store")
 
         // Remember which items were checked so we can preserve their state
         let previouslyChecked = Set(currentWeekItems.filter(\.isChecked).map(\.itemID))

@@ -22,7 +22,6 @@ struct DayColumnView: View {
     let isHeadCook: Bool
     let approvalFlowActive: Bool
     let onSlotTapped: (MealType) -> Void
-    let onSlotCleared: (MealType) -> Void
     let onApproveSuggestion: (CDMealSuggestion) -> Void
     let onRejectSuggestion: (CDMealSuggestion) -> Void
 
@@ -47,8 +46,7 @@ struct DayColumnView: View {
                         mealType: mealType,
                         recipeName: recipe?.name,
                         isToday: isToday,
-                        onTap: { onSlotTapped(mealType) },
-                        onClear: { onSlotCleared(mealType) }
+                        onTap: { onSlotTapped(mealType) }
                     )
 
                     // Show pending suggestions for this meal slot
@@ -135,7 +133,6 @@ private struct SuggestionRowView: View {
         isHeadCook: true,
         approvalFlowActive: true,
         onSlotTapped: { _ in },
-        onSlotCleared: { _ in },
         onApproveSuggestion: { _ in },
         onRejectSuggestion: { _ in }
     )
