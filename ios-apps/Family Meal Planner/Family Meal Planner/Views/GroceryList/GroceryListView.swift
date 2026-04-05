@@ -122,15 +122,19 @@ struct GroceryListView: View {
 
     // MARK: - Generation
 
-    /// Generate the grocery list from the meal plan if no items exist for this week.
+    /// Regenerate the grocery list from the meal plan if it's stale.
+    /// "Stale" means the set of (itemID, quantity, unit) derived from
+    /// this week's meal plans no longer matches what's on the list —
+    /// typically because the user just assigned, cleared, or replaced a
+    /// recipe in a meal slot.
     private func generateIfNeeded() {
-        if currentWeekItems.isEmpty {
-            regenerateFromMealPlan()
-        }
+        regenerateFromMealPlan()
     }
 
     /// (Re)generate grocery items from the current week's meal plan.
-    /// Preserves checked state for items that still exist.
+    /// Preserves checked state for items that still exist. Early-outs
+    /// when the target list exactly matches the existing one so we don't
+    /// churn Core Data (or CloudKit) on every tab switch.
     private func regenerateFromMealPlan() {
         let weekStart = DateHelper.stripTime(from: weekStartDate)
         let weekDays = DateHelper.weekDays(startingFrom: weekStartDate)
@@ -155,6 +159,16 @@ struct GroceryListView: View {
                 }
             }
         }
+
+        // Early out if the existing list already matches the target,
+        // so we only touch Core Data when there's a real change.
+        let existingSignature = Set(currentWeekItems.map { item in
+            "\(item.itemID)|\(item.totalQuantity)"
+        })
+        let targetSignature = Set(combined.map { key, value in
+            "\(key)|\(value.qty)"
+        })
+        if existingSignature == targetSignature { return }
 
         // Remember which items were checked so we can preserve their state
         let previouslyChecked = Set(currentWeekItems.filter(\.isChecked).map(\.itemID))

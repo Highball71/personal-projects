@@ -235,14 +235,13 @@ struct SurpriseMealView: View {
     }
 
     private func suggestWithProteins() {
-        let keywords = selectedProteins.flatMap { $0.keywords }
         let recipes = Array(allRecipes)
+        // Match on each recipe's detected primary protein (see
+        // ProteinOption.detect) rather than any keyword hit in any
+        // ingredient, so flavorings like "beef broth" can't misclassify.
         let matching = recipes.filter { recipe in
-            recipe.ingredientsList.contains { ingredient in
-                keywords.contains { keyword in
-                    ingredient.name.localizedCaseInsensitiveContains(keyword)
-                }
-            }
+            guard let detected = ProteinOption.detect(in: recipe) else { return false }
+            return selectedProteins.contains(detected)
         }
         // If no matches for the selected proteins, fall back to all recipes
         currentPool = matching.isEmpty ? recipes : matching

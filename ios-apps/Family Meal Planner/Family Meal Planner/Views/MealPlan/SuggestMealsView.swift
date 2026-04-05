@@ -9,7 +9,7 @@ import SwiftUI
 import CoreData
 
 /// The protein options available for filtering recipes.
-/// Each case includes keywords that match against ingredient names,
+/// Each case includes keywords that identify it in recipe names and ingredients,
 /// so "chicken breast" matches the .chicken option, "ground beef" matches .beef, etc.
 enum ProteinOption: String, CaseIterable, Identifiable {
     case chicken = "Chicken"
@@ -21,18 +21,62 @@ enum ProteinOption: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Keywords to search for in ingredient names (case-insensitive).
-    /// A recipe matches if any of its ingredients contain any of these keywords.
+    /// Keywords that identify this protein in a recipe name or ingredient.
+    /// Matching is case-insensitive substring.
     var keywords: [String] {
         switch self {
         case .chicken: return ["chicken"]
         case .beef: return ["beef", "steak", "sirloin", "chuck", "brisket"]
-        case .pork: return ["pork", "bacon", "ham", "sausage"]
+        case .pork: return ["pork", "bacon", "ham", "sausage", "prosciutto", "pancetta"]
         case .fish: return ["fish", "salmon", "tuna", "cod", "tilapia",
                             "halibut", "trout", "snapper", "catfish", "mahi"]
         case .shrimp: return ["shrimp", "prawn"]
         case .tofu: return ["tofu", "tempeh"]
         }
+    }
+
+    /// Words that, when present in an ingredient name, indicate the ingredient
+    /// is a flavoring/accent rather than the recipe's main protein. Used so
+    /// "beef broth" in a pork stew doesn't misclassify the stew as beef.
+    private static let flavoringMarkers: [String] = [
+        "broth", "stock", "bouillon", "bouillion",
+        "sauce", "paste", "gravy", "dressing", "marinade",
+        "seasoning", "rub", "powder", "extract",
+        "flavor", "flavoring", "base", "cube", "concentrate"
+    ]
+
+    /// Classifies a recipe with its primary protein, if one can be determined.
+    ///
+    /// Classification order:
+    ///   1. Recipe name — users typically name recipes by the main protein
+    ///      ("Chicken Parmesan", "Beef Stroganoff"). First match wins,
+    ///      iterated in `allCases` declaration order.
+    ///   2. Ingredient names — but any ingredient containing a flavoring
+    ///      marker ("beef broth", "chicken bouillon") is skipped so it
+    ///      can't override the main protein.
+    ///
+    /// Returns `nil` for recipes with no identifiable animal/tofu protein
+    /// (e.g. vegetarian dishes, baked goods).
+    static func detect(in recipe: CDRecipe) -> ProteinOption? {
+        let name = recipe.name.lowercased()
+        for protein in ProteinOption.allCases {
+            if protein.keywords.contains(where: { name.contains($0) }) {
+                return protein
+            }
+        }
+
+        for ingredient in recipe.ingredientsList {
+            let ingName = ingredient.name.lowercased()
+            if flavoringMarkers.contains(where: { ingName.contains($0) }) {
+                continue
+            }
+            for protein in ProteinOption.allCases {
+                if protein.keywords.contains(where: { ingName.contains($0) }) {
+                    return protein
+                }
+            }
+        }
+        return nil
     }
 }
 
@@ -268,14 +312,12 @@ struct SuggestMealsView: View {
             // Use everything
             pool = recipes
         } else {
-            // Find recipes with at least one matching protein ingredient
-            let keywords = selectedProteins.flatMap { $0.keywords }
+            // Match on each recipe's detected primary protein, not on any
+            // ingredient containing a protein keyword. This prevents pork
+            // stews with "beef broth" from matching the Beef chip.
             let matching = recipes.filter { recipe in
-                recipe.ingredientsList.contains { ingredient in
-                    keywords.contains { keyword in
-                        ingredient.name.localizedCaseInsensitiveContains(keyword)
-                    }
-                }
+                guard let detected = ProteinOption.detect(in: recipe) else { return false }
+                return selectedProteins.contains(detected)
             }
             pool = matching
         }
