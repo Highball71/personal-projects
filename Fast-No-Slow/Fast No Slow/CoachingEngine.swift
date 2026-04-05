@@ -1,6 +1,18 @@
 import Foundation
 import Combine
 
+// MARK: - Data Model
+
+struct CadenceTarget {
+    var target: Int    // ideal form (e.g. 170 SPM)
+    var floor: Int     // minimum acceptable (e.g. 164 SPM)
+}
+
+struct HRGuardrail {
+    var low: Int       // lower bound (de-emphasized)
+    var high: Int      // upper bound (strongly enforced)
+}
+
 // Which device is providing heart rate data right now.
 enum HRSource: Equatable {
     case chestStrap
@@ -8,56 +20,60 @@ enum HRSource: Equatable {
     case unknown
 }
 
-// Single active coaching state — only one at a time.
-// Higher raw value = higher priority.
-enum CoachingState: Int, Comparable, Equatable {
-    case stable              = 0
-    case cadenceLow          = 1
-    case hrTooLow            = 2
-    case hrDriftingHigh      = 3
-    case hrTooHigh           = 4
-    case hrTooHighEscalated  = 5
-    case sensorWarning       = 6
-
-    static func < (lhs: CoachingState, rhs: CoachingState) -> Bool {
-        lhs.rawValue < rhs.rawValue
-    }
+// Single coaching output — only one at a time.
+// Cadence is primary (form), HR is secondary (effort guardrail).
+enum CoachingCue: Equatable {
+    case increaseCadence   // "Quick feet."
+    case holdCadence       // stable — silence
+    case lightenStride     // "Lighter, shorter steps."
+    case reduceEffort      // "Ease the effort."
 }
 
-// Evaluates HR buffer, cadence, and sensor status to produce a single
-// coaching state plus the voice cue to speak (if any).
+// One-shot sensor events, separate from coaching cues.
+enum SensorAlert: Equatable {
+    case connected
+    case disconnected
+}
+
+// Return type from evaluate().
+struct EvaluationResult {
+    let cue: CoachingCue
+    let voiceMessage: String?     // nil = silence
+    let sensorAlert: SensorAlert? // nil = no sensor event
+}
+
+// MARK: - Coaching Engine
+
+/// Evaluates cadence and HR to produce a single coaching cue.
+/// Cadence is the primary training goal (form).
+/// Heart rate is a secondary guardrail (effort).
+/// Never solves high HR by encouraging low cadence.
 class CoachingEngine: ObservableObject {
 
-    @Published var activeState: CoachingState = .stable
+    @Published var activeCue: CoachingCue = .holdCadence
 
     // MARK: - Configuration (set by WorkoutManager before workout starts)
-    var lowHR: Int = 120
-    var highHR: Int = 150
-    var targetCadence: Int = 170
-    /// How many BPM within ceiling triggers drift warning
-    var driftMargin: Double = 5.0
-    /// How many seconds above zone before escalation
-    var escalationThreshold: TimeInterval = 30
-    /// Seconds cadence must be low before cueing
-    var cadenceLowDuration: TimeInterval = 5
-    /// Cadence tolerance band: target ± this value = "on cadence"
-    var cadenceTolerance: Double = 10
+    var cadenceTarget = CadenceTarget(target: 170, floor: 164)
+    var hrGuardrail = HRGuardrail(low: 120, high: 150)
 
     // MARK: - HR Rolling Buffer
-    // Stores (timestamp, heartRate) tuples for drift prediction.
+    // Stores (timestamp, heartRate) tuples for trend prediction.
     private var hrBuffer: [(date: Date, hr: Double)] = []
     private let bufferWindow: TimeInterval = 15 // keep 15s of data
 
-    // MARK: - State Tracking
-    private var aboveZoneSince: Date?
-    private var cadenceLowSince: Date?
-    private var lastCueState: CoachingState?
+    // MARK: - Evaluation Timing
+    // Coaching evaluates every ~2s even though the timer ticks every 1s.
+    private var lastEvaluationTime: Date = .distantPast
+    private let evaluationInterval: TimeInterval = 2.0
+
+    // MARK: - Cue Cooldown
+    private var lastCue: CoachingCue?
     private var lastCueTime: Date = .distantPast
     private let cueCooldown: TimeInterval = 12 // seconds between repeated cues
-    private var escalationStep = 0 // 0, 1, 2 for escalating messages
 
     // MARK: - Computed HR Metrics
-    // currentHR = average of last 4 seconds
+
+    /// Average HR over the last 4 seconds.
     var currentHR: Double {
         let cutoff = Date().addingTimeInterval(-4)
         let recent = hrBuffer.filter { $0.date >= cutoff }
@@ -65,7 +81,7 @@ class CoachingEngine: ObservableObject {
         return recent.map(\.hr).reduce(0, +) / Double(recent.count)
     }
 
-    // previousHR = average of 8–12 seconds ago
+    /// Average HR from 8–12 seconds ago.
     var previousHR: Double {
         let now = Date()
         let from = now.addingTimeInterval(-12)
@@ -75,7 +91,7 @@ class CoachingEngine: ObservableObject {
         return window.map(\.hr).reduce(0, +) / Double(window.count)
     }
 
-    // hrTrend = positive means rising, negative means falling
+    /// Positive = rising, negative = falling.
     var hrTrend: Double {
         currentHR - previousHR
     }
@@ -86,131 +102,126 @@ class CoachingEngine: ObservableObject {
     func addHeartRate(_ hr: Double) {
         let now = Date()
         hrBuffer.append((date: now, hr: hr))
-        // Trim buffer to window
         let cutoff = now.addingTimeInterval(-bufferWindow)
         hrBuffer.removeAll { $0.date < cutoff }
     }
 
-    /// Main evaluation. Call on every timer tick (~1s).
-    /// Returns a voice cue string if one should be spoken, nil for silence.
+    /// Main evaluation. Called on every timer tick (~1s).
+    /// Returns an EvaluationResult with the cue, optional voice message, and optional sensor alert.
     func evaluate(
         cadence: Double,
         hrSource: HRSource,
         sensorJustDisconnected: Bool,
         sensorJustConnected: Bool
-    ) -> String? {
+    ) -> EvaluationResult {
         let now = Date()
-        let hr = currentHR
 
-        // --- Determine highest-priority state ---
-
-        var newState: CoachingState = .stable
-
-        // Sensor warning: chest strap just disconnected
+        // --- Sensor alerts: one-shot, bypass cooldown ---
         if sensorJustDisconnected {
-            newState = .sensorWarning
+            return EvaluationResult(
+                cue: activeCue,
+                voiceMessage: "Heart rate monitor disconnected. Using Apple Watch heart rate.",
+                sensorAlert: .disconnected
+            )
         }
-
-        // HR too high / escalated
-        if hr > Double(highHR) {
-            if aboveZoneSince == nil {
-                aboveZoneSince = now
-                escalationStep = 0
-            }
-            let aboveDuration = now.timeIntervalSince(aboveZoneSince ?? now)
-            if aboveDuration >= escalationThreshold {
-                newState = max(newState, .hrTooHighEscalated)
-            } else {
-                newState = max(newState, .hrTooHigh)
-            }
-        } else {
-            aboveZoneSince = nil
-            escalationStep = 0
-        }
-
-        // HR drifting high: in zone but trending up near ceiling
-        if hr >= Double(lowHR) && hr <= Double(highHR) {
-            let distanceToCeiling = Double(highHR) - hr
-            if distanceToCeiling <= driftMargin && hrTrend > 1.0 {
-                newState = max(newState, .hrDriftingHigh)
-            }
-        }
-
-        // HR too low
-        if hr > 0 && hr < Double(lowHR) {
-            newState = max(newState, .hrTooLow)
-        }
-
-        // Cadence low: only if no higher-priority HR state
-        if cadence > 0 && cadence < Double(targetCadence) - cadenceTolerance {
-            if cadenceLowSince == nil {
-                cadenceLowSince = now
-            }
-            let lowDuration = now.timeIntervalSince(cadenceLowSince ?? now)
-            if lowDuration >= cadenceLowDuration && newState < .cadenceLow {
-                newState = max(newState, .cadenceLow)
-            }
-        } else {
-            cadenceLowSince = nil
-        }
-
-        // Sensor just connected (lower priority, but always cue)
         if sensorJustConnected {
-            activeState = newState
-            return "Chest strap connected."
+            return EvaluationResult(
+                cue: activeCue,
+                voiceMessage: "Chest strap connected.",
+                sensorAlert: .connected
+            )
         }
 
-        activeState = newState
+        // --- Gate: only evaluate coaching every ~2 seconds ---
+        guard now.timeIntervalSince(lastEvaluationTime) >= evaluationInterval else {
+            return EvaluationResult(cue: activeCue, voiceMessage: nil, sensorAlert: nil)
+        }
+        lastEvaluationTime = now
 
-        // --- Determine voice cue ---
-        // Sensor disconnect always speaks immediately
-        if sensorJustDisconnected {
-            lastCueState = .sensorWarning
-            lastCueTime = now
-            return "Heart rate monitor disconnected. Using Apple Watch heart rate."
+        // --- Cadence-first coaching logic ---
+        let hr = currentHR
+        let high = Double(hrGuardrail.high)
+        let floor = Double(cadenceTarget.floor)
+        let target = Double(cadenceTarget.target)
+
+        var newCue: CoachingCue
+
+        if hr > high {
+            // HR over guardrail — respond based on cadence
+            if cadence >= floor {
+                // Cadence is fine, HR is the problem → lighten stride
+                newCue = .lightenStride
+            } else {
+                // Cadence is also low — don't ask for more steps while HR is high
+                newCue = .reduceEffort
+            }
+        } else if cadence > 0 && cadence < floor {
+            // Below cadence floor — needs to pick it up
+            newCue = .increaseCadence
+        } else if cadence > 0 && cadence < target {
+            // Between floor and target — encourage toward target
+            newCue = .increaseCadence
+        } else {
+            // On target (or above) and HR in range — all good
+            newCue = .holdCadence
         }
 
-        // For other states, respect cooldown
-        if newState == .stable {
-            // Silence is correct when the run is going well
-            return nil
+        // Enhancement: predictive — if HR is trending up fast and near ceiling,
+        // bias toward lightenStride before HR actually crosses the guardrail
+        if hr > high - 8 && hrTrend > 3.0 && cadence >= floor && hr > 0 {
+            newCue = .lightenStride
         }
 
-        // Don't repeat same cue within cooldown unless state escalated
-        if newState == lastCueState && now.timeIntervalSince(lastCueTime) < cueCooldown {
-            return nil
+        // Edge case: walking (very low cadence) with high HR — reassure
+        if cadence > 0 && cadence < 80 && hr > high {
+            activeCue = .holdCadence
+            // Always speak this reassurance (bypass cooldown)
+            return EvaluationResult(
+                cue: .holdCadence,
+                voiceMessage: "Stay here — this is expected.",
+                sensorAlert: nil
+            )
         }
 
-        lastCueState = newState
+        activeCue = newCue
+
+        // --- Voice cue with cooldown ---
+        if newCue == .holdCadence {
+            return EvaluationResult(cue: newCue, voiceMessage: nil, sensorAlert: nil)
+        }
+
+        // Don't repeat same cue within cooldown
+        if newCue == lastCue && now.timeIntervalSince(lastCueTime) < cueCooldown {
+            return EvaluationResult(cue: newCue, voiceMessage: nil, sensorAlert: nil)
+        }
+
+        lastCue = newCue
         lastCueTime = now
 
-        switch newState {
-        case .hrTooHighEscalated:
-            escalationStep += 1
-            return escalationStep <= 1 ? "Bring the effort down." : "Back off a little more."
-        case .hrTooHigh:
-            return "Ease up a bit."
-        case .hrDriftingHigh:
-            return "Ease up a bit."
-        case .hrTooLow:
-            return "Pick it up a touch."
-        case .cadenceLow:
-            return "Quick feet."
-        case .sensorWarning:
-            return nil // already handled above
-        case .stable:
-            return nil
-        }
+        return EvaluationResult(
+            cue: newCue,
+            voiceMessage: voiceString(for: newCue),
+            sensorAlert: nil
+        )
     }
 
     /// Reset all state for a new workout.
     func reset() {
         hrBuffer.removeAll()
-        aboveZoneSince = nil
-        cadenceLowSince = nil
-        lastCueState = nil
+        lastEvaluationTime = .distantPast
+        lastCue = nil
         lastCueTime = .distantPast
-        escalationStep = 0
-        activeState = .stable
+        activeCue = .holdCadence
+    }
+
+    // MARK: - Voice Mapping
+
+    private func voiceString(for cue: CoachingCue) -> String {
+        switch cue {
+        case .increaseCadence: return "Quick feet."
+        case .lightenStride:   return "Lighter, shorter steps."
+        case .reduceEffort:    return "Ease the effort."
+        case .holdCadence:     return ""
+        }
     }
 }

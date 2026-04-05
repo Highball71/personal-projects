@@ -13,7 +13,7 @@ import ActivityKit
 struct WorkoutActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var heartRate: Int
-        var zoneStatus: String   // matches ZoneStatus.rawValue
+        var zoneStatus: String   // "ON TRACK", "QUICK FEET", "LIGHTEN UP", "EASE EFFORT"
         var elapsedTime: TimeInterval
         var cadence: Int
         var isPaused: Bool
@@ -40,10 +40,10 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     @Published var connectedDeviceName: String?
     @Published var hrMonitorState: HRMonitorState = .disconnected
 
-    // New: HR source, cadence, coaching, compliance
+    // HR source, cadence, coaching, compliance
     @Published var hrSource: HRSource = .unknown
     @Published var currentCadence: Double = 0
-    @Published var coachingState: CoachingState = .stable
+    @Published var activeCue: CoachingCue = .holdCadence
     @Published var timeOnCadence: TimeInterval = 0
     @Published var showSummary: Bool = false
     @Published var isPaused: Bool = false
@@ -61,10 +61,10 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     }
 
     // MARK: - Settings (set from ContentView before starting)
-    var lowHR: Int = 120
-    var highHR: Int = 150
-    var targetCadence: Int = 170
+    var cadenceTarget = CadenceTarget(target: 170, floor: 164)
+    var hrGuardrail = HRGuardrail(low: 120, high: 150)
     var metronomeMode: MetronomeMode = .continuous
+
 
     // MARK: - Sub-engines
     let coachingEngine = CoachingEngine()
@@ -203,17 +203,16 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         lastComplianceRewardTime = .distantPast
 
         // Configure coaching engine
-        coachingEngine.lowHR = lowHR
-        coachingEngine.highHR = highHR
-        coachingEngine.targetCadence = targetCadence
+        coachingEngine.cadenceTarget = cadenceTarget
+        coachingEngine.hrGuardrail = hrGuardrail
         coachingEngine.reset()
 
         startHeartRateQuery()
         locationManager.startUpdatingLocation()
         cadenceManager.startTracking()
 
-        // Start metronome
-        metronomeEngine.start(mode: metronomeMode, targetBPM: Double(targetCadence))
+        // Start metronome — 1 beat = 1 step, BPM = cadence target
+        metronomeEngine.start(mode: metronomeMode, targetBPM: Double(cadenceTarget.target), cadenceFloor: Double(cadenceTarget.floor))
 
         // 1-second coaching/tracking timer
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -221,7 +220,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         }
 
         startLiveActivity()
-        speak("Workout started. Target zone: \(lowHR) to \(highHR) beats per minute.")
+        speak("Workout started. Target cadence: \(cadenceTarget.target) steps per minute.")
     }
 
     func stopWorkout() {
@@ -253,6 +252,16 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         synthesizer.stopSpeaking(at: .word)
         locationManager.stopUpdatingLocation()
         updateLiveActivity()
+    }
+
+    /// Apply new settings mid-workout (called from pause editing before resume).
+    func applySettings(cadenceTarget: CadenceTarget, hrGuardrail: HRGuardrail) {
+        self.cadenceTarget = cadenceTarget
+        self.hrGuardrail = hrGuardrail
+        coachingEngine.cadenceTarget = cadenceTarget
+        coachingEngine.hrGuardrail = hrGuardrail
+        metronomeEngine.updateTargetBPM(Double(cadenceTarget.target))
+        metronomeEngine.updateCadenceFloor(Double(cadenceTarget.floor))
     }
 
     func resumeWorkout() {
@@ -315,10 +324,10 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
 
     // MARK: - Zone Status
     private func updateZoneStatus() {
-        if heartRate < Double(lowHR) {
+        if heartRate < Double(hrGuardrail.low) {
             zoneStatus = .belowZone
             isInZone = false
-        } else if heartRate > Double(highHR) {
+        } else if heartRate > Double(hrGuardrail.high) {
             zoneStatus = .aboveZone
             isInZone = false
         } else {
@@ -333,7 +342,8 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     private func timerTick() {
         elapsedTime = Date().timeIntervalSince(startDate ?? Date()) - totalPausedTime
         if isInZone { timeInZone += 1 }
-        if currentCadence > 0 && abs(currentCadence - Double(targetCadence)) <= 10 {
+        // Cadence compliance: at or above the floor
+        if currentCadence > 0 && currentCadence >= Double(cadenceTarget.floor) {
             timeOnCadence += 1
         }
         metronomeEngine.updateCadence(currentCadence)
@@ -344,7 +354,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
 
     // MARK: - Coaching
     private func runCoaching() {
-        let cue = coachingEngine.evaluate(
+        let result = coachingEngine.evaluate(
             cadence: currentCadence,
             hrSource: hrSource,
             sensorJustDisconnected: sensorJustDisconnected,
@@ -355,10 +365,10 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         sensorJustConnected = false
         sensorJustDisconnected = false
 
-        coachingState = coachingEngine.activeState
+        activeCue = result.cue
 
-        if let cue = cue {
-            speak(cue)
+        if let message = result.voiceMessage {
+            speak(message)
         }
     }
 
@@ -366,7 +376,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     private func checkComplianceStreak() {
         let hrOK = isInZone
         let cadenceOK = currentCadence > 0 &&
-            abs(currentCadence - Double(targetCadence)) <= 10
+            currentCadence >= Double(cadenceTarget.floor)
 
         if hrOK && cadenceOK {
             if complianceStreakStart == nil {
@@ -454,13 +464,13 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
             return
         }
         let attributes = WorkoutActivityAttributes(
-            targetLow: lowHR,
-            targetHigh: highHR,
-            targetCadence: targetCadence
+            targetLow: hrGuardrail.low,
+            targetHigh: hrGuardrail.high,
+            targetCadence: cadenceTarget.target
         )
         let initialState = WorkoutActivityAttributes.ContentState(
             heartRate: 0,
-            zoneStatus: ZoneStatus.belowZone.rawValue,
+            zoneStatus: "ON TRACK",
             elapsedTime: 0,
             cadence: 0,
             isPaused: false
@@ -480,7 +490,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         guard let activity = liveActivity else { return }
         let state = WorkoutActivityAttributes.ContentState(
             heartRate: Int(heartRate),
-            zoneStatus: zoneStatus.rawValue,
+            zoneStatus: cueStatusString,
             elapsedTime: elapsedTime,
             cadence: Int(currentCadence),
             isPaused: isPaused
@@ -488,11 +498,20 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
     }
 
+    private var cueStatusString: String {
+        switch activeCue {
+        case .holdCadence:      return "ON TRACK"
+        case .increaseCadence:  return "QUICK FEET"
+        case .lightenStride:    return "LIGHTEN UP"
+        case .reduceEffort:     return "EASE EFFORT"
+        }
+    }
+
     private func endLiveActivity() {
         guard let activity = liveActivity else { return }
         let finalState = WorkoutActivityAttributes.ContentState(
             heartRate: Int(heartRate),
-            zoneStatus: zoneStatus.rawValue,
+            zoneStatus: cueStatusString,
             elapsedTime: elapsedTime,
             cadence: Int(currentCadence),
             isPaused: false

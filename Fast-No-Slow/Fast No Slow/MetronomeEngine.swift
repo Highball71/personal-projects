@@ -17,8 +17,9 @@ enum MetronomeMode: String, CaseIterable, Identifiable {
     }
 }
 
-// Generates a metronome click at the target cadence.
-// Uses AVAudioEngine for sample-accurate timing and volume control.
+/// Metronome click at the target cadence (1 beat = 1 step).
+/// targetBPM is set from CadenceTarget.target.
+/// In guardrail/fade modes, volume ramps based on distance below cadenceFloor.
 class MetronomeEngine {
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
@@ -35,20 +36,21 @@ class MetronomeEngine {
     private let fadeOutDuration: TimeInterval = 120     // 2 min fade-out
     // After fadeFullDuration + fadeOutDuration = 5 min, switches to guardrail behavior
 
-    // Guardrail: current cadence, updated externally
+    // Guardrail: current cadence and floor, updated externally
     private var currentCadence: Double = 0
-    private let cadenceTolerance: Double = 10 // ±10 SPM = "on cadence"
+    private(set) var cadenceFloor: Double = 164
 
     // Pause state (keeps isRunning = true so resume can restart the timer)
     private(set) var isPaused: Bool = false
 
     // MARK: - Public API
 
-    func start(mode: MetronomeMode, targetBPM: Double) {
+    func start(mode: MetronomeMode, targetBPM: Double, cadenceFloor: Double? = nil) {
         stop()
 
         self.mode = mode
         self.targetBPM = targetBPM
+        self.cadenceFloor = cadenceFloor ?? (targetBPM - 6)
         self.startTime = Date()
         self.isRunning = true
 
@@ -210,15 +212,20 @@ class MetronomeEngine {
         }
     }
 
-    /// Volume for guardrail mode: silent when on cadence, fades in when off.
+    /// Volume for guardrail mode: silent at/above target, ramps in as cadence drops below floor.
     private func guardrailVolume() -> Float {
         guard currentCadence > 0 else { return 0.8 } // no data yet, play
-        let deviation = abs(currentCadence - targetBPM)
-        if deviation <= cadenceTolerance {
-            return 0.0 // on cadence, stay silent
+        if currentCadence >= targetBPM {
+            return 0.0 // at or above target, silent
         }
-        // Linear ramp from 0 at tolerance edge to 0.8 at tolerance + 20
-        let ramp = min(Float((deviation - cadenceTolerance) / 20.0), 1.0)
+        // Below target: ramp from 0 to 0.8 as cadence drops further below floor
+        let belowTarget = targetBPM - currentCadence
+        let ramp = min(Float(belowTarget / 20.0), 1.0)
         return ramp * 0.8
+    }
+
+    /// Update the cadence floor (called from WorkoutManager when settings change).
+    func updateCadenceFloor(_ floor: Double) {
+        cadenceFloor = floor
     }
 }

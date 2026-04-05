@@ -9,11 +9,16 @@ struct WorkoutView: View {
     @State private var ringPulse = false
     @State private var heartScale: CGFloat = 1.0
 
-    // MARK: - Color System
-    // green = in zone, yellow = drifting high, red = above zone, blue = below zone
+    // Pause editing state
+    @State private var editCadenceTarget: Int = 170
+    @State private var editCadenceFloor: Int = 164
+    @State private var editHRHigh: Int = 150
 
-    private var isDrifting: Bool {
-        workoutManager.coachingState == .hrDriftingHigh
+    // MARK: - Color System
+    // green = on track, yellow = lighten stride, orange = increase cadence, red = reduce effort, blue = below zone
+
+    private var isLightenStride: Bool {
+        workoutManager.activeCue == .lightenStride
     }
 
     private var ringColor: Color {
@@ -25,7 +30,7 @@ struct WorkoutView: View {
     }
 
     private var bpmColor: Color {
-        if isDrifting { return .yellow }
+        if isLightenStride { return .yellow }
         switch workoutManager.zoneStatus {
         case .inZone:    return .green
         case .aboveZone: return .red
@@ -34,20 +39,31 @@ struct WorkoutView: View {
     }
 
     private var bannerColor: Color {
-        if isDrifting { return .yellow }
-        switch workoutManager.zoneStatus {
-        case .belowZone: return .blue
-        case .inZone:    return .green
-        case .aboveZone: return .red
+        if workoutManager.isPaused { return .orange }
+        switch workoutManager.activeCue {
+        case .holdCadence:      return .green
+        case .increaseCadence:  return .orange
+        case .lightenStride:    return .yellow
+        case .reduceEffort:     return .red
         }
     }
 
     private var bannerIcon: String {
-        if isDrifting { return "arrow.up.forward" }
-        switch workoutManager.zoneStatus {
-        case .belowZone: return "hare"
-        case .inZone:    return "checkmark.circle.fill"
-        case .aboveZone: return "tortoise"
+        switch workoutManager.activeCue {
+        case .holdCadence:      return "checkmark.circle.fill"
+        case .increaseCadence:  return "hare"
+        case .lightenStride:    return "arrow.up.forward"
+        case .reduceEffort:     return "tortoise"
+        }
+    }
+
+    private var bannerText: String {
+        if workoutManager.isPaused { return "PAUSED" }
+        switch workoutManager.activeCue {
+        case .holdCadence:      return "ON TRACK"
+        case .increaseCadence:  return "QUICK FEET"
+        case .lightenStride:    return "LIGHTEN UP"
+        case .reduceEffort:     return "EASE EFFORT"
         }
     }
 
@@ -90,7 +106,12 @@ struct WorkoutView: View {
                         statsGrid
 
                         // Pause / Resume
-                        pauseButton
+                        pauseResumeButton
+
+                        // Pause editing (inline)
+                        if workoutManager.isPaused {
+                            pauseEditingSection
+                        }
 
                         // Hold-to-stop
                         stopButton
@@ -136,63 +157,69 @@ struct WorkoutView: View {
     // MARK: - Status Banner
 
     private var statusBanner: some View {
-        let paused = workoutManager.isPaused
         return HStack(spacing: 8) {
-            Image(systemName: paused ? "pause.fill" : bannerIcon)
+            Image(systemName: workoutManager.isPaused ? "pause.fill" : bannerIcon)
                 .font(.title3)
-            Text(paused ? "PAUSED" : isDrifting ? "EASE UP" : workoutManager.zoneStatus.rawValue)
+            Text(bannerText)
                 .font(.title3)
                 .fontWeight(.bold)
         }
         .foregroundColor(.white)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(paused ? Color.orange : bannerColor)
-        .animation(.easeInOut(duration: 0.3), value: workoutManager.zoneStatus)
-        .animation(.easeInOut(duration: 0.3), value: workoutManager.coachingState)
+        .background(bannerColor)
+        .animation(.easeInOut(duration: 0.3), value: workoutManager.activeCue)
         .animation(.easeInOut(duration: 0.3), value: workoutManager.isPaused)
     }
 
     // MARK: - Heart Rate Ring
 
     private var heartRateRing: some View {
-        ZStack {
-            // Outer glow ring — pulses gently
-            Circle()
-                .stroke(lineWidth: 6)
-                .foregroundColor(ringColor)
-                .shadow(color: workoutManager.isInZone ? .green.opacity(0.5) : .clear, radius: 24)
-                .frame(width: 220, height: 220)
-                .scaleEffect(ringPulse ? 1.025 : 1.0)
-                .animation(
-                    .easeInOut(duration: 1.6).repeatForever(autoreverses: true),
-                    value: ringPulse
-                )
+        VStack(spacing: 0) {
+            ZStack {
+                // Outer glow ring — pulses gently
+                Circle()
+                    .stroke(lineWidth: 6)
+                    .foregroundColor(ringColor)
+                    .shadow(color: workoutManager.isInZone ? .green.opacity(0.5) : .clear, radius: 24)
+                    .frame(width: 220, height: 220)
+                    .scaleEffect(ringPulse ? 1.025 : 1.0)
+                    .animation(
+                        .easeInOut(duration: 1.6).repeatForever(autoreverses: true),
+                        value: ringPulse
+                    )
 
-            // Inner content
-            VStack(spacing: 2) {
-                // Heart icon — bounces on each HR update
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 30))
-                    .foregroundColor(.red)
-                    .scaleEffect(heartScale)
+                // Inner content
+                VStack(spacing: 2) {
+                    // Heart icon — bounces on each HR update
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(.red)
+                        .scaleEffect(heartScale)
 
-                // BPM — massive, colored by zone
-                Text("\(Int(workoutManager.heartRate))")
-                    .font(.system(size: 76, weight: .bold, design: .rounded))
-                    .foregroundColor(bpmColor)
-                    .contentTransition(.numericText())
+                    // BPM — massive, colored by zone
+                    Text("\(Int(workoutManager.heartRate))")
+                        .font(.system(size: 76, weight: .bold, design: .rounded))
+                        .foregroundColor(bpmColor)
+                        .contentTransition(.numericText())
 
-                // HR source icon
-                hrSourceIcon
+                    // HR source icon
+                    hrSourceIcon
 
-                // Zone range
-                Text("Zone: \(workoutManager.lowHR)–\(workoutManager.highHR) bpm")
-                    .font(.caption)
-                    .foregroundColor(Color(white: 0.5))
+                    // Zone range
+                    Text("\(workoutManager.hrGuardrail.low)–\(workoutManager.hrGuardrail.high) bpm")
+                        .font(.caption)
+                        .foregroundColor(Color(white: 0.5))
+                }
             }
+            .frame(height: 230)
+
+            // Thin HR zone position bar
+            hrZoneBar
+                .frame(height: 6)
+                .padding(.horizontal, 40)
+                .padding(.top, 4)
         }
-        .frame(height: 230)
         .onAppear { ringPulse = true }
         .onChange(of: workoutManager.heartRate) { _, _ in
             // Heartbeat bounce
@@ -242,19 +269,28 @@ struct WorkoutView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 3) {
-                Text("Target \(workoutManager.targetCadence)")
+                Text("Target \(workoutManager.cadenceTarget.target)")
                     .font(.caption)
                     .foregroundColor(Color(white: 0.45))
                 if workoutManager.currentCadence > 0 {
-                    let onCadence = abs(workoutManager.currentCadence - Double(workoutManager.targetCadence)) <= 10
-                    Text(onCadence ? "On Cadence" : "Off Cadence")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(onCadence ? .green : .orange)
+                    let delta = Int(workoutManager.currentCadence) - workoutManager.cadenceTarget.target
+                    Text(delta >= 0 ? "+\(delta)" : "\(delta)")
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(cadenceDeltaColor)
                 }
             }
         }
         .padding(.horizontal, 8)
+    }
+
+    private var cadenceDeltaColor: Color {
+        let cadence = workoutManager.currentCadence
+        let target = Double(workoutManager.cadenceTarget.target)
+        let floor = Double(workoutManager.cadenceTarget.floor)
+        if cadence >= target { return .green }
+        if cadence >= floor { return .yellow }
+        return .orange
     }
 
     // MARK: - 2x2 Stats Grid (frosted glass)
@@ -310,9 +346,14 @@ struct WorkoutView: View {
 
     // MARK: - Pause / Resume Button
 
-    private var pauseButton: some View {
+    private var pauseResumeButton: some View {
         Button {
             if workoutManager.isPaused {
+                // Apply edited settings before resuming
+                workoutManager.applySettings(
+                    cadenceTarget: CadenceTarget(target: editCadenceTarget, floor: editCadenceFloor),
+                    hrGuardrail: HRGuardrail(low: workoutManager.hrGuardrail.low, high: editHRHigh)
+                )
                 workoutManager.resumeWorkout()
             } else {
                 workoutManager.pauseWorkout()
@@ -335,6 +376,14 @@ struct WorkoutView: View {
             )
         }
         .animation(.easeInOut(duration: 0.2), value: workoutManager.isPaused)
+        .onChange(of: workoutManager.isPaused) { _, paused in
+            if paused {
+                // Initialize edit state from current settings
+                editCadenceTarget = workoutManager.cadenceTarget.target
+                editCadenceFloor = workoutManager.cadenceTarget.floor
+                editHRHigh = workoutManager.hrGuardrail.high
+            }
+        }
     }
 
     // MARK: - Stop Button (hold to confirm)
@@ -390,6 +439,117 @@ struct WorkoutView: View {
         holdTimer = nil
         isHoldingStop = false
         withAnimation(.easeOut(duration: 0.2)) { holdProgress = 0 }
+    }
+
+    // MARK: - HR Zone Position Bar
+
+    private var hrZoneBar: some View {
+        GeometryReader { geo in
+            let low = Double(workoutManager.hrGuardrail.low)
+            let high = Double(workoutManager.hrGuardrail.high)
+            let hr = workoutManager.heartRate
+            // Map HR to position: scale 40–220 bpm across the bar width
+            let minBPM: Double = 40
+            let maxBPM: Double = 220
+            let range = maxBPM - minBPM
+            let lowFrac = CGFloat((low - minBPM) / range)
+            let highFrac = CGFloat((high - minBPM) / range)
+            let hrFrac = CGFloat(min(max((hr - minBPM) / range, 0), 1))
+
+            ZStack(alignment: .leading) {
+                // Background
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color(white: 0.15))
+
+                // Green zone band
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.green.opacity(0.4))
+                    .frame(width: geo.size.width * (highFrac - lowFrac))
+                    .offset(x: geo.size.width * lowFrac)
+
+                // Current HR dot
+                if hr > 0 {
+                    Circle()
+                        .fill(ringColor)
+                        .frame(width: 10, height: 10)
+                        .shadow(color: ringColor.opacity(0.6), radius: 4)
+                        .offset(x: geo.size.width * hrFrac - 5)
+                        .animation(.easeInOut(duration: 0.3), value: workoutManager.heartRate)
+                }
+            }
+        }
+    }
+
+    // MARK: - Pause Editing
+
+    private var pauseEditingSection: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("Adjust Settings")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Spacer()
+            }
+
+            HStack(spacing: 0) {
+                VStack(spacing: 4) {
+                    Text("Cadence")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                    Picker("Target", selection: $editCadenceTarget) {
+                        ForEach(100...210, id: \.self) { value in
+                            Text("\(value)").tag(value)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 100)
+                    .clipped()
+                }
+                .frame(maxWidth: .infinity)
+
+                VStack(spacing: 4) {
+                    Text("Floor")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color(white: 0.5))
+                    Picker("Floor", selection: $editCadenceFloor) {
+                        ForEach(100...210, id: \.self) { value in
+                            Text("\(value)").tag(value)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 100)
+                    .clipped()
+                }
+                .frame(maxWidth: .infinity)
+
+                VStack(spacing: 4) {
+                    Text("HR Max")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
+                    Picker("HR Max", selection: $editHRHigh) {
+                        ForEach(100...220, id: \.self) { value in
+                            Text("\(value)").tag(value)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 100)
+                    .clipped()
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial.opacity(0.6))
+        .background(Color(white: 0.08))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(white: 0.15), lineWidth: 1)
+        )
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     // MARK: - Formatters

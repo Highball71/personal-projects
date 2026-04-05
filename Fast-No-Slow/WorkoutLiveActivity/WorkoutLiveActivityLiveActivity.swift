@@ -7,7 +7,7 @@ import SwiftUI
 struct WorkoutActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var heartRate: Int
-        var zoneStatus: String   // "SPEED UP", "IN THE ZONE", "SLOW DOWN"
+        var zoneStatus: String   // "ON TRACK", "QUICK FEET", "LIGHTEN UP", "EASE EFFORT"
         var elapsedTime: TimeInterval
         var cadence: Int
         var isPaused: Bool
@@ -129,9 +129,11 @@ struct WorkoutLiveActivityLiveActivity: Widget {
 
     private func zoneColor(for status: String) -> Color {
         switch status {
-        case "IN THE ZONE": return .green
-        case "SLOW DOWN":   return .red
-        default:            return .blue
+        case "ON TRACK":     return .green
+        case "QUICK FEET":   return .orange
+        case "LIGHTEN UP":   return .yellow
+        case "EASE EFFORT":  return .red
+        default:             return .blue
         }
     }
 
@@ -153,13 +155,13 @@ extension WorkoutActivityAttributes {
 extension WorkoutActivityAttributes.ContentState {
     fileprivate static var running: WorkoutActivityAttributes.ContentState {
         WorkoutActivityAttributes.ContentState(
-            heartRate: 155, zoneStatus: "IN THE ZONE",
+            heartRate: 155, zoneStatus: "ON TRACK",
             elapsedTime: 1245, cadence: 172, isPaused: false
         )
     }
     fileprivate static var paused: WorkoutActivityAttributes.ContentState {
         WorkoutActivityAttributes.ContentState(
-            heartRate: 148, zoneStatus: "IN THE ZONE",
+            heartRate: 148, zoneStatus: "ON TRACK",
             elapsedTime: 1245, cadence: 0, isPaused: true
         )
     }
