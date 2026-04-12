@@ -72,12 +72,12 @@ struct SettingsView: View {
             .alert("iCloud Required", isPresented: $showCloudKitAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Sign in to iCloud in Settings to share your recipe library with household members.")
+                Text("Sign in to iCloud in Settings to share with your household.")
             }
             .alert("Sync Not Ready", isPresented: $showContainerUnavailableAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("CloudKit hasn't synced yet. Wait a moment and try again.")
+                Text("Still syncing. Wait a moment and try again.")
             }
             .alert("Couldn't Create Share Link", isPresented: $showingShareError) {
                 Button("OK", role: .cancel) {}
@@ -181,7 +181,7 @@ struct SettingsView: View {
         } header: {
             Text("Household")
         } footer: {
-            Text("Add your family members here. Pick \"You are\" so the app knows who's using this device.")
+            Text("Add your household members. Set your name below so the app knows who you are.")
         }
     }
 
@@ -222,7 +222,7 @@ struct SettingsView: View {
         } header: {
             Text("Head Cook")
         } footer: {
-            Text("The Head Cook has final say on the weekly meal plan. Others can suggest recipes, but the Head Cook approves them. Leave unset to skip the approval flow.")
+            Text("The Head Cook approves the weekly meal plan. Others can suggest meals, but the Head Cook decides. Leave blank to let anyone plan meals.")
         }
     }
 
@@ -240,9 +240,7 @@ struct SettingsView: View {
 
     private var sharingSection: some View {
         Section {
-            // Tapping while the spinner is showing cancels the in-flight operation.
             Button {
-                Logger.cloudkit.info("Share button tapped — isLoadingShare=\(isLoadingShare)")
                 if isLoadingShare { cancelShare() } else { generateShareURL() }
             } label: {
                 HStack {
@@ -260,26 +258,21 @@ struct SettingsView: View {
             }
             .disabled(!isSyncReady && !isLoadingShare)
 
-            // Subtle sync status indicator
+            // Sync status — compact, unobtrusive
             SyncStatusRow(
                 syncState: syncMonitor.syncState,
                 isOffline: syncMonitor.isOffline,
                 lastErrorMessage: syncMonitor.lastErrorMessage
             )
-
-            Button("Reset Sharing", role: .destructive) {
-                showingResetConfirm = true
-            }
-            .disabled(isLoadingShare)
         } header: {
-            Text("iCloud Sharing")
+            Text("Sharing")
         } footer: {
             if syncMonitor.isOffline {
-                Text("You appear to be offline. Connect to the internet to share your recipe library.")
-            } else if case .error(let msg) = syncMonitor.syncState {
-                Text("Sync issue: \(msg). Try again or use Debug Recovery tools.")
+                Text("You appear to be offline. Connect to the internet to share.")
+            } else if case .error = syncMonitor.syncState {
+                Text("There's a sync issue. Try again in a moment.")
             } else {
-                Text("Share your recipe library with household members so everyone sees the same recipes, meal plans, and grocery lists.")
+                Text("Share your recipes, meal plans, and grocery lists with your household.")
             }
         }
     }
@@ -742,15 +735,14 @@ struct SyncStatusRow: View {
         if isOffline { return "Offline" }
         switch syncState {
         case .synced:
-            return "iCloud connected"
+            return "Connected"
         case .syncing:
-            // If there was a recent error, show it instead of just "Syncing..."
-            if let msg = lastErrorMessage {
-                return "Syncing (last error: \(msg))"
+            if lastErrorMessage != nil {
+                return "Reconnecting..."
             }
             return "Syncing..."
-        case .error(let m):
-            return "Sync issue: \(m)"
+        case .error:
+            return "Sync issue"
         }
     }
 
@@ -782,7 +774,7 @@ final class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
 
     func itemTitle(for csc: UICloudSharingController) -> String? {
         Logger.cloudkit.info("CloudSharingDelegate: itemTitle called")
-        return "Family Meal Planner"
+        return "FluffyList"
     }
 
     func cloudSharingController(

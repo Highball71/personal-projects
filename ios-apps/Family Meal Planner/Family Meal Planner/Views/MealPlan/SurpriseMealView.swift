@@ -263,17 +263,10 @@ struct SurpriseMealView: View {
         // ProteinOption.detect) rather than any keyword hit in any
         // ingredient, so flavorings like "beef broth" can't misclassify.
         let selected = selectedProteins
-        // TEMP DEBUG — remove before release
-        print("[TEMP DEBUG] Surprise Me filter — selected=\(selected.map(\.rawValue).sorted()) library=\(recipes.count) recipes")
         let matching = recipes.filter { recipe in
             let detected = ProteinOption.detect(in: recipe)
-            let didMatch = detected.map { selected.contains($0) } ?? false
-            // TEMP DEBUG — remove before release
-            print("[TEMP DEBUG]   \"\(recipe.name)\" detected=\(detected?.rawValue ?? "nil") matched=\(didMatch)")
-            return didMatch
+            return detected.map { selected.contains($0) } ?? false
         }
-        // TEMP DEBUG — remove before release
-        print("[TEMP DEBUG] Surprise Me filter — \(matching.count) of \(recipes.count) matched; showing empty state if zero")
 
         // No fallback to the full library — if nothing matches the selected
         // protein, show an empty state. Falling back would surface any recipe

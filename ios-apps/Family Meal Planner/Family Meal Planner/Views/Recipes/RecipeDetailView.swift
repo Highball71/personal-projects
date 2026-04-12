@@ -224,8 +224,7 @@ struct RecipeDetailView: View {
                         }
                     }
                 } else {
-                    // Household exists but no identity set
-                    Text("Set \"You are\" in Settings to rate recipes")
+                    Text("Set your name in Settings to rate recipes.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

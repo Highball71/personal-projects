@@ -89,18 +89,6 @@ struct GroceryListView: View {
                 }
             }
             .navigationTitle("Grocery List")
-            // TEMPORARY DEBUG — remove before release
-            .safeAreaInset(edge: .top) {
-                Text("DEBUG: Grocery regeneration active")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.red)
-            }
-            // Offline banner — shown as a persistent inset above the content
             .safeAreaInset(edge: .top) {
                 if syncMonitor.isOffline {
                     HStack(spacing: 6) {
@@ -149,7 +137,7 @@ struct GroceryListView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Clear", role: .destructive) { clearCheckedItems() }
             } message: {
-                Text("This will remove all checked items from the list. This clears checkmarks for everyone in your household.")
+                Text("Checked items will be removed for everyone in your household.")
             }
             .alert("Uncheck all items?", isPresented: $showUncheckConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -187,21 +175,6 @@ struct GroceryListView: View {
             plan.date >= weekStart && plan.date < weekEnd
         }
 
-        // TEMP DEBUG — remove before release
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        fmt.timeZone = TimeZone.current
-        print("[TEMP DEBUG] Grocery regen — weekStart=\(fmt.string(from: weekStart)) weekEnd=\(fmt.string(from: weekEnd))")
-        print("[TEMP DEBUG] Grocery regen — allMealPlans=\(allMealPlans.count) thisWeek=\(thisWeekPlans.count)")
-        // Dump every plan so we can see WHICH ones are being excluded and why.
-        for plan in allMealPlans {
-            let inRange = plan.date >= weekStart && plan.date < weekEnd
-            let marker = inRange ? "IN " : "OUT"
-            let recipeName = plan.recipe?.name ?? "<nil recipe>"
-            let ingCount = plan.recipe?.ingredientsList.count ?? 0
-            print("[TEMP DEBUG]   [\(marker)] plan.date=\(fmt.string(from: plan.date)) type=\(plan.mealTypeRaw) recipe=\"\(recipeName)\" ingredients=\(ingCount)")
-        }
-
         // Combine duplicates: same name + same unit = summed quantity
         var combined: [String: (name: String, qty: Double, unit: IngredientUnit)] = [:]
         for plan in thisWeekPlans {
@@ -217,9 +190,6 @@ struct GroceryListView: View {
             }
         }
 
-        // TEMP DEBUG — remove before release
-        print("[TEMP DEBUG] Grocery regen — combined items=\(combined.count) existing=\(currentWeekItems.count)")
-
         // Early out if the existing list already matches the target,
         // so we only touch Core Data when there's a real change.
         let existingSignature = Set(currentWeekItems.map { item in
@@ -229,13 +199,8 @@ struct GroceryListView: View {
             "\(key)|\(value.qty)"
         })
         if existingSignature == targetSignature {
-            // TEMP DEBUG — remove before release
-            print("[TEMP DEBUG] Grocery regen — signatures match, early-out")
             return
         }
-
-        // TEMP DEBUG — remove before release
-        print("[TEMP DEBUG] Grocery regen — writing \(combined.count) items to store")
 
         // Remember which items were checked so we can preserve their state
         let previouslyChecked = Set(currentWeekItems.filter(\.isChecked).map(\.itemID))

@@ -2,8 +2,9 @@
 //  Family_Meal_PlannerApp.swift
 //  Family Meal Planner
 //
-//  Rebuilt with Core Data + NSPersistentCloudKitContainer.
-//  No SwiftData — direct Core Data for reliable CloudKit sharing.
+//  Two paths:
+//    - useSupabase = true  -> Supabase Auth + PostgREST (new)
+//    - useSupabase = false -> Core Data + CloudKit (old, preserved)
 //
 
 import SwiftUI
@@ -11,17 +12,24 @@ import CoreData
 import CloudKit
 import os
 
-// MARK: - App Delegate (CloudKit Share Acceptance)
+// MARK: - Feature Flag
+
+/// Flip this to switch between old CloudKit path and new Supabase path.
+/// Once Supabase is validated end-to-end, the CloudKit path can be removed.
+private let useSupabase = true
+
+// MARK: - App Delegate (CloudKit Share Acceptance — old path only)
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
     ) {
+        guard !useSupabase else { return }  // No-op on Supabase path.
+
         let persistence = PersistenceController.shared
         let container = persistence.container
 
-        // Accept the share into our shared persistent store.
         container.acceptShareInvitations(
             from: [cloudKitShareMetadata],
             into: persistence.sharedStore!
@@ -38,68 +46,69 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct Family_Meal_PlannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
-    /// The shared persistence controller, injected as an environment object
-    /// so views can access the container (and react to container rebuilds
-    /// via @Published).
-    @StateObject private var persistence = PersistenceController.shared
-    
-    /// Single SyncMonitor instance shared across the app.
-    @State private var syncMonitor = SyncMonitor()
 
-    /// Central store for meal plan mutations (assign, clear, suggest).
+    // Old CloudKit path — kept but only initialised when needed.
+    @StateObject private var persistence = PersistenceController.shared
+    @State private var syncMonitor = SyncMonitor()
     @State private var mealPlanningStore = MealPlanningStore()
     private let performStartupReset = false
     @State private var didRunStartupTasks = false
+
+    // New Supabase path
+    @StateObject private var supabaseManager = SupabaseManager.shared
+    @StateObject private var authService = AuthService()
+    @StateObject private var householdService = HouseholdService()
+    @StateObject private var recipeService = RecipeService()
+
     var body: some Scene {
         WindowGroup {
-            // When a local-store reset is in progress, remove ALL views
-            // that hold @FetchRequest from the hierarchy. This prevents
-            // stale-object crashes (CDRecipe, CDHouseholdMember, etc.)
-            // from the old container being accessed during the rebuild.
-            //
-            // When isResetting flips back to false, SwiftUI creates
-            // fresh ContentView (and all child views) with @FetchRequest
-            // instances bound to the NEW container's viewContext.
-            Group {
-            if persistence.isResetting {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Resetting sync data…")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
+            if useSupabase {
+                // ── Supabase path ──
+                AppRootView()
+                    .environmentObject(supabaseManager)
+                    .environmentObject(authService)
+                    .environmentObject(householdService)
+                    .environmentObject(recipeService)
             } else {
-                ContentView()
-                    .environment(
-                        \.managedObjectContext,
-                         persistence.container.viewContext
-                    )
-                    .environment(syncMonitor)
-                    .environment(mealPlanningStore)
-                    .environmentObject(persistence)
-                
-            }
-            }
-            .task {
-                guard !didRunStartupTasks else { return }
-                didRunStartupTasks = true
-
-                if performStartupReset {
-                    do {
-                        try await persistence.resetLocalStoresAndRebuildContainer(syncMonitor: syncMonitor)
-                    } catch {
-                        print("❌ Reset failed: \(error)")
+                // ── Old CloudKit path (preserved, not deleted) ──
+                Group {
+                    if persistence.isResetting {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("Resetting sync data…")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemBackground))
+                    } else {
+                        ContentView()
+                            .environment(
+                                \.managedObjectContext,
+                                 persistence.container.viewContext
+                            )
+                            .environment(syncMonitor)
+                            .environment(mealPlanningStore)
+                            .environmentObject(persistence)
                     }
                 }
+                .task {
+                    guard !didRunStartupTasks else { return }
+                    didRunStartupTasks = true
 
-                persistence.ensureDefaultHouseholdExists()
-                persistence.backfillOrphanedObjects()
+                    if performStartupReset {
+                        do {
+                            try await persistence.resetLocalStoresAndRebuildContainer(syncMonitor: syncMonitor)
+                        } catch {
+                            print("Reset failed: \(error)")
+                        }
+                    }
+
+                    persistence.ensureDefaultHouseholdExists()
+                    persistence.backfillOrphanedObjects()
+                }
             }
         }
-        
     }
 }

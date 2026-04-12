@@ -34,7 +34,7 @@ final class ShareCoordinator: NSObject, UICloudSharingControllerDelegate {
 
     /// Called when the share record is saved to CloudKit.
     func itemTitle(for csc: UICloudSharingController) -> String? {
-        return "Family Meal Planner"
+        return "FluffyList"
     }
 
     /// Called when the user stops sharing entirely.

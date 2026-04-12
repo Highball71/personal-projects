@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination 'generic/platform=iOS Simulator' -configuration Debug build)",
+      "Bash(xcrun simctl:*)",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination 'platform=iOS Simulator,id=F8E33853-5505-43C1-BC86-0D75F2A4A6B3' -configuration Debug build)",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -showBuildSettings -scheme \"Family Meal Planner\")",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' -configuration Debug build)",
+      "Bash(xcodebuild -showsdks)",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -showdestinations)",
+      "Bash(xcrun swiftc:*)"
+    ]
+  }
+}

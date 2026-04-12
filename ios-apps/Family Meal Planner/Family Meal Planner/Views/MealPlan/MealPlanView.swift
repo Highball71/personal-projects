@@ -275,13 +275,7 @@ struct MealPlanView: View {
         }
         let todayIsInVisibleWeek = today >= visibleStart && today < visibleEnd
         if !todayIsInVisibleWeek {
-            let fresh = DateHelper.startOfWeek(containing: Date())
-            // TEMP DEBUG — remove before release
-            print("[TEMP DEBUG] MealPlan resync — visible was \(visibleStart) (today=\(today)), snapping to \(fresh)")
-            weekStartDate = fresh
-        } else {
-            // TEMP DEBUG — remove before release
-            print("[TEMP DEBUG] MealPlan resync — visible \(visibleStart) already contains today \(today), keeping")
+            weekStartDate = DateHelper.startOfWeek(containing: Date())
         }
     }
 

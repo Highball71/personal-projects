@@ -99,7 +99,7 @@ final class CloudKitSharingService {
             timeoutNanoseconds: 15_000_000_000
         )
 
-        share[CKShare.SystemFieldKey.title] = "Family Meal Planner" as CKRecordValue
+        share[CKShare.SystemFieldKey.title] = "FluffyList" as CKRecordValue
         await clearApplicationVersion(from: share, using: ckContainer)
 
         return (share, ckContainer)
@@ -219,7 +219,7 @@ final class CloudKitSharingService {
             logger.error("nuclearShareReset: WARNING — new URL is identical to old URL!")
         }
 
-        newShare[CKShare.SystemFieldKey.title] = "Family Meal Planner" as CKRecordValue
+        newShare[CKShare.SystemFieldKey.title] = "FluffyList" as CKRecordValue
         await clearApplicationVersion(from: newShare, using: ckContainer)
 
         return (newShare, ckContainer)

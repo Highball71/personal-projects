@@ -128,17 +128,6 @@ struct SuggestMealsView: View {
 
     private var proteinSelectionView: some View {
         VStack(spacing: 24) {
-            // TEMPORARY DEBUG — remove before release
-            Text("DEBUG: New protein filter active")
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(Color.red)
-                .padding(.top, 4)
-
             VStack(spacing: 6) {
                 Text("What proteins do you have?")
                     .font(.title2)

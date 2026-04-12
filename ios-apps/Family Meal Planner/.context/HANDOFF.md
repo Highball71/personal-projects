@@ -1,59 +1,54 @@
 # HANDOFF.md — FluffyList
 
 ## One-Paragraph Resume
-FluffyList Beta (Build 92) is on TestFlight. The app is a household meal planner with recipes, grocery lists, and CloudKit sharing. The main goal right now is **reliable household sharing** — Shannon (David's wife) needs to be able to accept a CloudKit share and use the app as a shared household member. The current blocker is an inconsistent share flow: the share link triggers a "needs newer version" error due to `CFBundleVersion` metadata embedded in the `CKShare` at creation time. The beta app has been given a distinct temporary icon (different from the original orange/spoon icon) so testers can immediately distinguish it from any production FluffyList install.
+FluffyList Beta (Build 92) is migrating from CloudKit to Supabase for household sharing. The Supabase scaffolding is in place: SQL schema with RLS, Swift service layer (Auth, Household, Recipe), Codable models, Sign in with Apple flow, household create/join by code, and a recipe list view — all compiling and wired into the app behind a feature flag (`useSupabase = true` in `Family_Meal_PlannerApp.swift`). The old CloudKit code is preserved but inactive. Next: create a Supabase project, plug in real URL/key, and test end-to-end.
 
 ---
 
 ## Current Status
-- **Build:** 92 (TestFlight, live)
+- **Build:** 92 (TestFlight, live — still CloudKit; Supabase path not yet deployed)
 - **Branch:** main
 - **Bundle ID:** com.highball71.fluffylist.beta
 - **Display Name:** FluffyList Beta
-- **Device:** iPhone (for share recreation; iMac for code)
-- **Proxy:** https://fluffylist-proxy.onrender.com (Render free tier, Node/Express)
+- **Feature Flag:** `useSupabase = true` in Family_Meal_PlannerApp.swift
+- **Proxy:** https://fluffylist-proxy.onrender.com (for Claude Vision API, unchanged)
 
-## Main Goal
-**Reliable household sharing via CloudKit.**
+## Architecture
+- **Source of truth:** Supabase (Postgres + RLS)
+- **Auth:** Sign in with Apple via Supabase Auth
+- **Sharing:** Join-code flow (6-char code per household)
+- **Old CloudKit path:** Preserved behind `useSupabase = false`, not deleted
 
-## What's Working
-- Photo scan (Claude Vision API) — intermittent "0 pages scanned" bug, not blocking
-- Ingredient search
-- URL import
-- Grocery list persistence (fixed)
-- Proxy authentication
-- CloudKit sync (production schema deployed)
-- Multi-page photo scanning
-- Per-person recipe ratings
-- Weekly meal planning
+## What's Done (Supabase Migration)
+- SQL schema: `supabase/migrations/001_initial_schema.sql` (9 tables + RLS)
+- SPM dependency: `supabase-swift` v2.43.1 added
+- Config: `Secrets.xcconfig` has `SUPABASE_URL` / `SUPABASE_ANON_KEY` placeholders
+- Service layer: `SupabaseManager`, `AuthService`, `HouseholdService`, `RecipeService`
+- Models: `SupabaseModels.swift` (Codable Row/Insert structs)
+- Views: `SignInView`, `HouseholdOnboardingView`, `AppRootView`, `SupabaseRecipeListView`, `SupabaseAddRecipeView`, `HouseholdInfoView`
+- Build: Compiles clean (iPhone 17 Pro Simulator)
 
-## What's Broken / Blocking
-- **CloudKit share acceptance** — Shannon gets "needs newer version" error
-  - Root cause: `CFBundleVersion` in `CKShare` metadata mismatch between builds
-  - Fix: Delete and recreate the share on iPhone (embeds fresh Build 92 metadata)
-- **Inconsistent share flow** — the overall share-accept-collaborate cycle is unreliable
-- **Data wipe on reinstall** — Not yet diagnosed
+## What's Not Done Yet
+- Supabase project not created (no real URL/key)
+- Sign in with Apple not configured in Supabase dashboard
+- Meal plan and grocery views not yet on Supabase path (placeholders)
+- No offline/local cache
+- No realtime subscriptions
+- Old CloudKit code not yet removed
 
-## Critical Files
-- `AnthropicClient.swift` — Proxy integration
-- `Entitlements.plist` — `aps-environment` currently set to development, needs flip to production
-- `Info.plist` — `CFBundleVersion` = 92
-- `Assets.xcassets/AppIcon.appiconset/` — Beta icon (temporary, distinct from production)
-
-## Repos
-- **Main:** `github.com/Highball71/personal-projects` (contains `ios-apps/Family Meal Planner/`)
-- **Proxy:** `github.com/Highball71/fluffylist-proxy`
+## Critical Files (New)
+- `Family_Meal_PlannerApp.swift` — feature flag + both paths
+- `Services/Supabase/` — all Supabase services
+- `Models/Supabase/SupabaseModels.swift` — Codable structs
+- `Views/Auth/` — all auth/onboarding/Supabase views
+- `supabase/migrations/001_initial_schema.sql` — database schema
+- `.context/MIGRATION_PLAN.md` — full migration plan
 
 ## Next Steps (In Order)
-1. Delete Shannon's share on iPhone, recreate it, have her accept
-2. Verify share acceptance works end-to-end
-3. If still failing, increment build to 93 and push new TestFlight
-4. Flip `aps-environment` to production
-5. Build iPad-native layout
-6. Final ingredient/photo scan test
-7. Submit to App Store
-
-## What to Check First When Resuming
-- Has Shannon accepted the new share link yet?
-- What was the last error message?
-- Is the beta icon showing correctly on device?
+1. Create Supabase project at supabase.com
+2. Run `001_initial_schema.sql` in SQL editor
+3. Enable Sign in with Apple in Supabase Auth settings
+4. Add real URL + anon key to `Secrets.xcconfig`
+5. Test sign-in -> create household -> add recipe end-to-end
+6. Wire up meal plan and grocery tabs to Supabase
+7. Remove old CloudKit code after Supabase is validated

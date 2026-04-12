@@ -15,16 +15,37 @@ Record of architectural decisions and constraints that should not be re-litigate
 
 ---
 
-## Decision: CloudKit for Sync, Not Custom Backend
+## Decision: CloudKit for Sync, Not Custom Backend (SUPERSEDED)
 **Date:** Early 2025
-**Status:** Locked in, but complex
-**Why:**
+**Status:** SUPERSEDED by Supabase (April 2025)
+**Why it was chosen:**
 - Free tier (tied to iCloud accounts)
 - Apple-native, works offline
-- Family sharing use case fits CloudKit's design
-- No cost for data transfer
 
-**Constraint:** CloudKit sharing metadata includes `CFBundleVersion`. If recipient's build is lower, CloudKit rejects. Solution: delete and recreate share if metadata mismatch occurs.
+**Why it was replaced:** CloudKit sharing was unreliable — `CKShare` metadata version mismatches caused "needs newer version" errors with no practical automated fix. Household sharing is the app's core feature and CloudKit made it fragile.
+
+---
+
+## Decision: Supabase for Shared Data + Auth
+**Date:** April 2025
+**Status:** Active (scaffolding complete, integration testing pending)
+**Why:**
+- Explicit control over sharing via row-level security
+- Join-code flow is simpler and more reliable than CKShare
+- Sign in with Apple via Supabase Auth
+- PostgreSQL gives us full SQL power for queries
+- Free tier is generous for a household app
+
+**Trade-offs:**
+- No offline support initially (Supabase is always remote)
+- Adds a third-party dependency (supabase-swift)
+- Requires managing a Supabase project
+
+**Implementation:**
+- Feature flag `useSupabase` in `Family_Meal_PlannerApp.swift`
+- Old CloudKit code preserved, not deleted
+- SQL schema in `supabase/migrations/001_initial_schema.sql`
+- Service layer in `Services/Supabase/`
 
 ---
 
@@ -82,9 +103,9 @@ Record of architectural decisions and constraints that should not be re-litigate
 ---
 
 ## What NOT to Change
-- **CloudKit must stay** (alternative backends require major rework)
 - **SwiftUI must stay** (rewriting in UIKit would set back 2+ months)
 - **Proxy must be kept** (API key can't live on device)
+- **Old CloudKit code stays** until Supabase is fully validated
 
 ---
 
