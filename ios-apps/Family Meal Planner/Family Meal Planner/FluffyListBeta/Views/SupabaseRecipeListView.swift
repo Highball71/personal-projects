@@ -96,45 +96,12 @@ struct SupabaseRecipeListView: View {
 
     private func recipeRow(_ recipe: RecipeRow) -> some View {
         HStack(spacing: 12) {
-            // Category stripe
-            RoundedRectangle(cornerRadius: 2)
-                .fill(recipe.recipeCategory.stripeColor)
-                .frame(width: 3, height: 40)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.name)
-                    .font(.headline)
-                    .foregroundStyle(Color.fluffyPrimary)
-
-                HStack(spacing: 8) {
-                    Text(recipe.category.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(Color.fluffySecondary)
-
-                    if let addedBy = recipe.addedByName, !addedBy.isEmpty {
-                        Text("by \(addedBy)")
-                            .font(.caption)
-                            .foregroundStyle(Color.fluffySecondary)
-                    }
-                }
-            }
+            Text(recipe.name)
+                .font(.headline)
+                .foregroundStyle(Color.fluffyPrimary)
 
             Spacer()
-
-            if recipe.isFavorite {
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(Color.fluffyAccent)
-                    .font(.caption)
-            }
         }
         .padding(.vertical, 4)
-        .swipeActions(edge: .leading) {
-            Button {
-                Task { await recipeService.toggleFavorite(recipe) }
-            } label: {
-                Image(systemName: recipe.isFavorite ? "heart.slash" : "heart.fill")
-            }
-            .tint(Color.fluffyAccent)
-        }
     }
 }

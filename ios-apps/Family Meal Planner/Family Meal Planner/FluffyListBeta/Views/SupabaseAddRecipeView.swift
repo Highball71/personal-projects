@@ -2,64 +2,38 @@
 //  SupabaseAddRecipeView.swift
 //  FluffyList
 //
-//  Minimal recipe creation form backed by Supabase.
-//  Reuses the existing RecipeCategory enum for category selection.
+//  Full recipe creation form backed by Supabase.
+//  Structured ingredients with name/quantity/unit,
+//  instructions, category, servings, prep/cook times, and source.
+//
+//  Reuses existing shared components:
+//    - IngredientRowView / IngredientFormData (ingredient row UI)
+//    - RecipeCategory, RecipeSource, IngredientUnit (shared enums)
 //
 
+import os
 import SwiftUI
 
 struct SupabaseAddRecipeView: View {
     @EnvironmentObject private var recipeService: RecipeService
-    @EnvironmentObject private var householdService: HouseholdService
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name = ""
-    @State private var category: RecipeCategory = .dinner
-    @State private var servings = 4
-    @State private var prepTime = 30
-    @State private var cookTime = 0
-    @State private var instructions = ""
-    @State private var ingredients: [IngredientField] = [IngredientField()]
-
-    struct IngredientField: Identifiable {
-        let id = UUID()
-        var name = ""
-        var quantity = 1.0
-        var unit = "piece"
-    }
+    @State private var viewModel = SupabaseRecipeFormViewModel()
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Recipe Info") {
-                    TextField("Recipe name", text: $name)
-                    Picker("Category", selection: $category) {
-                        ForEach(RecipeCategory.allCases, id: \.self) { cat in
-                            Text(cat.rawValue.capitalized).tag(cat)
-                        }
-                    }
-                    Stepper("Servings: \(servings)", value: $servings, in: 1...20)
-                    Stepper("Prep: \(prepTime) min", value: $prepTime, in: 0...240, step: 5)
-                    Stepper("Cook: \(cookTime) min", value: $cookTime, in: 0...480, step: 5)
-                }
+                recipeInfoSection
+                ingredientsSection
+                instructionsSection
+                sourceSection
 
-                Section("Ingredients") {
-                    ForEach($ingredients) { $ingredient in
-                        HStack {
-                            TextField("Name", text: $ingredient.name)
-                            TextField("Qty", value: $ingredient.quantity, format: .number)
-                                .frame(width: 50)
-                                .keyboardType(.decimalPad)
-                        }
+                if let error = viewModel.saveError {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
                     }
-                    Button("Add Ingredient") {
-                        ingredients.append(IngredientField())
-                    }
-                }
-
-                Section("Instructions") {
-                    TextEditor(text: $instructions)
-                        .frame(minHeight: 100)
                 }
             }
             .navigationTitle("New Recipe")
@@ -72,34 +46,93 @@ struct SupabaseAddRecipeView: View {
                     Button("Save") {
                         Task { await saveRecipe() }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!viewModel.validate() || viewModel.isSaving)
                 }
             }
         }
     }
 
+    // MARK: - Recipe Info
+
+    private var recipeInfoSection: some View {
+        Section("Recipe Info") {
+            TextField("Recipe Name", text: $viewModel.name)
+
+            Picker("Category", selection: $viewModel.category) {
+                ForEach(RecipeCategory.allCases) { cat in
+                    Text(cat.rawValue).tag(cat)
+                }
+            }
+
+            Stepper("Servings: \(viewModel.servings)", value: $viewModel.servings, in: 1...20)
+
+            Stepper(
+                "Prep Time: \(viewModel.prepTimeMinutes) min",
+                value: $viewModel.prepTimeMinutes,
+                in: 0...480,
+                step: 5
+            )
+
+            Stepper(
+                "Cook Time: \(viewModel.cookTimeMinutes) min",
+                value: $viewModel.cookTimeMinutes,
+                in: 0...480,
+                step: 5
+            )
+        }
+    }
+
+    // MARK: - Ingredients
+
+    private var ingredientsSection: some View {
+        Section("Ingredients") {
+            ForEach($viewModel.ingredientRows) { $row in
+                IngredientRowView(data: $row)
+            }
+            .onDelete { indexSet in
+                viewModel.ingredientRows.remove(atOffsets: indexSet)
+            }
+
+            Button("Add Ingredient") {
+                viewModel.ingredientRows.append(IngredientFormData())
+            }
+        }
+    }
+
+    // MARK: - Instructions
+
+    private var instructionsSection: some View {
+        Section("Instructions") {
+            TextEditor(text: $viewModel.instructions)
+                .frame(minHeight: 150)
+        }
+    }
+
+    // MARK: - Source
+
+    private var sourceSection: some View {
+        Section("Source") {
+            Picker("Source Type", selection: $viewModel.sourceType) {
+                Text("None").tag(RecipeSource?.none)
+                ForEach(RecipeSource.allCases) { source in
+                    Text(source.rawValue).tag(RecipeSource?.some(source))
+                }
+            }
+
+            if viewModel.sourceType != nil {
+                TextField(viewModel.sourcePlaceholder, text: $viewModel.sourceDetail)
+            }
+        }
+    }
+
+    // MARK: - Save
+
     private func saveRecipe() async {
-        // Find the current member's display name.
-        let memberName = householdService.members
-            .first { $0.userID == SupabaseManager.shared.currentUserID }?
-            .displayName
-
-        let ingredientInserts = ingredients
-            .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
-            .map { RecipeIngredientInsert(name: $0.name, quantity: $0.quantity, unit: $0.unit) }
-
-        let result = await recipeService.addRecipe(
-            name: name.trimmingCharacters(in: .whitespaces),
-            category: category.rawValue,
-            servings: servings,
-            prepTimeMinutes: prepTime,
-            cookTimeMinutes: cookTime,
-            instructions: instructions,
-            addedByName: memberName,
-            ingredients: ingredientInserts
+        let success = await viewModel.save(
+            recipeService: recipeService
         )
 
-        if result != nil {
+        if success {
             dismiss()
         }
     }

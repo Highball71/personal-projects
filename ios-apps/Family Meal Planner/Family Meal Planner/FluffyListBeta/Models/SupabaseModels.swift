@@ -79,59 +79,22 @@ struct RecipeRow: Codable, Identifiable {
     let id: UUID
     let householdID: UUID
     let name: String
-    let category: String
-    let servings: Int
-    let prepTimeMinutes: Int
-    let cookTimeMinutes: Int
-    let instructions: String
-    let isFavorite: Bool
-    let sourceType: String?
-    let sourceDetail: String?
-    let addedByName: String?
-    let addedByUserID: UUID?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, servings, instructions
+        case id, name
         case householdID = "household_id"
-        case prepTimeMinutes = "prep_time_minutes"
-        case cookTimeMinutes = "cook_time_minutes"
-        case isFavorite = "is_favorite"
-        case sourceType = "source_type"
-        case sourceDetail = "source_detail"
-        case addedByName = "added_by_name"
-        case addedByUserID = "added_by_user_id"
         case createdAt = "created_at"
-    }
-
-    /// Map the Supabase category string to the existing RecipeCategory enum.
-    var recipeCategory: RecipeCategory {
-        RecipeCategory(rawValue: category) ?? .dinner
     }
 }
 
 struct RecipeInsert: Codable {
     let householdID: UUID
     let name: String
-    let category: String
-    let servings: Int
-    let prepTimeMinutes: Int
-    let cookTimeMinutes: Int
-    let instructions: String
-    let sourceType: String?
-    let sourceDetail: String?
-    let addedByName: String?
-    let addedByUserID: UUID?
 
     enum CodingKeys: String, CodingKey {
-        case name, category, servings, instructions
+        case name
         case householdID = "household_id"
-        case prepTimeMinutes = "prep_time_minutes"
-        case cookTimeMinutes = "cook_time_minutes"
-        case sourceType = "source_type"
-        case sourceDetail = "source_detail"
-        case addedByName = "added_by_name"
-        case addedByUserID = "added_by_user_id"
     }
 }
 

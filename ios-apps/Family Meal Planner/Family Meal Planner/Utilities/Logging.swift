@@ -16,4 +16,5 @@ extension Logger {
     static let cloudkit = Logger(subsystem: subsystem, category: "cloudkit")
     static let search = Logger(subsystem: subsystem, category: "search")
     static let permissions = Logger(subsystem: subsystem, category: "permissions")
+    static let supabase = Logger(subsystem: subsystem, category: "supabase")
 }
