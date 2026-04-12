@@ -3,7 +3,7 @@
 //  FluffyList
 //
 //  Recipe list backed by Supabase instead of Core Data @FetchRequest.
-//  Minimal first pass — shows recipes, allows adding and deleting.
+//  Tap a recipe to edit, swipe to delete, swipe leading to favorite.
 //
 
 import SwiftUI
@@ -15,6 +15,8 @@ struct SupabaseRecipeListView: View {
 
     @State private var showingAddRecipe = false
     @State private var showingHouseholdInfo = false
+    @State private var editingRecipe: RecipeRow?
+    @State private var editingIngredients: [RecipeIngredientRow] = []
 
     var body: some View {
         NavigationStack {
@@ -46,6 +48,9 @@ struct SupabaseRecipeListView: View {
             }
             .sheet(isPresented: $showingAddRecipe) {
                 SupabaseAddRecipeView()
+            }
+            .sheet(item: $editingRecipe) { recipe in
+                SupabaseAddRecipeView(recipe: recipe, ingredients: editingIngredients)
             }
             .sheet(isPresented: $showingHouseholdInfo) {
                 HouseholdInfoView()
@@ -80,7 +85,12 @@ struct SupabaseRecipeListView: View {
     private var recipeList: some View {
         List {
             ForEach(recipeService.recipes) { recipe in
-                recipeRow(recipe)
+                Button {
+                    Task { await openEdit(recipe) }
+                } label: {
+                    recipeRow(recipe)
+                }
+                .tint(Color.fluffyPrimary)
             }
             .onDelete { offsets in
                 Task {
@@ -96,12 +106,44 @@ struct SupabaseRecipeListView: View {
 
     private func recipeRow(_ recipe: RecipeRow) -> some View {
         HStack(spacing: 12) {
-            Text(recipe.name)
-                .font(.headline)
-                .foregroundStyle(Color.fluffyPrimary)
+            // Category stripe
+            RoundedRectangle(cornerRadius: 2)
+                .fill(recipe.recipeCategory.stripeColor)
+                .frame(width: 3, height: 40)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recipe.name)
+                    .font(.headline)
+                    .foregroundStyle(Color.fluffyPrimary)
+
+                Text(recipe.category.capitalized)
+                    .font(.caption)
+                    .foregroundStyle(Color.fluffySecondary)
+            }
 
             Spacer()
+
+            if recipe.isFavorite {
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(Color.fluffyAccent)
+                    .font(.caption)
+            }
         }
         .padding(.vertical, 4)
+        .swipeActions(edge: .leading) {
+            Button {
+                Task { await recipeService.toggleFavorite(recipe) }
+            } label: {
+                Image(systemName: recipe.isFavorite ? "heart.slash" : "heart.fill")
+            }
+            .tint(Color.fluffyAccent)
+        }
+    }
+
+    // MARK: - Edit
+
+    private func openEdit(_ recipe: RecipeRow) async {
+        editingIngredients = await recipeService.fetchIngredients(for: recipe.id)
+        editingRecipe = recipe
     }
 }

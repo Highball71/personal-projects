@@ -13,10 +13,19 @@ import os
 /// After capturing the first photo, the user can add more pages (up to 5),
 /// remove bad photos, and then send all pages for recipe extraction.
 struct PhotoScanView: View {
-    @State private var pages: [UIImage]
+    // NOTE: initialPages is stored as a `let` and synced to `pages` via
+    // .onAppear. We intentionally do NOT use `State(initialValue:)` here
+    // because @State is only initialised once per view identity — if
+    // SwiftUI evaluates the sheet content closure before scannedPages is
+    // populated (e.g. during an earlier body render), the state captures
+    // the stale empty array and ignores later re-creations. Reading
+    // `initialPages` in onAppear guarantees we see the current value.
+    let initialPages: [UIImage]
     let onDone: ([UIImage]) -> Void
     let onCancel: () -> Void
 
+    @State private var pages: [UIImage] = []
+    @State private var hasInitializedPages = false
     @State private var showingCamera = false
     @State private var showingCameraPermissionDenied = false
 
@@ -24,9 +33,10 @@ struct PhotoScanView: View {
     private let maxPages = 5
 
     init(initialPages: [UIImage], onDone: @escaping ([UIImage]) -> Void, onCancel: @escaping () -> Void) {
-        _pages = State(initialValue: initialPages)
+        self.initialPages = initialPages
         self.onDone = onDone
         self.onCancel = onCancel
+        Logger.importPipeline.info("PhotoScanView init: initialPages count=\(initialPages.count, privacy: .public)")
     }
 
     var body: some View {
@@ -112,6 +122,16 @@ struct PhotoScanView: View {
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("FluffyList needs camera access to scan recipes. You can enable it in Settings.")
+            }
+            .onAppear {
+                Logger.importPipeline.info("PhotoScanView onAppear: initialPages=\(initialPages.count, privacy: .public), pages=\(pages.count, privacy: .public), hasInitialized=\(hasInitializedPages, privacy: .public)")
+                // Sync from initialPages the first time the view appears.
+                // This avoids the @State init-only-once trap where the state
+                // captures an empty array before the real pages arrive.
+                guard !hasInitializedPages else { return }
+                pages = initialPages
+                hasInitializedPages = true
+                Logger.importPipeline.info("PhotoScanView pages synced from initialPages — pages now=\(pages.count, privacy: .public)")
             }
         }
     }

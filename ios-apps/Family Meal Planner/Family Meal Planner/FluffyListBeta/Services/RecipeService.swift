@@ -67,24 +67,39 @@ final class RecipeService: ObservableObject {
 
     // MARK: - Create
 
-    /// Add a new recipe (name + household_id only — matches actual DB schema).
-    /// UI fields like category, servings, etc. are collected by the form
-    /// but not sent until the schema supports them.
-    func addRecipe(name: String) async -> RecipeRow? {
+    /// Add a new recipe with all structured fields + ingredients.
+    func addRecipe(
+        name: String,
+        category: String = "dinner",
+        servings: Int = 4,
+        prepTimeMinutes: Int = 0,
+        cookTimeMinutes: Int = 0,
+        instructions: String = "",
+        sourceType: String? = nil,
+        sourceDetail: String? = nil,
+        ingredients: [RecipeIngredientInsert] = []
+    ) async -> RecipeRow? {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.error("addRecipe: no household ID — cannot save")
             errorMessage = "No household selected."
             return nil
         }
 
-        Logger.supabase.info("addRecipe: household=\(householdID.uuidString), name=\"\(name)\"")
+        Logger.supabase.info("addRecipe: household=\(householdID.uuidString), name=\"\(name)\", category=\(category), ingredients=\(ingredients.count)")
         isLoading = true
         errorMessage = nil
 
         do {
             let insert = RecipeInsert(
                 householdID: householdID,
-                name: name
+                name: name,
+                category: category,
+                servings: servings,
+                prepTimeMinutes: prepTimeMinutes,
+                cookTimeMinutes: cookTimeMinutes,
+                instructions: instructions,
+                sourceType: sourceType,
+                sourceDetail: sourceDetail
             )
 
             let rows: [RecipeRow] = try await supabase
@@ -103,6 +118,26 @@ final class RecipeService: ObservableObject {
 
             Logger.supabase.info("addRecipe: saved recipe id=\(newRecipe.id.uuidString)")
 
+            // Insert ingredients if any.
+            if !ingredients.isEmpty {
+                let ingredientsWithRecipeID = ingredients.map {
+                    RecipeIngredientInsert(
+                        recipeID: newRecipe.id,
+                        name: $0.name,
+                        quantity: $0.quantity,
+                        unit: $0.unit,
+                        sortOrder: $0.sortOrder
+                    )
+                }
+
+                try await supabase
+                    .from("recipe_ingredients")
+                    .insert(ingredientsWithRecipeID)
+                    .execute()
+
+                Logger.supabase.info("addRecipe: inserted \(ingredients.count) ingredient(s)")
+            }
+
             // Refresh the list.
             Logger.supabase.info("addRecipe: reloading recipe list")
             await fetchRecipes()
@@ -113,6 +148,81 @@ final class RecipeService: ObservableObject {
             errorMessage = error.localizedDescription
             isLoading = false
             return nil
+        }
+    }
+
+    // MARK: - Update
+
+    /// Update an existing recipe's fields and replace its ingredients.
+    func updateRecipe(
+        id: UUID,
+        name: String,
+        category: String,
+        servings: Int,
+        prepTimeMinutes: Int,
+        cookTimeMinutes: Int,
+        instructions: String,
+        sourceType: String?,
+        sourceDetail: String?,
+        ingredients: [RecipeIngredientInsert]
+    ) async -> Bool {
+        Logger.supabase.info("updateRecipe: id=\(id.uuidString), name=\"\(name)\", ingredients=\(ingredients.count)")
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Update the recipe row.
+            let update = RecipeInsert(
+                householdID: SupabaseManager.shared.currentHouseholdID ?? UUID(),
+                name: name,
+                category: category,
+                servings: servings,
+                prepTimeMinutes: prepTimeMinutes,
+                cookTimeMinutes: cookTimeMinutes,
+                instructions: instructions,
+                sourceType: sourceType,
+                sourceDetail: sourceDetail
+            )
+
+            try await supabase
+                .from("recipes")
+                .update(update)
+                .eq("id", value: id.uuidString)
+                .execute()
+
+            // Replace ingredients: delete old, insert new.
+            try await supabase
+                .from("recipe_ingredients")
+                .delete()
+                .eq("recipe_id", value: id.uuidString)
+                .execute()
+
+            if !ingredients.isEmpty {
+                let ingredientsWithRecipeID = ingredients.map {
+                    RecipeIngredientInsert(
+                        recipeID: id,
+                        name: $0.name,
+                        quantity: $0.quantity,
+                        unit: $0.unit,
+                        sortOrder: $0.sortOrder
+                    )
+                }
+
+                try await supabase
+                    .from("recipe_ingredients")
+                    .insert(ingredientsWithRecipeID)
+                    .execute()
+            }
+
+            Logger.supabase.info("updateRecipe: succeeded")
+            await fetchRecipes()
+            isLoading = false
+            return true
+        } catch {
+            Logger.supabase.error("updateRecipe: failed — \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            isLoading = false
+            return false
         }
     }
 
@@ -132,4 +242,19 @@ final class RecipeService: ObservableObject {
         }
     }
 
+    // MARK: - Update
+
+    func toggleFavorite(_ recipe: RecipeRow) async {
+        do {
+            try await supabase
+                .from("recipes")
+                .update(["is_favorite": !recipe.isFavorite])
+                .eq("id", value: recipe.id.uuidString)
+                .execute()
+
+            await fetchRecipes()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }

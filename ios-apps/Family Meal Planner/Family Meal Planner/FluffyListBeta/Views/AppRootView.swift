@@ -52,13 +52,12 @@ struct SupabaseContentView: View {
                     Label("Recipes", systemImage: "book")
                 }
 
-            // Placeholder tabs — will be wired up later
-            Text("Meal Plan (coming soon)")
+            SupabaseMealPlanView()
                 .tabItem {
                     Label("Meal Plan", systemImage: "calendar")
                 }
 
-            Text("Groceries (coming soon)")
+            SupabaseGroceryListView()
                 .tabItem {
                     Label("Groceries", systemImage: "cart")
                 }

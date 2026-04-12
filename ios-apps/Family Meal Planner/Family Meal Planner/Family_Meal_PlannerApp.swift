@@ -59,6 +59,8 @@ struct Family_Meal_PlannerApp: App {
     @StateObject private var authService = AuthService()
     @StateObject private var householdService = HouseholdService()
     @StateObject private var recipeService = RecipeService()
+    @StateObject private var groceryService = GroceryService()
+    @StateObject private var mealPlanService = MealPlanService()
 
     var body: some Scene {
         WindowGroup {
@@ -69,6 +71,8 @@ struct Family_Meal_PlannerApp: App {
                     .environmentObject(authService)
                     .environmentObject(householdService)
                     .environmentObject(recipeService)
+                    .environmentObject(groceryService)
+                    .environmentObject(mealPlanService)
             } else {
                 // ── Old CloudKit path (preserved, not deleted) ──
                 Group {
