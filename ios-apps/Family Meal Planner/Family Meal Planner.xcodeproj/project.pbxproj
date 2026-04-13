@@ -337,7 +337,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Family Meal Planner/Family_Meal_Planner.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 85;
+				CURRENT_PROJECT_VERSION = 101;
 				DEVELOPMENT_TEAM = A5DP57PZ7N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -377,7 +377,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Family Meal Planner/Family_Meal_Planner.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 85;
+				CURRENT_PROJECT_VERSION = 101;
 				DEVELOPMENT_TEAM = A5DP57PZ7N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
