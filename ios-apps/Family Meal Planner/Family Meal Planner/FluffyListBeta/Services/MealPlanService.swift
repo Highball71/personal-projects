@@ -121,6 +121,58 @@ final class MealPlanService: ObservableObject {
         }
     }
 
+    // MARK: - Assign + Groceries (orchestration)
+
+    /// Full "assign a recipe to a day" pipeline that any caller can use:
+    ///   1. Remove the existing meal plan's grocery contributions (if any)
+    ///   2. Upsert the new meal plan row
+    ///   3. Fetch the recipe's ingredients
+    ///   4. Insert them as grocery items tagged as contributions from
+    ///      the new plan (so clearing the plan later can undo them)
+    ///
+    /// Returns the new meal plan ID on success, nil on failure.
+    /// Non-fatal if the recipe has no ingredients — the meal plan is
+    /// still assigned and the method returns the new ID.
+    func assignRecipeWithGroceries(
+        recipe: RecipeRow,
+        on date: Date,
+        existingPlanID: UUID?,
+        recipeService: RecipeService,
+        groceryService: GroceryService
+    ) async -> UUID? {
+        // 1. Remove old contributions (if reassigning a day)
+        if let existingPlanID {
+            Logger.supabase.info("assignRecipeWithGroceries: removing old contributions for plan \(existingPlanID.uuidString)")
+            _ = await groceryService.removeContributions(forMealPlan: existingPlanID)
+        }
+
+        // 2. Upsert meal plan, get new ID
+        guard let newPlanID = await assignRecipe(recipeID: recipe.id, on: date) else {
+            return nil
+        }
+
+        // 3. Fetch the recipe's ingredients
+        let ingredients = await recipeService.fetchIngredients(for: recipe.id)
+        Logger.supabase.info("assignRecipeWithGroceries: fetched \(ingredients.count) ingredient(s)")
+
+        // 4. Insert grocery items with contributions (only if any exist)
+        if !ingredients.isEmpty, let householdID = SupabaseManager.shared.currentHouseholdID {
+            let inserts = ingredients
+                .sorted { $0.sortOrder < $1.sortOrder }
+                .map { ing in
+                    GroceryItemInsert(
+                        householdID: householdID,
+                        name: ing.name,
+                        quantity: ing.quantity,
+                        unit: ing.unit
+                    )
+                }
+            _ = await groceryService.addItemsForMealPlan(mealPlanID: newPlanID, items: inserts)
+        }
+
+        return newPlanID
+    }
+
     // MARK: - Clear
 
     /// Delete the meal plan row for the given date (if any).

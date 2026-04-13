@@ -3,13 +3,22 @@
 //  FluffyList
 //
 //  Phase 1 grocery list backed by Supabase.
-//  Flat list — tap to check off, swipe to delete, pull to refresh.
+//  Split into "To Buy" (unchecked) and "Already Got" (checked) sections.
+//  Tap to check off, swipe to delete, pull to refresh.
 //
 
 import SwiftUI
 
 struct SupabaseGroceryListView: View {
     @EnvironmentObject private var groceryService: GroceryService
+
+    private var uncheckedItems: [SupabaseGroceryItem] {
+        groceryService.items.filter { !$0.isChecked }
+    }
+
+    private var checkedItems: [SupabaseGroceryItem] {
+        groceryService.items.filter { $0.isChecked }
+    }
 
     var body: some View {
         NavigationStack {
@@ -66,24 +75,49 @@ struct SupabaseGroceryListView: View {
 
     private var itemList: some View {
         List {
-            ForEach(groceryService.items) { item in
-                Button {
-                    Task { await groceryService.toggleChecked(item) }
-                } label: {
-                    itemRow(item)
+            if !uncheckedItems.isEmpty {
+                Section("To Buy") {
+                    ForEach(uncheckedItems) { item in
+                        Button {
+                            Task { await groceryService.toggleChecked(item) }
+                        } label: {
+                            itemRow(item)
+                        }
+                        .tint(Color.fluffyPrimary)
+                    }
+                    .onDelete { offsets in
+                        Task {
+                            for index in offsets {
+                                let item = uncheckedItems[index]
+                                await groceryService.deleteItem(item.id)
+                            }
+                        }
+                    }
                 }
-                .tint(Color.fluffyPrimary)
             }
-            .onDelete { offsets in
-                Task {
-                    for index in offsets {
-                        let item = groceryService.items[index]
-                        await groceryService.deleteItem(item.id)
+
+            if !checkedItems.isEmpty {
+                Section("Already Got") {
+                    ForEach(checkedItems) { item in
+                        Button {
+                            Task { await groceryService.toggleChecked(item) }
+                        } label: {
+                            itemRow(item)
+                        }
+                        .tint(Color.fluffyPrimary)
+                    }
+                    .onDelete { offsets in
+                        Task {
+                            for index in offsets {
+                                let item = checkedItems[index]
+                                await groceryService.deleteItem(item.id)
+                            }
+                        }
                     }
                 }
             }
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
     }
 
     private func itemRow(_ item: SupabaseGroceryItem) -> some View {

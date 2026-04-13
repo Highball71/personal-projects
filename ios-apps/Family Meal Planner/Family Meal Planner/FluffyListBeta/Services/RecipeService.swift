@@ -14,6 +14,9 @@ import Supabase
 @MainActor
 final class RecipeService: ObservableObject {
     @Published var recipes: [RecipeRow] = []
+    /// Map of recipe ID → its ingredient names, lowercased for search.
+    /// Populated alongside `recipes` on every `fetchRecipes()` call.
+    @Published var ingredientsByRecipeID: [UUID: [String]] = [:]
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -21,11 +24,13 @@ final class RecipeService: ObservableObject {
 
     // MARK: - Fetch
 
-    /// Load all recipes for the current household.
+    /// Load all recipes for the current household, then load all of
+    /// their ingredients so client-side search can match by name.
     func fetchRecipes() async {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.warning("fetchRecipes: no household ID set, returning empty list")
             recipes = []
+            ingredientsByRecipeID = [:]
             return
         }
 
@@ -42,11 +47,41 @@ final class RecipeService: ObservableObject {
                 .value
 
             Logger.supabase.info("fetchRecipes: loaded \(self.recipes.count) recipe(s)")
+
+            // Also load all ingredients so search works immediately.
+            // RLS on recipe_ingredients already scopes to the household.
+            await fetchAllIngredients()
+
             isLoading = false
         } catch {
             Logger.supabase.error("fetchRecipes: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+
+    /// Fetch every ingredient visible to the current household (RLS
+    /// enforces the scoping) and build a lookup map keyed by recipe ID.
+    /// Stored names are lowercased so search comparisons are cheap.
+    func fetchAllIngredients() async {
+        do {
+            let allIngredients: [RecipeIngredientRow] = try await supabase
+                .from("recipe_ingredients")
+                .select()
+                .execute()
+                .value
+
+            var map: [UUID: [String]] = [:]
+            for ingredient in allIngredients {
+                map[ingredient.recipeID, default: []].append(ingredient.name.lowercased())
+            }
+            ingredientsByRecipeID = map
+
+            Logger.supabase.info("fetchAllIngredients: loaded \(allIngredients.count) ingredient(s) across \(map.count) recipe(s)")
+        } catch {
+            Logger.supabase.error("fetchAllIngredients: failed — \(error.localizedDescription)")
+            // Non-fatal: search just won't match ingredients until next
+            // successful fetch. Don't surface as user-facing error.
         }
     }
 

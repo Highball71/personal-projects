@@ -18,7 +18,7 @@ struct SupabaseMealPlanView: View {
     @State private var weekStart: Date = DateHelper.startOfWeek(containing: Date())
     @State private var pickerDate: Date?
     @State private var isAssigning = false
-    @State private var showingAddedToGrocery = false
+    @State private var toastMessage: String?
 
     /// The 7 dates of the current week.
     private var weekDates: [Date] {
@@ -36,14 +36,8 @@ struct SupabaseMealPlanView: View {
                     dayList
                 }
             }
-            .navigationTitle("Meal Plan")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text(weekHeader)
-                        .font(.caption)
-                        .foregroundStyle(Color.fluffySecondary)
-                }
-            }
+            .navigationTitle("This Week")
+            .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await mealPlanService.fetchPlans(weekStart: weekStart)
             }
@@ -57,8 +51,8 @@ struct SupabaseMealPlanView: View {
                 RecipePickerSheet(
                     recipes: recipeService.recipes,
                     onPick: { recipe in
+                        pickerDate = nil  // close picker immediately
                         Task { await assignRecipe(recipe, to: date) }
-                        pickerDate = nil
                     },
                     onCancel: {
                         pickerDate = nil
@@ -66,7 +60,7 @@ struct SupabaseMealPlanView: View {
                 )
             }
             .overlay { assigningOverlay }
-            .overlay { addedToGroceryOverlay }
+            .overlay { toastOverlay }
         }
     }
 
@@ -84,6 +78,15 @@ struct SupabaseMealPlanView: View {
 
     private var dayList: some View {
         List {
+            Section {
+                Text(weekHeader)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.fluffySecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+
             ForEach(weekDates, id: \.self) { date in
                 dayRow(date)
                     .swipeActions(edge: .trailing) {
@@ -159,22 +162,21 @@ struct SupabaseMealPlanView: View {
     }
 
     @ViewBuilder
-    private var addedToGroceryOverlay: some View {
-        if showingAddedToGrocery {
+    private var toastOverlay: some View {
+        if let message = toastMessage {
             VStack(spacing: 8) {
-                Image(systemName: "cart.badge.plus")
+                Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(Color.fluffyAccent)
-                Text("Ingredients added\nto grocery list")
+                    .foregroundStyle(.green)
+                Text(message)
                     .font(.headline)
-                    .multilineTextAlignment(.center)
             }
             .padding(24)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
             .transition(.opacity)
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { showingAddedToGrocery = false }
+                    withAnimation { toastMessage = nil }
                 }
             }
         }
@@ -186,6 +188,13 @@ struct SupabaseMealPlanView: View {
         let f = DateFormatter()
         f.dateFormat = "EEE"
         return f.string(from: date).uppercased()
+    }
+
+    /// Full day name for toast messages ("Monday", "Tuesday", ...).
+    private func fullDayName(for date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE"
+        return f.string(from: date)
     }
 
     private func dayNumber(for date: Date) -> String {
@@ -206,56 +215,30 @@ struct SupabaseMealPlanView: View {
 
     // MARK: - Orchestration
 
-    /// Upsert a meal plan row, then fetch the recipe's ingredients and
-    /// bulk-insert them as grocery items. No deduping in Phase 1.
+    /// Delegates to MealPlanService's full assign-and-groceries pipeline.
+    /// Shows a day-specific success toast on success.
     private func assignRecipe(_ recipe: RecipeRow, to date: Date) async {
         isAssigning = true
         defer { isAssigning = false }
 
-        // 1. If this day already has a recipe, remove its old grocery
-        //    contributions first. The upsert below may reuse the same
-        //    meal plan row ID, so the old contributions would end up
-        //    linked to the wrong recipe if we didn't clean them up.
-        if let existing = plan(for: date) {
-            Logger.supabase.info("MealPlan assign: day already has plan \(existing.id.uuidString), removing contributions first")
-            _ = await groceryService.removeContributions(forMealPlan: existing.id)
-        }
+        let existingPlanID = plan(for: date)?.id
 
-        // 2. Upsert meal plan row and get its ID
-        guard let newPlanID = await mealPlanService.assignRecipe(recipeID: recipe.id, on: date) else {
-            return
-        }
+        let result = await mealPlanService.assignRecipeWithGroceries(
+            recipe: recipe,
+            on: date,
+            existingPlanID: existingPlanID,
+            recipeService: recipeService,
+            groceryService: groceryService
+        )
 
-        // 3. Refresh the meal plan so the UI updates
+        guard result != nil else { return }
+
+        // Refresh meal plan UI
         await mealPlanService.fetchPlans(weekStart: weekStart)
 
-        // 4. Fetch the recipe's ingredients
-        let ingredients = await recipeService.fetchIngredients(for: recipe.id)
-        Logger.supabase.info("MealPlan assign: fetched \(ingredients.count) ingredient(s) for recipe \(recipe.id.uuidString)")
-
-        guard !ingredients.isEmpty else {
-            Logger.supabase.info("MealPlan assign: no ingredients to add to grocery list")
-            return
-        }
-
-        // 5. Insert grocery items with contributions linked to the new plan
-        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return }
-        let inserts = ingredients
-            .sorted { $0.sortOrder < $1.sortOrder }
-            .map { ing in
-                GroceryItemInsert(
-                    householdID: householdID,
-                    name: ing.name,
-                    quantity: ing.quantity,
-                    unit: ing.unit
-                )
-            }
-
-        Logger.supabase.info("MealPlan assign: inserting \(inserts.count) grocery item(s) for plan \(newPlanID.uuidString)")
-        let added = await groceryService.addItemsForMealPlan(mealPlanID: newPlanID, items: inserts)
-        if added {
-            withAnimation { showingAddedToGrocery = true }
-        }
+        // Success feedback with the target day's name
+        let message = "Added to \(fullDayName(for: date))"
+        withAnimation { toastMessage = message }
     }
 
     /// Clear a day's meal plan and remove its grocery contributions.
@@ -297,16 +280,24 @@ private struct RecipePickerSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(recipes) { recipe in
+                        Section {
                             Button {
-                                onPick(recipe)
+                                // Random pick — reuses onPick so the parent's
+                                // full assignment + grocery pipeline fires.
+                                if let pick = recipes.randomElement() {
+                                    Logger.supabase.info("Surprise Me: picked \"\(pick.name)\" id=\(pick.id.uuidString)")
+                                    onPick(pick)
+                                }
                             } label: {
-                                HStack {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "dice.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(Color.fluffyAccent)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(recipe.name)
+                                        Text("Surprise Me")
                                             .font(.headline)
                                             .foregroundStyle(Color.fluffyPrimary)
-                                        Text(recipe.category.capitalized)
+                                        Text("Pick a random recipe")
                                             .font(.caption)
                                             .foregroundStyle(Color.fluffySecondary)
                                     }
@@ -316,8 +307,30 @@ private struct RecipePickerSheet: View {
                             }
                             .tint(Color.fluffyPrimary)
                         }
+
+                        Section("All Recipes") {
+                            ForEach(recipes) { recipe in
+                                Button {
+                                    onPick(recipe)
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(recipe.name)
+                                                .font(.headline)
+                                                .foregroundStyle(Color.fluffyPrimary)
+                                            Text(recipe.category.capitalized)
+                                                .font(.caption)
+                                                .foregroundStyle(Color.fluffySecondary)
+                                        }
+                                        Spacer()
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .tint(Color.fluffyPrimary)
+                            }
+                        }
                     }
-                    .listStyle(.plain)
+                    .listStyle(.insetGrouped)
                 }
             }
             .navigationTitle("Choose a Recipe")

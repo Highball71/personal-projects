@@ -324,18 +324,10 @@ struct SupabaseAddRecipeView: View {
                     .foregroundStyle(.green)
                 Text("Recipe saved")
                     .font(.headline)
-                Text("Edit below to refine")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             .padding(24)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
             .transition(.opacity)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                    withAnimation { showingExtractionSuccess = false }
-                }
-            }
         }
     }
 
@@ -343,10 +335,10 @@ struct SupabaseAddRecipeView: View {
     private var groceryAddedOverlay: some View {
         if showingGroceryAddedConfirmation {
             VStack(spacing: 8) {
-                Image(systemName: "cart.badge.plus")
+                Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(Color.fluffyAccent)
-                Text("Added to Grocery List")
+                    .foregroundStyle(.green)
+                Text("Groceries updated")
                     .font(.headline)
             }
             .padding(24)
@@ -478,16 +470,22 @@ struct SupabaseAddRecipeView: View {
             viewModel.populateFrom(extracted, sourceType: .photo)
 
             // Auto-save the extracted recipe so the user can't forget.
-            // On success, the VM transitions to edit mode, so further
-            // tweaks save via updateRecipe() instead of creating a
-            // duplicate. On failure, stay in add mode — the existing
+            // On success, show the "Recipe saved" toast briefly and
+            // dismiss back to the list so the new recipe is immediately
+            // visible. On failure, stay in add mode — the existing
             // inline error banner surfaces the problem and the user
             // can tap Save manually to retry.
             Logger.supabase.info("Photo import: auto-saving extracted recipe")
             let autoSaved = await viewModel.save(recipeService: recipeService)
             if autoSaved {
-                Logger.supabase.info("Photo import: auto-save succeeded")
+                Logger.supabase.info("Photo import: auto-save succeeded, dismissing")
+                isExtracting = false
+                extractingPageCount = 0
                 withAnimation { showingExtractionSuccess = true }
+                // Give the toast a moment to be seen, then dismiss.
+                try? await Task.sleep(for: .milliseconds(1200))
+                dismiss()
+                return
             } else {
                 Logger.supabase.error("Photo import: auto-save failed — user must save manually")
                 // viewModel.saveError is already set; the form's

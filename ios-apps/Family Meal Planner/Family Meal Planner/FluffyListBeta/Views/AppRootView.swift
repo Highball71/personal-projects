@@ -41,26 +41,34 @@ struct SupabaseContentView: View {
     @EnvironmentObject private var recipeService: RecipeService
     @EnvironmentObject private var authService: AuthService
 
-    @State private var showingSettings = false
-    @State private var showingAddRecipe = false
+    /// Tabs in the order they appear in the tab bar.
+    private enum Tab: Hashable {
+        case recipes, mealPlan, groceries
+    }
+
+    /// Meal Plan is the default landing tab because it's the primary
+    /// screen for weekly planning.
+    @State private var selectedTab: Tab = .mealPlan
 
     var body: some View {
-        TabView {
-            // Recipes tab — Supabase-backed
+        TabView(selection: $selectedTab) {
             SupabaseRecipeListView()
                 .tabItem {
                     Label("Recipes", systemImage: "book")
                 }
+                .tag(Tab.recipes)
 
             SupabaseMealPlanView()
                 .tabItem {
                     Label("Meal Plan", systemImage: "calendar")
                 }
+                .tag(Tab.mealPlan)
 
             SupabaseGroceryListView()
                 .tabItem {
                     Label("Groceries", systemImage: "cart")
                 }
+                .tag(Tab.groceries)
         }
         .tint(Color.fluffyAccent)
         .task {
