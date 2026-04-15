@@ -59,10 +59,23 @@ struct SupabaseRecipeListView: View {
         displayedRecipes.first { $0.isFavorite } ?? displayedRecipes.first
     }
 
-    /// Grid recipes — everything except the hero.
+    /// Grid recipes — everything except the hero and recently-added.
     private var gridRecipes: [RecipeRow] {
-        guard let hero = heroRecipe else { return [] }
-        return displayedRecipes.filter { $0.id != hero.id }
+        let excludeIDs = Set(
+            [heroRecipe?.id].compactMap { $0 } + recentlyAdded.map(\.id)
+        )
+        return displayedRecipes.filter { !excludeIDs.contains($0.id) }
+    }
+
+    /// The 4 most recently created recipes (by createdAt), excluding
+    /// the hero, for the horizontal "Recently Added" strip.
+    private var recentlyAdded: [RecipeRow] {
+        let heroID = heroRecipe?.id
+        return displayedRecipes
+            .filter { $0.id != heroID }
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(4)
+            .map { $0 }
     }
 
     private let gridColumns = [
@@ -149,6 +162,29 @@ struct SupabaseRecipeListView: View {
                     .contextMenu { recipeContextMenu(hero) }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
+                }
+
+                // Recently Added horizontal scroll
+                if !recentlyAdded.isEmpty {
+                    FluffySectionHeader(title: "Recently Added", section: .recipes)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(recentlyAdded) { recipe in
+                                NavigationLink {
+                                    SupabaseRecipeDetailView(recipe: recipe)
+                                } label: {
+                                    recentCard(recipe)
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu { recipeContextMenu(recipe) }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 24)
                 }
 
                 // Two-column grid
@@ -295,6 +331,43 @@ struct SupabaseRecipeListView: View {
         }
         .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
+    }
+
+    // MARK: - Recent Card
+
+    /// Compact horizontal card for the "Recently Added" strip.
+    private func recentCard(_ recipe: RecipeRow) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                cardGradient(for: recipe)
+                Image(systemName: categoryIcon(for: recipe))
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white.opacity(0.2))
+            }
+            .frame(width: 140, height: 90)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 10,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 10
+                )
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(recipe.name)
+                    .font(.fluffySubheadline)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .lineLimit(1)
+                Text(recipe.category.capitalized)
+                    .font(.fluffyCaption)
+                    .foregroundStyle(Color.fluffySecondary)
+            }
+            .padding(8)
+        }
+        .frame(width: 140)
+        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 
     // MARK: - Card Helpers

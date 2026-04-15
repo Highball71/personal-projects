@@ -91,11 +91,8 @@ struct RecipeScanView: View {
         } message: {
             Text("FluffyList needs camera access to scan recipes. Enable it in Settings.")
         }
-        .onChange(of: camera.lastCapture) { _, image in
-            if let image {
-                pages.append(image)
-                camera.lastCapture = nil
-            }
+        .onReceive(camera.capturedImage) { image in
+            pages.append(image)
         }
     }
 
@@ -320,11 +317,17 @@ struct RecipeScanView: View {
 // MARK: - Camera Capture Manager
 
 /// Manages AVCaptureSession for the live preview and photo capture.
+/// Uses a PassthroughSubject instead of @Published so every capture
+/// is guaranteed to notify the view (no SwiftUI Equatable coalescing).
 private class CameraCaptureManager: NSObject, ObservableObject {
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
-    @Published var lastCapture: UIImage?
     private var isConfigured = false
+    private var isRunning = false
+
+    /// Fires once per captured image. Subscribe with .onReceive —
+    /// more reliable than .onChange for one-shot external events.
+    let capturedImage = PassthroughSubject<UIImage, Never>()
 
     func configure() {
         guard !isConfigured else { return }
@@ -348,16 +351,20 @@ private class CameraCaptureManager: NSObject, ObservableObject {
         guard isConfigured else { return }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.startRunning()
+            DispatchQueue.main.async { self?.isRunning = true }
         }
     }
 
     func stop() {
+        isRunning = false
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.stopRunning()
         }
     }
 
     func capture() {
+        // Guard: session must be running or the photo output silently drops the request
+        guard isRunning, session.isRunning else { return }
         let settings = AVCapturePhotoSettings()
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
@@ -369,9 +376,16 @@ extension CameraCaptureManager: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
+        if let error {
+            print("RecipeScanView: photo capture error — \(error.localizedDescription)")
+            return
+        }
         guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else { return }
-        DispatchQueue.main.async { self.lastCapture = image }
+              let image = UIImage(data: data) else {
+            print("RecipeScanView: photo capture returned nil data")
+            return
+        }
+        DispatchQueue.main.async { self.capturedImage.send(image) }
     }
 }
 
