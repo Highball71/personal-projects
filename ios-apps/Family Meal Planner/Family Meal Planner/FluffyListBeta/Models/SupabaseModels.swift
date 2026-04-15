@@ -84,13 +84,14 @@ struct RecipeRow: Codable, Identifiable, Equatable {
     let prepTimeMinutes: Int
     let cookTimeMinutes: Int
     let instructions: String
+    let notes: String
     let isFavorite: Bool
     let sourceType: String?
     let sourceDetail: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, servings, instructions
+        case id, name, category, servings, instructions, notes
         case householdID = "household_id"
         case prepTimeMinutes = "prep_time_minutes"
         case cookTimeMinutes = "cook_time_minutes"
@@ -112,6 +113,7 @@ struct RecipeRow: Codable, Identifiable, Equatable {
         prepTimeMinutes = (try? c.decode(Int.self, forKey: .prepTimeMinutes)) ?? 0
         cookTimeMinutes = (try? c.decode(Int.self, forKey: .cookTimeMinutes)) ?? 0
         instructions   = (try? c.decode(String.self, forKey: .instructions)) ?? ""
+        notes          = (try? c.decode(String.self, forKey: .notes)) ?? ""
         isFavorite     = (try? c.decode(Bool.self, forKey: .isFavorite)) ?? false
         sourceType     = try? c.decode(String.self, forKey: .sourceType)
         sourceDetail   = try? c.decode(String.self, forKey: .sourceDetail)
@@ -131,11 +133,12 @@ struct RecipeInsert: Codable {
     let prepTimeMinutes: Int
     let cookTimeMinutes: Int
     let instructions: String
+    let notes: String
     let sourceType: String?
     let sourceDetail: String?
 
     enum CodingKeys: String, CodingKey {
-        case name, category, servings, instructions
+        case name, category, servings, instructions, notes
         case householdID = "household_id"
         case prepTimeMinutes = "prep_time_minutes"
         case cookTimeMinutes = "cook_time_minutes"

@@ -57,6 +57,7 @@ struct SupabaseAddRecipeView: View {
                 recipeInfoSection
                 ingredientsSection
                 instructionsSection
+                notesSection
                 sourceSection
 
                 if let error = viewModel.saveError {
@@ -245,6 +246,15 @@ struct SupabaseAddRecipeView: View {
         Section("Instructions") {
             TextEditor(text: $viewModel.instructions)
                 .frame(minHeight: 150)
+        }
+    }
+
+    // MARK: - Notes
+
+    private var notesSection: some View {
+        Section("Notes") {
+            TextField("e.g. kids loved this, add more garlic next time", text: $viewModel.notes, axis: .vertical)
+                .lineLimit(3...6)
         }
     }
 

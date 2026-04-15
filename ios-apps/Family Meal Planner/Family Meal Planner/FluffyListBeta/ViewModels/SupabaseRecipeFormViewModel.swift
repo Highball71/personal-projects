@@ -19,6 +19,7 @@ final class SupabaseRecipeFormViewModel {
     var prepTimeMinutes: Int = 30
     var cookTimeMinutes: Int = 0
     var instructions: String = ""
+    var notes: String = ""
     var ingredientRows: [IngredientFormData] = [IngredientFormData()]
     var sourceType: RecipeSource?
     var sourceDetail: String = ""
@@ -45,6 +46,7 @@ final class SupabaseRecipeFormViewModel {
         prepTimeMinutes = recipe.prepTimeMinutes
         cookTimeMinutes = recipe.cookTimeMinutes
         instructions = recipe.instructions
+        notes = recipe.notes
         sourceType = recipe.sourceType.flatMap { RecipeSource(rawValue: $0) }
         sourceDetail = recipe.sourceDetail ?? ""
 
@@ -117,6 +119,7 @@ final class SupabaseRecipeFormViewModel {
 
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedInstructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
         Logger.supabase.info("SupabaseRecipeFormVM: \(self.isEditing ? "updating" : "creating") \"\(trimmedName)\" category=\(self.category.rawValue) ingredients=\(ingredientInserts.count)")
 
@@ -132,6 +135,7 @@ final class SupabaseRecipeFormViewModel {
                 prepTimeMinutes: prepTimeMinutes,
                 cookTimeMinutes: cookTimeMinutes,
                 instructions: trimmedInstructions,
+                notes: trimmedNotes,
                 sourceType: sourceType?.rawValue,
                 sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail,
                 ingredients: ingredientInserts
@@ -145,6 +149,7 @@ final class SupabaseRecipeFormViewModel {
                 prepTimeMinutes: prepTimeMinutes,
                 cookTimeMinutes: cookTimeMinutes,
                 instructions: trimmedInstructions,
+                notes: trimmedNotes,
                 sourceType: sourceType?.rawValue,
                 sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail,
                 ingredients: ingredientInserts

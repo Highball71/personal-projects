@@ -4,8 +4,9 @@
 //
 //  Read-only recipe detail screen for the Supabase path.
 //  Figma spec: Playfair Display bold title, amber section headers,
-//  bullet-dot ingredients, bold ingredient names in prep steps,
-//  and an amber "Add to This Week" button.
+//  bullet-dot ingredients with a servings scaler, bold ingredient
+//  names in prep steps, notes section, and an amber "Add to This
+//  Week" button.
 //
 
 import SwiftUI
@@ -23,8 +24,17 @@ struct SupabaseRecipeDetailView: View {
     @State private var showingDayPicker = false
     @State private var toastMessage: String?
 
+    /// User-adjustable serving count — defaults to the recipe's saved value.
+    @State private var scaledServings: Int = 0
+
     private var totalMinutes: Int {
         recipe.prepTimeMinutes + recipe.cookTimeMinutes
+    }
+
+    /// How much to multiply each ingredient quantity.
+    private var scaleFactor: Double {
+        guard recipe.servings > 0 else { return 1 }
+        return Double(scaledServings) / Double(recipe.servings)
     }
 
     /// Ingredient names sorted longest-first so highlighting
@@ -50,6 +60,12 @@ struct SupabaseRecipeDetailView: View {
                 if !recipe.instructions.isEmpty {
                     sectionDivider.padding(.top, 24)
                     preparationSection
+                        .padding(.top, 24)
+                }
+
+                if !recipe.notes.isEmpty {
+                    sectionDivider.padding(.top, 24)
+                    notesSection
                         .padding(.top, 24)
                 }
 
@@ -104,7 +120,11 @@ struct SupabaseRecipeDetailView: View {
             )
         }
         .overlay { toastOverlay }
-        .task { await loadIngredients() }
+        .task {
+            // Initialize the stepper to the recipe's default servings
+            if scaledServings == 0 { scaledServings = max(recipe.servings, 1) }
+            await loadIngredients()
+        }
     }
 
     // MARK: - Title
@@ -149,8 +169,13 @@ struct SupabaseRecipeDetailView: View {
 
     private var ingredientsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Ingredients")
-                .padding(.horizontal, 20)
+            // Section header + serving scaler on the same line
+            HStack {
+                FluffySectionHeader(title: "Ingredients")
+                Spacer()
+                servingsScaler
+            }
+            .padding(.horizontal, 20)
 
             if isLoadingIngredients {
                 ProgressView()
@@ -169,6 +194,47 @@ struct SupabaseRecipeDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Compact stepper that adjusts the scaled servings count.
+    private var servingsScaler: some View {
+        HStack(spacing: 8) {
+            Button {
+                if scaledServings > 1 {
+                    withAnimation { scaledServings -= 1 }
+                }
+            } label: {
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(
+                        scaledServings > 1 ? Color.fluffyAmber : Color.fluffyDivider
+                    )
+            }
+            .disabled(scaledServings <= 1)
+
+            Text("\(scaledServings)")
+                .font(.fluffyHeadline)
+                .foregroundStyle(Color.fluffyPrimary)
+                .frame(minWidth: 20)
+                .contentTransition(.numericText())
+
+            Button {
+                if scaledServings < 24 {
+                    withAnimation { scaledServings += 1 }
+                }
+            } label: {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(
+                        scaledServings < 24 ? Color.fluffyAmber : Color.fluffyDivider
+                    )
+            }
+            .disabled(scaledServings >= 24)
+
+            Image(systemName: "person.2")
+                .font(.fluffyCaption)
+                .foregroundStyle(Color.fluffySecondary)
         }
     }
 
@@ -193,6 +259,19 @@ struct SupabaseRecipeDetailView: View {
         }
     }
 
+    // MARK: - Notes
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            FluffySectionHeader(title: "Notes")
+                .padding(.horizontal, 20)
+            Text(recipe.notes)
+                .font(.fluffyBody)
+                .foregroundStyle(Color.fluffySecondary)
+                .padding(.horizontal, 20)
+        }
+    }
+
     // MARK: - Divider
 
     private var sectionDivider: some View {
@@ -204,7 +283,7 @@ struct SupabaseRecipeDetailView: View {
 
     // MARK: - Ingredient Formatting
 
-    /// Format a single ingredient for display.
+    /// Format a single ingredient with the current scale factor applied.
     /// "to taste" → "Salt, to taste"
     /// "—" (none) → "3 eggs"
     /// Normal → "1 1/2 cups all-purpose flour"
@@ -215,7 +294,8 @@ struct SupabaseRecipeDetailView: View {
             return "\(ingredient.name), to taste"
         }
 
-        let qty = FractionFormatter.formatAsFraction(ingredient.quantity)
+        let scaledQty = ingredient.quantity * scaleFactor
+        let qty = FractionFormatter.formatAsFraction(scaledQty)
 
         if unit == nil || unit == .none {
             return "\(qty) \(ingredient.name)"
@@ -227,14 +307,12 @@ struct SupabaseRecipeDetailView: View {
     // MARK: - Ingredient Highlighting
 
     /// Build an AttributedString with ingredient names set to Inter Semi Bold.
-    /// This makes ingredient references in instructions pop visually.
     private func highlightIngredients(in text: String) -> AttributedString {
         var result = AttributedString(text)
         result.font = .custom("Inter-Regular", size: 16)
         result.foregroundColor = Color.fluffyPrimary
 
         for name in ingredientNames {
-            // Skip very short names (e.g. "oil") to avoid false positives
             guard name.count >= 3 else { continue }
 
             var searchStart = result.startIndex

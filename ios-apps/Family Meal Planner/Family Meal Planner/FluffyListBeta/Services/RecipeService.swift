@@ -110,6 +110,7 @@ final class RecipeService: ObservableObject {
         prepTimeMinutes: Int = 0,
         cookTimeMinutes: Int = 0,
         instructions: String = "",
+        notes: String = "",
         sourceType: String? = nil,
         sourceDetail: String? = nil,
         ingredients: [RecipeIngredientInsert] = []
@@ -133,6 +134,7 @@ final class RecipeService: ObservableObject {
                 prepTimeMinutes: prepTimeMinutes,
                 cookTimeMinutes: cookTimeMinutes,
                 instructions: instructions,
+                notes: notes,
                 sourceType: sourceType,
                 sourceDetail: sourceDetail
             )
@@ -197,6 +199,7 @@ final class RecipeService: ObservableObject {
         prepTimeMinutes: Int,
         cookTimeMinutes: Int,
         instructions: String,
+        notes: String = "",
         sourceType: String?,
         sourceDetail: String?,
         ingredients: [RecipeIngredientInsert]
@@ -215,6 +218,7 @@ final class RecipeService: ObservableObject {
                 prepTimeMinutes: prepTimeMinutes,
                 cookTimeMinutes: cookTimeMinutes,
                 instructions: instructions,
+                notes: notes,
                 sourceType: sourceType,
                 sourceDetail: sourceDetail
             )
