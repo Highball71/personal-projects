@@ -6,13 +6,17 @@
 	<true/>
 	<key>ProxyKey</key>
 	<string>$(PROXY_KEY)</string>
-	<key>SUPABASE_URL</key>
-	<string>$(SUPABASE_URL)</string>
 	<key>SUPABASE_ANON_KEY</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
-	<key>UIBackgroundModes</key>
+	<key>SUPABASE_URL</key>
+	<string>$(SUPABASE_URL)</string>
+	<key>UIAppFonts</key>
 	<array>
-		<string>remote-notification</string>
+		<string>PlayfairDisplay-Bold.ttf</string>
+		<string>Inter-Regular.ttf</string>
+		<string>Inter-SemiBold.ttf</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array/>
 </dict>
 </plist>

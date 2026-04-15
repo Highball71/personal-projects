@@ -24,8 +24,8 @@ struct HouseholdInfoView: View {
                     Section {
                         HStack {
                             Text((household.joinCode ?? "------").uppercased())
-                                .font(.title2.monospaced().bold())
-                                .foregroundStyle(Color.fluffyAccent)
+                                .font(.system(.title2, design: .monospaced, weight: .bold))
+                                .foregroundStyle(Color.fluffyAmber)
 
                             Spacer()
 
@@ -47,16 +47,16 @@ struct HouseholdInfoView: View {
                         HStack {
                             ProgressView()
                             Text("Loading...")
-                                .foregroundStyle(Color.fluffySecondary)
+                                .foregroundStyle(Color.fluffyPrimary.opacity(0.8))
                         }
                     } else if householdService.members.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("No members found.")
-                                .foregroundStyle(Color.fluffySecondary)
+                                .foregroundStyle(Color.fluffyPrimary.opacity(0.8))
                             if let error = householdService.errorMessage {
                                 Text(error)
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
+                                    .font(.fluffyCaption)
+                                    .foregroundStyle(Color.fluffyError)
                             }
                         }
                     } else {
@@ -66,8 +66,8 @@ struct HouseholdInfoView: View {
                                 Spacer()
                                 if member.isHeadCook {
                                     Text("Head Cook")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.fluffyAccent)
+                                        .font(.fluffyCaption)
+                                        .foregroundStyle(Color.fluffyAmber)
                                 }
                             }
                         }

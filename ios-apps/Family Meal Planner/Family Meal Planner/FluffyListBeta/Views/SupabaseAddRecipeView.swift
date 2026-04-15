@@ -31,24 +31,12 @@ struct SupabaseAddRecipeView: View {
     @State private var showingCamera = false
     @State private var showingPhotoLibrary = false
     @State private var selectedPhotoItem: PhotosPickerItem?
-    /// Identifiable wrapper that drives .sheet(item:). The sheet content
-    /// closure CANNOT fire until this is non-nil, so PhotoScanView can
-    /// never be constructed with empty pages.
-    @State private var scanSession: ScanSession?
     @State private var isExtracting = false
     @State private var extractingPageCount: Int = 0
     @State private var extractionError: String?
     @State private var showingExtractionError = false
     @State private var showingCameraPermissionDenied = false
     @State private var showingExtractionSuccess = false
-
-    /// Wraps the captured pages with a fresh identity for each scan.
-    /// Using .sheet(item:) guarantees SwiftUI doesn't pre-construct the
-    /// sheet content while the data source is nil.
-    private struct ScanSession: Identifiable {
-        let id = UUID()
-        let pages: [UIImage]
-    }
 
     /// Add mode — blank form.
     init() {
@@ -74,8 +62,8 @@ struct SupabaseAddRecipeView: View {
                 if let error = viewModel.saveError {
                     Section {
                         Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
+                            .foregroundStyle(Color.fluffyError)
+                            .font(.fluffyCaption)
                     }
                 }
 
@@ -125,9 +113,9 @@ struct SupabaseAddRecipeView: View {
             // Photo option sheet (camera vs library)
             .confirmationDialog("Add Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button("Take Photo") {
+                    Button("Scan Pages") {
                         showingPhotoOptions = false
-                        requestCameraAccess()
+                        showingCamera = true
                     }
                 }
                 Button("Choose from Library") {
@@ -140,35 +128,22 @@ struct SupabaseAddRecipeView: View {
             }
             // Photo library picker
             .photosPicker(isPresented: $showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
-            // Camera. The capture handoff builds a ScanSession directly
-            // from the captured image, so the scan sheet only presents
-            // once we have pages in hand — no eager view construction,
-            // no stale @State timing window.
+            // Figma-styled recipe scanner — replaces the old CameraView +
+            // PhotoScanView two-step with a single dark-themed camera view
+            // that handles multi-page capture internally.
             .fullScreenCover(isPresented: $showingCamera) {
-                CameraView { image in
-                    handleCameraCapture(image)
-                }
-                .ignoresSafeArea()
-            }
-            // Multi-page scan review. Using .sheet(item:) so the content
-            // closure only runs when scanSession is non-nil — this prevents
-            // any eager view construction with empty pages.
-            .sheet(item: $scanSession) { session in
-                PhotoScanView(
-                    initialPages: session.pages,
+                RecipeScanView(
                     onDone: { images in
-                        Logger.supabase.info("Photo import: PhotoScanView onDone with \(images.count) image(s)")
-                        scanSession = nil
+                        showingCamera = false
+                        Logger.supabase.info("Photo import: RecipeScanView onDone with \(images.count) image(s)")
                         Task { await extractRecipe(from: images) }
                     },
                     onCancel: {
-                        Logger.supabase.info("Photo import: PhotoScanView cancelled")
-                        scanSession = nil
+                        showingCamera = false
+                        Logger.supabase.info("Photo import: RecipeScanView cancelled")
                     }
                 )
-                .onAppear {
-                    Logger.supabase.info("Photo import: PhotoScanView appeared with session pages count=\(session.pages.count)")
-                }
+                .ignoresSafeArea()
             }
             // Photo library selection
             .onChange(of: selectedPhotoItem) { _, newItem in
@@ -304,10 +279,10 @@ struct SupabaseAddRecipeView: View {
                     Text(extractingPageCount > 1
                          ? "Reading recipe from \(extractingPageCount) pages..."
                          : "Reading recipe from photo...")
-                        .font(.headline)
+                        .font(.fluffyHeadline)
                     Text("This may take a few seconds")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.fluffyCallout)
+                        .foregroundStyle(Color.fluffySecondary)
                 }
                 .padding(32)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -321,9 +296,10 @@ struct SupabaseAddRecipeView: View {
             VStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.fluffySuccess)
                 Text("Recipe saved")
-                    .font(.headline)
+                    .font(.fluffyHeadline)
+                    .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -337,9 +313,10 @@ struct SupabaseAddRecipeView: View {
             VStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.fluffySuccess)
                 Text("Groceries updated")
-                    .font(.headline)
+                    .font(.fluffyHeadline)
+                    .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -401,56 +378,6 @@ struct SupabaseAddRecipeView: View {
 
         if success {
             withAnimation { showingGroceryAddedConfirmation = true }
-        }
-    }
-
-    // MARK: - Camera Permission
-
-    private func requestCameraAccess() {
-        switch CameraPermissionService.checkStatus() {
-        case .authorized:
-            showingCamera = true
-        case .notDetermined:
-            Task {
-                let granted = await CameraPermissionService.requestAccess()
-                if granted {
-                    showingCamera = true
-                } else {
-                    showingCameraPermissionDenied = true
-                }
-            }
-        case .denied, .restricted:
-            showingCameraPermissionDenied = true
-        @unknown default:
-            showingCameraPermissionDenied = true
-        }
-    }
-
-    // MARK: - Camera Capture Handoff
-
-    /// Handle the raw image from CameraView. Dismisses the camera cover,
-    /// then atomically creates a ScanSession to drive .sheet(item:).
-    /// The session is constructed with the captured image already in hand,
-    /// so PhotoScanView cannot be initialized with empty pages.
-    private func handleCameraCapture(_ image: UIImage?) {
-        Logger.supabase.info("Photo import: camera captured image=\(image != nil)")
-
-        showingCamera = false
-
-        guard let image else {
-            Logger.supabase.info("Photo import: camera cancelled, not presenting scan sheet")
-            return
-        }
-
-        // Wait for the fullScreenCover dismiss animation to complete before
-        // presenting the sheet. The ScanSession is constructed inline so
-        // there's no intermediate state the sheet could read before the
-        // image is available.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(400))
-            let session = ScanSession(pages: [image])
-            Logger.supabase.info("Photo import: opening scan sheet with session id=\(session.id.uuidString) pages=\(session.pages.count)")
-            scanSession = session
         }
     }
 

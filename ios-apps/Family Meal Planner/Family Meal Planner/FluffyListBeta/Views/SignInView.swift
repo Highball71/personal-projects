@@ -21,11 +21,11 @@ struct SignInView: View {
                 .foregroundStyle(Color.fluffyAccent)
 
             Text("FluffyList")
-                .font(.largeTitle.bold())
+                .font(.fluffyDisplayLarge)
                 .foregroundStyle(Color.fluffyPrimary)
 
             Text("Household meal planning,\nmade simple.")
-                .font(.title3)
+                .font(.fluffyCallout)
                 .foregroundStyle(Color.fluffySecondary)
                 .multilineTextAlignment(.center)
 
@@ -56,8 +56,8 @@ struct SignInView: View {
 
             if let error = authService.errorMessage {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.fluffyCaption)
+                    .foregroundStyle(Color.fluffyError)
                     .padding(.horizontal)
             }
 

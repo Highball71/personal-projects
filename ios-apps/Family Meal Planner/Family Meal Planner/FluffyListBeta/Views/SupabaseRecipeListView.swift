@@ -2,8 +2,9 @@
 //  SupabaseRecipeListView.swift
 //  FluffyList
 //
-//  Recipe list backed by Supabase instead of Core Data @FetchRequest.
-//  Tap a recipe to edit, swipe to delete, swipe leading to favorite.
+//  Recipe browse view with amber accent, horizontal category filter
+//  chips, a featured hero card, and a two-column grid of recipe cards.
+//  Figma Heirloom design.
 //
 
 import os
@@ -18,32 +19,58 @@ struct SupabaseRecipeListView: View {
 
     @State private var showingAddRecipe = false
     @State private var showingHouseholdInfo = false
-    @State private var editingRecipe: RecipeRow?
-    @State private var editingIngredients: [RecipeIngredientRow] = []
     @State private var searchText = ""
-    /// When non-nil, presents the day picker sheet for adding this
-    /// recipe to the meal plan.
+    @State private var selectedTag: BrowseTag = .all
     @State private var recipeToPlan: RecipeRow?
     @State private var toastMessage: String?
 
-    /// Recipes filtered by the current search query. Matches recipe
-    /// name OR any ingredient name (both lowercased, substring match).
-    /// When the query is empty, returns all recipes unchanged.
-    private var filteredRecipes: [RecipeRow] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return recipeService.recipes }
+    // MARK: - Filtering
 
-        return recipeService.recipes.filter { recipe in
-            if recipe.name.lowercased().contains(query) {
-                return true
+    /// Recipes filtered by the selected browse tag, then by search text.
+    private var displayedRecipes: [RecipeRow] {
+        var result = recipeService.recipes
+
+        // Browse tag filter
+        if selectedTag != .all {
+            result = result.filter { recipe in
+                selectedTag.matches(
+                    recipe,
+                    ingredientNames: recipeService.ingredientsByRecipeID[recipe.id]
+                )
             }
-            if let ingredientNames = recipeService.ingredientsByRecipeID[recipe.id],
-               ingredientNames.contains(where: { $0.contains(query) }) {
-                return true
-            }
-            return false
         }
+
+        // Search text filter
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !query.isEmpty {
+            result = result.filter { recipe in
+                if recipe.name.lowercased().contains(query) { return true }
+                if let names = recipeService.ingredientsByRecipeID[recipe.id],
+                   names.contains(where: { $0.contains(query) }) { return true }
+                return false
+            }
+        }
+
+        return result
     }
+
+    /// The hero card recipe — first favorite, or newest recipe.
+    private var heroRecipe: RecipeRow? {
+        displayedRecipes.first { $0.isFavorite } ?? displayedRecipes.first
+    }
+
+    /// Grid recipes — everything except the hero.
+    private var gridRecipes: [RecipeRow] {
+        guard let hero = heroRecipe else { return [] }
+        return displayedRecipes.filter { $0.id != hero.id }
+    }
+
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
@@ -52,12 +79,14 @@ struct SupabaseRecipeListView: View {
                     ProgressView("Loading recipes...")
                 } else if recipeService.recipes.isEmpty {
                     emptyState
-                } else if filteredRecipes.isEmpty {
+                } else if displayedRecipes.isEmpty {
                     noMatchesState
                 } else {
-                    recipeList
+                    browseContent
                 }
             }
+            .animation(.easeInOut(duration: 0.25), value: recipeService.isLoading)
+            .background(Color.fluffyBackground)
             .navigationTitle("Recipes")
             .searchable(
                 text: $searchText,
@@ -66,25 +95,18 @@ struct SupabaseRecipeListView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showingHouseholdInfo = true
-                    } label: {
+                    Button { showingHouseholdInfo = true } label: {
                         Image(systemName: "house.fill")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingAddRecipe = true
-                    } label: {
+                    Button { showingAddRecipe = true } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
             .sheet(isPresented: $showingAddRecipe) {
                 SupabaseAddRecipeView()
-            }
-            .sheet(item: $editingRecipe) { recipe in
-                SupabaseAddRecipeView(recipe: recipe, ingredients: editingIngredients)
             }
             .sheet(item: $recipeToPlan) { recipe in
                 DayPickerSheet(
@@ -93,9 +115,7 @@ struct SupabaseRecipeListView: View {
                         recipeToPlan = nil
                         Task { await addToMealPlan(recipe: recipe, date: date) }
                     },
-                    onCancel: {
-                        recipeToPlan = nil
-                    }
+                    onCancel: { recipeToPlan = nil }
                 )
             }
             .sheet(isPresented: $showingHouseholdInfo) {
@@ -108,15 +128,305 @@ struct SupabaseRecipeListView: View {
         }
     }
 
+    // MARK: - Browse Content
+
+    private var browseContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Category filter chips
+                chipBar
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
+
+                // Hero card
+                if let hero = heroRecipe {
+                    NavigationLink {
+                        SupabaseRecipeDetailView(recipe: hero)
+                    } label: {
+                        heroCard(hero)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { recipeContextMenu(hero) }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                }
+
+                // Two-column grid
+                if !gridRecipes.isEmpty {
+                    LazyVGrid(columns: gridColumns, spacing: 14) {
+                        ForEach(gridRecipes) { recipe in
+                            NavigationLink {
+                                SupabaseRecipeDetailView(recipe: recipe)
+                            } label: {
+                                gridCard(recipe)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu { recipeContextMenu(recipe) }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+    }
+
+    // MARK: - Chip Bar
+
+    private var chipBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(BrowseTag.allCases) { tag in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedTag = tag
+                        }
+                    } label: {
+                        Text(tag.rawValue)
+                            .font(.fluffySubheadline)
+                            .foregroundStyle(
+                                selectedTag == tag ? .white : Color.fluffyAmber
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedTag == tag
+                                    ? Color.fluffyAmber
+                                    : Color.fluffyAmber.opacity(0.12),
+                                in: Capsule()
+                            )
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    // MARK: - Hero Card
+
+    private func heroCard(_ recipe: RecipeRow) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            // Gradient background with category icon
+            cardGradient(for: recipe)
+                .frame(height: 200)
+                .overlay(alignment: .center) {
+                    Image(systemName: categoryIcon(for: recipe))
+                        .font(.system(size: 64))
+                        .foregroundStyle(.white.opacity(0.15))
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            // Bottom scrim + title
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(recipe.name)
+                        .font(.fluffyDisplay)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    Spacer()
+                    if recipe.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+                Text(recipeSubtitle(recipe))
+                    .font(.fluffyCallout)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.55)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 16)
+                )
+            )
+        }
+        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+    }
+
+    // MARK: - Grid Card
+
+    private func gridCard(_ recipe: RecipeRow) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Gradient "photo" area
+            ZStack {
+                cardGradient(for: recipe)
+                Image(systemName: categoryIcon(for: recipe))
+                    .font(.system(size: 36))
+                    .foregroundStyle(.white.opacity(0.2))
+            }
+            .frame(height: 120)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 12,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 12
+                )
+            )
+
+            // Info area
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top) {
+                    Text(recipe.name)
+                        .font(.fluffyHeadline)
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    if recipe.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.fluffyAmber)
+                    }
+                }
+                Text(recipeSubtitle(recipe))
+                    .font(.fluffyCaption)
+                    .foregroundStyle(Color.fluffySecondary)
+                    .lineLimit(1)
+            }
+            .padding(10)
+        }
+        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
+    }
+
+    // MARK: - Card Helpers
+
+    private func recipeSubtitle(_ recipe: RecipeRow) -> String {
+        let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
+        if total > 0 {
+            return "\(recipe.category.capitalized) · \(total) min"
+        }
+        return recipe.category.capitalized
+    }
+
+    /// Deterministic warm gradient based on recipe category.
+    private func cardGradient(for recipe: RecipeRow) -> LinearGradient {
+        let pair: (String, String) = switch recipe.recipeCategory {
+        case .breakfast: ("F5C882", "D4A050")
+        case .lunch:     ("7DB88F", "5A9E6E")
+        case .dinner:    ("D4845A", "B86840")
+        case .snack:     ("B5C9A8", "8EB088")
+        case .dessert:   ("D4A0B0", "C08098")
+        case .side:      ("8AB0A0", "5A9080")
+        case .drink:     ("A0B8D0", "7898B8")
+        }
+        return LinearGradient(
+            colors: [Color(hex: pair.0), Color(hex: pair.1)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// SF Symbol per meal category — used as a placeholder in cards.
+    private func categoryIcon(for recipe: RecipeRow) -> String {
+        switch recipe.recipeCategory {
+        case .breakfast: "sunrise.fill"
+        case .lunch:     "sun.max.fill"
+        case .dinner:    "moon.stars.fill"
+        case .snack:     "leaf.fill"
+        case .dessert:   "birthday.cake.fill"
+        case .side:      "carrot.fill"
+        case .drink:     "cup.and.saucer.fill"
+        }
+    }
+
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private func recipeContextMenu(_ recipe: RecipeRow) -> some View {
+        Button {
+            recipeToPlan = recipe
+        } label: {
+            Label("Add to Meal Plan", systemImage: "calendar.badge.plus")
+        }
+        Button {
+            Task { await recipeService.toggleFavorite(recipe) }
+        } label: {
+            Label(
+                recipe.isFavorite ? "Unfavorite" : "Favorite",
+                systemImage: recipe.isFavorite ? "heart.slash" : "heart"
+            )
+        }
+        Button(role: .destructive) {
+            Task { await recipeService.deleteRecipe(recipe.id) }
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+    }
+
+    // MARK: - Empty / No-Matches
+
+    private var emptyState: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            ZStack {
+                Circle()
+                    .fill(Color.fluffyAmberLight)
+                    .frame(width: 120, height: 120)
+                Image(systemName: "book.closed")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.fluffyAmber)
+            }
+            .padding(.bottom, 24)
+            Text("No recipes yet")
+                .font(.fluffyDisplay)
+                .foregroundStyle(Color.fluffyPrimary)
+                .padding(.bottom, 8)
+            Text("Tap + to add your first recipe.")
+                .font(.fluffyBody)
+                .foregroundStyle(Color.fluffySecondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    private var noMatchesState: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            ZStack {
+                Circle()
+                    .fill(Color.fluffyAmberLight)
+                    .frame(width: 120, height: 120)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.fluffyAmber)
+            }
+            .padding(.bottom, 24)
+            Text("No matches")
+                .font(.fluffyDisplay)
+                .foregroundStyle(Color.fluffyPrimary)
+                .padding(.bottom, 8)
+            Text("Try a different search or filter.")
+                .font(.fluffyBody)
+                .foregroundStyle(Color.fluffySecondary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    // MARK: - Toast
+
     @ViewBuilder
     private var toastOverlay: some View {
         if let message = toastMessage {
             VStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.fluffySuccess)
                 Text(message)
-                    .font(.headline)
+                    .font(.fluffyHeadline)
+                    .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -129,118 +439,9 @@ struct SupabaseRecipeListView: View {
         }
     }
 
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "book.closed")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.fluffySecondary)
-
-            Text("No recipes yet")
-                .font(.title3)
-                .foregroundStyle(Color.fluffyPrimary)
-
-            Text("Tap + to add your first recipe.")
-                .font(.subheadline)
-                .foregroundStyle(Color.fluffySecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var noMatchesState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.fluffySecondary)
-
-            Text("No matches")
-                .font(.title3)
-                .foregroundStyle(Color.fluffyPrimary)
-
-            Text("No recipes match “\(searchText)”.")
-                .font(.subheadline)
-                .foregroundStyle(Color.fluffySecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - Recipe List
-
-    private var recipeList: some View {
-        List {
-            ForEach(filteredRecipes) { recipe in
-                Button {
-                    Task { await openEdit(recipe) }
-                } label: {
-                    recipeRow(recipe)
-                }
-                .tint(Color.fluffyPrimary)
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button {
-                        recipeToPlan = recipe
-                    } label: {
-                        Label("Plan", systemImage: "calendar.badge.plus")
-                    }
-                    .tint(Color.fluffyAccent)
-                }
-            }
-            .onDelete { offsets in
-                Task {
-                    for index in offsets {
-                        let recipe = filteredRecipes[index]
-                        await recipeService.deleteRecipe(recipe.id)
-                    }
-                }
-            }
-        }
-        .listStyle(.plain)
-    }
-
-    private func recipeRow(_ recipe: RecipeRow) -> some View {
-        HStack(spacing: 12) {
-            // Category stripe
-            RoundedRectangle(cornerRadius: 2)
-                .fill(recipe.recipeCategory.stripeColor)
-                .frame(width: 3, height: 40)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.name)
-                    .font(.headline)
-                    .foregroundStyle(Color.fluffyPrimary)
-
-                Text(recipe.category.capitalized)
-                    .font(.caption)
-                    .foregroundStyle(Color.fluffySecondary)
-            }
-
-            Spacer()
-
-            if recipe.isFavorite {
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(Color.fluffyAccent)
-                    .font(.caption)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Edit
-
-    private func openEdit(_ recipe: RecipeRow) async {
-        editingIngredients = await recipeService.fetchIngredients(for: recipe.id)
-        editingRecipe = recipe
-    }
-
     // MARK: - Add to Meal Plan
 
-    /// Assigns the picked recipe to a day using the shared meal-plan
-    /// orchestration helper. Shows a day-specific success toast.
     private func addToMealPlan(recipe: RecipeRow, date: Date) async {
-        // If that day already has a plan in the loaded week, pass its
-        // ID so the helper can subtract its old grocery contributions
-        // before replacing. Otherwise nil (helper handles missing).
         let existingPlanID = mealPlanService
             .plansByDate[MealPlanService.isoDate(from: date)]?.id
 
@@ -256,16 +457,77 @@ struct SupabaseRecipeListView: View {
 
         guard result != nil else { return }
 
-        // Refresh the meal plan's cached state so the meal plan tab
-        // shows the new assignment next time it's viewed.
         await mealPlanService.fetchPlans(
             weekStart: DateHelper.startOfWeek(containing: date)
         )
 
-        // Full day name for the toast
         let f = DateFormatter()
         f.dateFormat = "EEEE"
         withAnimation { toastMessage = "Added to \(f.string(from: date))" }
+    }
+}
+
+// MARK: - Browse Tags
+
+/// Cuisine / ingredient-based filter tags for the recipe browse view.
+/// Matches recipes by scanning their name and ingredient list for keywords.
+private enum BrowseTag: String, CaseIterable, Identifiable {
+    case all        = "All"
+    case chicken    = "Chicken"
+    case pasta      = "Pasta"
+    case fish       = "Fish"
+    case vegetarian = "Vegetarian"
+    case pork       = "Pork"
+    case soups      = "Soups"
+
+    var id: String { rawValue }
+
+    /// Whether a recipe matches this tag based on its name and ingredients.
+    func matches(_ recipe: RecipeRow, ingredientNames: [String]?) -> Bool {
+        let nameLower = recipe.name.lowercased()
+        let ingredients = ingredientNames ?? []
+
+        func containsAny(_ keywords: [String]) -> Bool {
+            keywords.contains { kw in
+                nameLower.contains(kw) || ingredients.contains { $0.contains(kw) }
+            }
+        }
+
+        switch self {
+        case .all:
+            return true
+        case .chicken:
+            return containsAny(["chicken", "poultry"])
+        case .pasta:
+            return containsAny([
+                "pasta", "spaghetti", "penne", "linguine", "fettuccine",
+                "macaroni", "noodle", "lasagna", "rigatoni", "orzo",
+                "tortellini", "ravioli", "gnocchi"
+            ])
+        case .fish:
+            return containsAny([
+                "fish", "salmon", "tuna", "cod", "tilapia", "shrimp",
+                "seafood", "prawn", "crab", "lobster", "scallop",
+                "halibut", "mahi", "swordfish", "anchov"
+            ])
+        case .vegetarian:
+            // Negative match: no common meat/fish keywords
+            let meatKeywords = [
+                "chicken", "beef", "pork", "turkey", "lamb", "bacon",
+                "sausage", "ham", "steak", "prosciutto", "fish",
+                "salmon", "tuna", "shrimp", "prawn", "crab",
+                "lobster", "scallop", "anchov"
+            ]
+            return !containsAny(meatKeywords)
+        case .pork:
+            return containsAny([
+                "pork", "bacon", "ham", "prosciutto", "pancetta"
+            ])
+        case .soups:
+            return containsAny([
+                "soup", "stew", "chowder", "bisque", "broth", "chili"
+            ])
+        }
     }
 }
 
@@ -273,7 +535,7 @@ struct SupabaseRecipeListView: View {
 
 /// Lightweight sheet that lets the user pick one of the 7 days of the
 /// current week to assign a recipe to.
-private struct DayPickerSheet: View {
+struct DayPickerSheet: View {
     let recipe: RecipeRow
     let onPick: (Date) -> Void
     let onCancel: () -> Void
@@ -291,7 +553,7 @@ private struct DayPickerSheet: View {
             List {
                 Section {
                     Text(recipe.name)
-                        .font(.headline)
+                        .font(.fluffyHeadline)
                         .foregroundStyle(Color.fluffyPrimary)
                 } header: {
                     Text("Plan this recipe")
@@ -304,16 +566,17 @@ private struct DayPickerSheet: View {
                         } label: {
                             HStack {
                                 Text(dayName(for: date))
-                                    .font(.caption)
+                                    .font(.fluffyCaption)
+                                    .fontWeight(.semibold)
                                     .foregroundStyle(Color.fluffySecondary)
                                     .frame(width: 40, alignment: .leading)
                                 Text(fullDate(for: date))
-                                    .font(.body)
+                                    .font(.fluffyBody)
                                     .foregroundStyle(Color.fluffyPrimary)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
-                                    .foregroundStyle(Color.fluffySecondary)
+                                    .foregroundStyle(Color.fluffyTertiary)
                             }
                             .contentShape(Rectangle())
                         }

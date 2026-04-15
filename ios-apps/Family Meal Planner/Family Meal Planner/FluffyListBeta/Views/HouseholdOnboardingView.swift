@@ -4,6 +4,7 @@
 //
 //  After sign-in, if the user has no household, show this screen
 //  to create one or join an existing one by code.
+//  Heirloom design tokens throughout.
 //
 
 import SwiftUI
@@ -37,6 +38,7 @@ struct HouseholdOnboardingView: View {
             .background(Color.fluffyBackground)
             .navigationTitle("Get Started")
             .navigationBarTitleDisplayMode(.large)
+            .animation(.easeInOut(duration: 0.25), value: mode)
         }
     }
 
@@ -48,45 +50,39 @@ struct HouseholdOnboardingView: View {
 
             Image(systemName: "house.fill")
                 .font(.system(size: 60))
-                .foregroundStyle(Color.fluffyAccent)
+                .foregroundStyle(Color.fluffyAmber)
 
             Text("Set up your household")
-                .font(.title2.bold())
+                .font(.fluffyDisplaySmall)
                 .foregroundStyle(Color.fluffyPrimary)
 
-            Text("Create a new household or join one that someone has already set up.")
-                .font(.body)
+            Text("Create a new household or join one\nthat someone has already set up.")
+                .font(.fluffyBody)
                 .foregroundStyle(Color.fluffySecondary)
                 .multilineTextAlignment(.center)
 
             Spacer()
 
-            Button {
+            FluffyPrimaryButton("Create Household", icon: "plus.circle.fill", section: .recipes) {
                 mode = .create
-            } label: {
-                Label("Create Household", systemImage: "plus.circle.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.fluffyAccent)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
             Button {
                 mode = .join
             } label: {
-                Label("Join with Code", systemImage: "person.badge.plus")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.fluffyCard)
-                    .foregroundStyle(Color.fluffyPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.fluffyBorder, lineWidth: 1)
-                    )
+                HStack(spacing: 8) {
+                    Image(systemName: "person.badge.plus")
+                    Text("Join with Code")
+                }
+                .font(.fluffyButton)
+                .foregroundStyle(Color.fluffyPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.fluffyBorder, lineWidth: 1)
+                )
             }
 
             Spacer()
@@ -99,7 +95,7 @@ struct HouseholdOnboardingView: View {
     private var createView: some View {
         VStack(spacing: 16) {
             Text("Create a Household")
-                .font(.title2.bold())
+                .font(.fluffyDisplaySmall)
                 .foregroundStyle(Color.fluffyPrimary)
 
             TextField("Household name (e.g. The Alberts)", text: $householdName)
@@ -108,36 +104,25 @@ struct HouseholdOnboardingView: View {
             TextField("Your name", text: $displayName)
                 .textFieldStyle(.roundedBorder)
 
-            Button {
+            FluffyPrimaryButton("Create", section: .recipes) {
                 Task {
-                    let success = await householdService.createHousehold(
+                    _ = await householdService.createHousehold(
                         name: householdName,
                         memberDisplayName: displayName
                     )
-                    if !success {
-                        // Error is shown via householdService.errorMessage
-                    }
-                }
-            } label: {
-                if householdService.isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else {
-                    Text("Create")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
                 }
             }
-            .background(Color.fluffyAccent)
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             .disabled(householdName.isEmpty || displayName.isEmpty || householdService.isLoading)
+            .opacity(householdName.isEmpty || displayName.isEmpty ? 0.5 : 1)
+
+            if householdService.isLoading {
+                ProgressView()
+            }
 
             errorView
 
             Button("Back") { mode = .choose }
+                .font(.fluffyCallout)
                 .foregroundStyle(Color.fluffySecondary)
 
             Spacer()
@@ -149,11 +134,11 @@ struct HouseholdOnboardingView: View {
     private var joinView: some View {
         VStack(spacing: 16) {
             Text("Join a Household")
-                .font(.title2.bold())
+                .font(.fluffyDisplaySmall)
                 .foregroundStyle(Color.fluffyPrimary)
 
-            Text("Ask the household creator for the 6-character join code.")
-                .font(.subheadline)
+            Text("Ask the household creator for the\n6-character join code.")
+                .font(.fluffyCallout)
                 .foregroundStyle(Color.fluffySecondary)
                 .multilineTextAlignment(.center)
 
@@ -161,44 +146,31 @@ struct HouseholdOnboardingView: View {
                 .textFieldStyle(.roundedBorder)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .font(.title2.monospaced())
+                .font(.system(.title2, design: .monospaced, weight: .bold))
                 .multilineTextAlignment(.center)
 
             TextField("Your name", text: $displayName)
                 .textFieldStyle(.roundedBorder)
 
-            Button {
-                print("🟡 [HouseholdOnboardingView] Join tapped — code=\"\(joinCode)\", displayName=\"\(displayName)\"")
+            FluffyPrimaryButton("Join", section: .recipes) {
                 Task {
-                    let success = await householdService.joinHousehold(
+                    _ = await householdService.joinHousehold(
                         code: joinCode,
                         memberDisplayName: displayName
                     )
-                    print("🟢 [HouseholdOnboardingView] joinHousehold returned success=\(success)")
-                    if !success {
-                        // Error is shown via householdService.errorMessage
-                    }
-                }
-            } label: {
-                if householdService.isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else {
-                    Text("Join")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
                 }
             }
-            .background(Color.fluffyAccent)
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             .disabled(joinCode.count != 6 || displayName.isEmpty || householdService.isLoading)
+            .opacity(joinCode.count != 6 || displayName.isEmpty ? 0.5 : 1)
+
+            if householdService.isLoading {
+                ProgressView()
+            }
 
             errorView
 
             Button("Back") { mode = .choose }
+                .font(.fluffyCallout)
                 .foregroundStyle(Color.fluffySecondary)
 
             Spacer()
@@ -211,8 +183,8 @@ struct HouseholdOnboardingView: View {
     private var errorView: some View {
         if let error = householdService.errorMessage {
             Text(error)
-                .font(.caption)
-                .foregroundStyle(.red)
+                .font(.fluffyCaption)
+                .foregroundStyle(Color.fluffyError)
                 .padding(.horizontal)
         }
     }
