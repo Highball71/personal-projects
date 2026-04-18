@@ -119,7 +119,7 @@ If homemade photo EXISTS:
 │  "Your Photo" label         │
 │  ┌───────────────────────┐  │
 │  │  Homemade image       │  │  ← RecipeCardImage, preference: .homemade, height: 160
-│  │  (rounded, 160px)     │  │
+│  │  (rounded, 160px)     │  │     Tappable — triggers picker to replace photo
 │  └───────────────────────┘  │
 └─────────────────────────────┘
 
@@ -140,6 +140,7 @@ Shown when `recipe.homemadeImagePath != nil`. Contains:
 
 - "Your Photo" label — `fluffyCaption`, `fluffySecondary` color, left-aligned
 - `RecipeCardImage(recipe: recipe, height: 160, preference: .homemade)` — with rounded corners (12pt) and `clipShape`
+- Tapping the image triggers the same `showingHomemadePhotoPicker` to allow replacing the photo (the upload uses `upsert: true`, so the storage file is overwritten)
 - Horizontal padding matching the rest of the detail screen (20pt)
 - Vertical spacing: 16pt above, 8pt between label and image
 
@@ -166,7 +167,21 @@ The hero image condition stays the same — it shows whenever any image exists, 
 
 **Existing `homemadePhotoPrompt`:** No changes. Already shows "Made this? Add your photo" with camera icon, triggers `showingHomemadePhotoPicker`.
 
-**Existing upload flow:** No changes. `uploadHomemadePhoto(_:)` already handles upload, path setting, recipe refresh, and toast.
+**Toast error support:** Add an `@State private var isErrorToast = false` bool. In `toastOverlay`, use this to switch between:
+- Success: `checkmark.circle.fill` with `fluffySuccess` (existing behavior)
+- Error: `xmark.circle.fill` with `fluffyError`
+
+**Upload flow change:** In `uploadHomemadePhoto(_:)`, when `uploadHomemadeImage()` returns `nil`, set the error toast:
+
+```swift
+guard let path = await recipeService.uploadHomemadeImage(image, recipeID: recipe.id) else {
+    isErrorToast = true
+    withAnimation { toastMessage = "Photo could not be saved" }
+    return
+}
+```
+
+On success, ensure `isErrorToast = false` before showing the success toast (existing behavior).
 
 ### 3. No Other Files Change
 
@@ -189,8 +204,8 @@ The hero image condition stays the same — it shows whenever any image exists, 
 - Loading overlay disappears
 - Recipe row is unchanged — no `homemade_image_path` set
 - Source image is unchanged
-- No toast shown (silent failure — upload overlay just disappears)
-- UI returns to previous state: hero image + "Made this?" prompt
+- Error toast shown: "Photo could not be saved" (uses existing `toastMessage` with error icon)
+- UI returns to previous state: hero image + "Made this?" prompt (or existing homemade photo if replacing)
 
 ### JPEG compression fails
 
