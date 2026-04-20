@@ -52,27 +52,32 @@ enum RecipeWebImporter {
         }
 
         // --- Step 3: Send to Claude ---
+        // Strip script/style/nav noise and HTML tags before sending so
+        // we spend tokens on actual recipe content instead of markup.
+        // The 50_000 char cap stays as a safety net; cleaned text from
+        // a typical recipe page lands well under it.
+        let cleaned = cleanForExtraction(htmlText)
         let maxChars = 50_000
-        let trimmedHTML = htmlText.count > maxChars
-            ? String(htmlText.prefix(maxChars))
-            : htmlText
-        Logger.importPipeline.info("Sending \(trimmedHTML.count, privacy: .public) chars to Claude API...")
+        let trimmedText = cleaned.count > maxChars
+            ? String(cleaned.prefix(maxChars))
+            : cleaned
+        Logger.importPipeline.info("Sending \(trimmedText.count, privacy: .public) chars to Claude API (cleaned from \(htmlText.count, privacy: .public) chars HTML)")
 
         let userPrompt = """
-            Extract the recipe from this webpage HTML. Return JSON with these fields: \
-            name (string), category (string - one of: breakfast, lunch, dinner, \
-            snack, dessert, side, drink), servingSize (string), prepTime (string), \
-            cookTime (string), ingredients (array of objects with: name, amount, \
-            unit), instructions (array of strings), and source (string or null \
-            - the name of the website or blog this recipe is from).
+            This is the readable text extracted from a recipe webpage. \
+            Ignore navigation, ads, comments, related-recipes lists, \
+            cookie banners, and footer boilerplate. Focus on the recipe \
+            content itself.
 
-            If you cannot find a clear, complete recipe in this text, respond with \
-            exactly this JSON: {"error": "no_recipe_found"}. Do NOT make up or guess \
-            a recipe.
+            \(RecipeImageExtractor.schemaInstructions)
 
-            Here is the webpage HTML:
+            If you cannot find a clear, complete recipe in this text, \
+            respond with exactly this JSON: {"error": "no_recipe_found"}. \
+            Do NOT make up or guess a recipe.
 
-            \(trimmedHTML)
+            Here is the webpage text:
+
+            \(trimmedText)
             """
 
         let response = try await AnthropicClient.sendTextMessage(
@@ -97,6 +102,64 @@ enum RecipeWebImporter {
     }
 
     // MARK: - Private
+
+    /// Phase 1 string-based readability pass. Strips obvious noise
+    /// blocks (script/style/nav/header/footer/aside), removes the
+    /// remaining HTML tags, decodes a handful of common entities, and
+    /// collapses runs of whitespace. Not a full readability port —
+    /// just enough to keep token spend on recipe content. JSON-LD
+    /// extraction runs against raw HTML and is unaffected.
+    private static func cleanForExtraction(_ html: String) -> String {
+        var text = html
+
+        let blockTags = ["script", "style", "nav", "header", "footer", "aside", "form", "iframe", "noscript"]
+        for tag in blockTags {
+            let pattern = "(?is)<\(tag)\\b[^>]*>.*?</\(tag)>"
+            text = text.replacingOccurrences(
+                of: pattern,
+                with: " ",
+                options: .regularExpression
+            )
+        }
+
+        // Strip remaining HTML tags.
+        text = text.replacingOccurrences(
+            of: "<[^>]+>",
+            with: " ",
+            options: .regularExpression
+        )
+
+        // Decode the HTML entities that show up in nearly every page.
+        // Anything fancier (e.g. numeric entities) is rare enough in
+        // recipe body content to skip in Phase 1.
+        let entities: [(String, String)] = [
+            ("&nbsp;", " "),
+            ("&amp;", "&"),
+            ("&lt;", "<"),
+            ("&gt;", ">"),
+            ("&quot;", "\""),
+            ("&#39;", "'"),
+            ("&apos;", "'"),
+            ("&rsquo;", "'"),
+            ("&lsquo;", "'"),
+            ("&rdquo;", "\""),
+            ("&ldquo;", "\""),
+            ("&mdash;", "—"),
+            ("&ndash;", "–")
+        ]
+        for (from, to) in entities {
+            text = text.replacingOccurrences(of: from, with: to)
+        }
+
+        // Collapse whitespace runs to a single space, then trim.
+        text = text.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        )
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private static func fetchHTML(from url: URL) async throws -> String {
         Logger.network.info("Fetching webpage...")

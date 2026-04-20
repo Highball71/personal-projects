@@ -3,8 +3,13 @@
 //  FluffyList
 //
 //  CRUD for meal_plans via Supabase.
-//  Household-scoped via RLS. One recipe per (household, date) enforced
-//  by the unique constraint in migration 004.
+//  Household-scoped via RLS.
+//
+//  Slot rule (Beta): one meal per (household, date). The DB still
+//  permits multiple rows per slot — the rule is enforced in the app
+//  by the assign path, which clears the slot before inserting.
+//  Legacy multi-row slots are tolerated on read and collapsed on the
+//  next assign or remove.
 //
 
 import Combine
@@ -15,7 +20,8 @@ import Supabase
 @MainActor
 final class MealPlanService: ObservableObject {
     /// Plans for the currently-loaded week, keyed by ISO date string.
-    @Published var plansByDate: [String: MealPlanRow] = [:]
+    /// Each date maps to an array of meal plan rows (multi-meal per day).
+    @Published var plansByDate: [String: [MealPlanRow]] = [:]
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -62,9 +68,9 @@ final class MealPlanService: ObservableObject {
                 .execute()
                 .value
 
-            var map: [String: MealPlanRow] = [:]
+            var map: [String: [MealPlanRow]] = [:]
             for row in rows {
-                map[row.date] = row
+                map[row.date, default: []].append(row)
             }
             plansByDate = map
 
@@ -77,20 +83,19 @@ final class MealPlanService: ObservableObject {
         }
     }
 
-    // MARK: - Assign
+    // MARK: - Add Meal
 
-    /// Upsert a meal plan row for (household, date). Replaces any
-    /// existing recipe for that day. Returns the meal plan's ID on
-    /// success (needed by the caller to record grocery contributions).
-    func assignRecipe(recipeID: UUID, on date: Date) async -> UUID? {
+    /// Insert a new meal plan row for (household, date).
+    /// Multiple rows per date are allowed.
+    func addMeal(recipeID: UUID, on date: Date) async -> UUID? {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
-            Logger.supabase.error("assignRecipe: no household ID")
+            Logger.supabase.error("addMeal: no household ID")
             errorMessage = "No household selected."
             return nil
         }
 
         let iso = Self.isoDate(from: date)
-        Logger.supabase.info("assignRecipe: recipe=\(recipeID.uuidString) date=\(iso)")
+        Logger.supabase.info("addMeal: recipe=\(recipeID.uuidString) date=\(iso)")
 
         let insert = MealPlanInsert(
             householdID: householdID,
@@ -101,61 +106,79 @@ final class MealPlanService: ObservableObject {
         do {
             let rows: [MealPlanRow] = try await supabase
                 .from("meal_plans")
-                .upsert(insert, onConflict: "household_id,date")
+                .insert(insert)
                 .select()
                 .execute()
                 .value
 
             guard let row = rows.first else {
-                Logger.supabase.error("assignRecipe: upsert returned no rows")
+                Logger.supabase.error("addMeal: insert returned no rows")
                 errorMessage = "Meal plan was not saved."
                 return nil
             }
 
-            Logger.supabase.info("assignRecipe: upsert succeeded id=\(row.id.uuidString)")
+            Logger.supabase.info("addMeal: inserted id=\(row.id.uuidString)")
             return row.id
         } catch {
-            Logger.supabase.error("assignRecipe: failed — \(error.localizedDescription)")
+            Logger.supabase.error("addMeal: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return nil
         }
     }
 
-    // MARK: - Assign + Groceries (orchestration)
+    // MARK: - Assign Meal + Groceries (orchestration)
 
-    /// Full "assign a recipe to a day" pipeline that any caller can use:
-    ///   1. Remove the existing meal plan's grocery contributions (if any)
-    ///   2. Upsert the new meal plan row
+    /// Assign a recipe to a slot (household, date), enforcing the
+    /// one-meal-per-slot rule:
+    ///   1. Clear the slot — delete any existing meal_plans rows for
+    ///      this date and undo their grocery contributions
+    ///   2. Insert the new meal plan row
     ///   3. Fetch the recipe's ingredients
-    ///   4. Insert them as grocery items tagged as contributions from
-    ///      the new plan (so clearing the plan later can undo them)
+    ///   4. Insert them as grocery items with contribution tracking
+    ///
+    /// This is the single write path for meal assignment from any UI
+    /// surface (meal plan view, recipe list, recipe detail). Calling
+    /// it on an empty slot is just an insert; calling it on a filled
+    /// slot is a clean replace.
     ///
     /// Returns the new meal plan ID on success, nil on failure.
-    /// Non-fatal if the recipe has no ingredients — the meal plan is
-    /// still assigned and the method returns the new ID.
-    func assignRecipeWithGroceries(
+    func addMealWithGroceries(
         recipe: RecipeRow,
         on date: Date,
-        existingPlanID: UUID?,
         recipeService: RecipeService,
         groceryService: GroceryService
     ) async -> UUID? {
-        // 1. Remove old contributions (if reassigning a day)
-        if let existingPlanID {
-            Logger.supabase.info("assignRecipeWithGroceries: removing old contributions for plan \(existingPlanID.uuidString)")
-            _ = await groceryService.removeContributions(forMealPlan: existingPlanID)
+        // Guard: don't allow assigning meals to past dates.
+        if Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date()) {
+            Logger.supabase.warning("addMealWithGroceries: blocked — date \(Self.isoDate(from: date)) is in the past")
+            errorMessage = "You can only plan meals for today or future days."
+            return nil
         }
 
-        // 2. Upsert meal plan, get new ID
-        guard let newPlanID = await assignRecipe(recipeID: recipe.id, on: date) else {
+        // 1. Clear the slot first so this date holds at most one meal
+        //    after we insert. Safe on an already-empty slot.
+        //
+        //    CRITICAL: if the clear fails (silent RLS rejection, network
+        //    error, etc.) we MUST NOT proceed with the insert. Doing so
+        //    would leave the slot stacked (old + new) and double the
+        //    grocery contributions. errorMessage is already set by
+        //    clearDayWithGroceries on failure.
+        let cleared = await clearDayWithGroceries(on: date, groceryService: groceryService)
+        guard cleared else {
+            Logger.supabase.error("addMealWithGroceries: aborting insert — slot clear failed for date=\(Self.isoDate(from: date))")
+            return nil
+        }
+
+        // 2. Insert meal plan row
+        guard let newPlanID = await addMeal(recipeID: recipe.id, on: date) else {
             return nil
         }
 
         // 3. Fetch the recipe's ingredients
         let ingredients = await recipeService.fetchIngredients(for: recipe.id)
-        Logger.supabase.info("assignRecipeWithGroceries: fetched \(ingredients.count) ingredient(s)")
+        Logger.supabase.info("addMealWithGroceries: fetched \(ingredients.count) ingredient(s)")
 
-        // 4. Insert grocery items with contributions (only if any exist)
+        // 4. Insert grocery items with contributions
         if !ingredients.isEmpty, let householdID = SupabaseManager.shared.currentHouseholdID {
             let inserts = ingredients
                 .sorted { $0.sortOrder < $1.sortOrder }
@@ -173,30 +196,195 @@ final class MealPlanService: ObservableObject {
         return newPlanID
     }
 
-    // MARK: - Clear
+    // MARK: - Remove Single Meal
 
-    /// Delete the meal plan row for the given date (if any).
-    func clearSlot(on date: Date) async -> Bool {
-        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
+    /// Remove one specific meal plan entry and undo its grocery contributions.
+    func removeMeal(_ planID: UUID, groceryService: GroceryService) async -> Bool {
+        Logger.supabase.info("removeMeal: planID=\(planID.uuidString)")
 
-        let iso = Self.isoDate(from: date)
-        Logger.supabase.info("clearSlot: date=\(iso)")
+        // 1. Undo grocery contributions for this specific meal
+        _ = await groceryService.removeContributions(forMealPlan: planID)
 
+        // 2. Delete the meal plan row
         do {
             try await supabase
                 .from("meal_plans")
                 .delete()
+                .eq("id", value: planID.uuidString)
+                .execute()
+
+            Logger.supabase.info("removeMeal: deleted")
+            return true
+        } catch {
+            Logger.supabase.error("removeMeal: failed — \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    // MARK: - Scheduling Check
+
+    /// Returns true if the recipe is currently assigned to any meal plan
+    /// in this household. Used to block deletion of in-use recipes.
+    /// Fails closed (returns true) on error to prevent unsafe deletion.
+    func isRecipeScheduled(_ recipeID: UUID) async -> Bool {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
+
+        do {
+            let rows: [MealPlanRow] = try await supabase
+                .from("meal_plans")
+                .select()
+                .eq("household_id", value: householdID.uuidString)
+                .eq("recipe_id", value: recipeID.uuidString)
+                .limit(1)
+                .execute()
+                .value
+
+            return !rows.isEmpty
+        } catch {
+            Logger.supabase.error("isRecipeScheduled: check failed — \(error.localizedDescription)")
+            // Fail closed: assume scheduled to prevent unsafe deletion
+            return true
+        }
+    }
+
+    // MARK: - Clear Day
+
+    /// Remove all meals for (household, date) and undo their grocery
+    /// contributions. Order matters: delete first, then only undo
+    /// contributions for the rows the server actually removed. That
+    /// way an RLS-silent failure can't strip groceries from meals that
+    /// are still in the plan.
+    func clearDayWithGroceries(on date: Date, groceryService: GroceryService) async -> Bool {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
+
+        let iso = Self.isoDate(from: date)
+
+        // 1. Snapshot current rows for logging context.
+        let beforeRows = await fetchSlotRows(householdID: householdID, iso: iso)
+        Logger.supabase.info("clearDayWithGroceries: date=\(iso) — \(beforeRows.count) row(s) before delete")
+
+        guard !beforeRows.isEmpty else { return true }
+
+        // 2. Delete with .select() so we get back the rows the server
+        //    actually removed.
+        let deletedIDs: [UUID]
+        do {
+            let deleted: [MealPlanRow] = try await supabase
+                .from("meal_plans")
+                .delete()
+                .eq("household_id", value: householdID.uuidString)
+                .eq("date", value: iso)
+                .select()
+                .execute()
+                .value
+            deletedIDs = deleted.map(\.id)
+            Logger.supabase.info("clearDayWithGroceries: server reported \(deletedIDs.count) row(s) deleted")
+        } catch {
+            Logger.supabase.error("clearDayWithGroceries: delete failed — \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        // 3. Verify the slot is empty.
+        let afterRows = await fetchSlotRows(householdID: householdID, iso: iso)
+        Logger.supabase.info("clearDayWithGroceries: date=\(iso) — \(afterRows.count) row(s) after delete")
+
+        if !afterRows.isEmpty {
+            let leftover = afterRows.map { $0.id.uuidString }.joined(separator: ", ")
+            Logger.supabase.error("clearDayWithGroceries: \(afterRows.count) row(s) still present after delete (likely RLS blocked the DELETE). leftover=[\(leftover)]")
+            errorMessage = "Couldn't remove this meal. Please try again or check your account permissions."
+            return false
+        }
+
+        // 4. Now that the meal_plans rows are truly gone, undo their
+        //    grocery contributions.
+        for id in deletedIDs {
+            _ = await groceryService.removeContributions(forMealPlan: id)
+        }
+
+        return true
+    }
+
+    /// Delete all meal plan rows for (household, date) directly in the
+    /// database. Verifies the result by counting rows before and after
+    /// and re-reading the slot. Does NOT mutate `plansByDate` — the
+    /// caller is expected to refetch so the UI sees authoritative state.
+    func clearSlot(on date: Date) async -> Bool {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else {
+            Logger.supabase.error("clearSlot: no household ID")
+            return false
+        }
+
+        let iso = Self.isoDate(from: date)
+
+        // 1. Count rows currently in the slot.
+        let beforeRows = await fetchSlotRows(householdID: householdID, iso: iso)
+        Logger.supabase.info("clearSlot: date=\(iso) — \(beforeRows.count) row(s) before delete")
+
+        if beforeRows.isEmpty {
+            // Nothing to do, but surface the no-op clearly in logs.
+            Logger.supabase.info("clearSlot: date=\(iso) — slot already empty")
+            return true
+        }
+
+        // 2. Issue the delete and capture which rows the server reports
+        //    as deleted. This catches the silent-no-op case (e.g. an
+        //    RLS policy that grants SELECT but not DELETE) — without
+        //    .select() the API call would succeed even when zero rows
+        //    were actually removed.
+        let deletedIDs: [UUID]
+        do {
+            let deleted: [MealPlanRow] = try await supabase
+                .from("meal_plans")
+                .delete()
+                .eq("household_id", value: householdID.uuidString)
+                .eq("date", value: iso)
+                .select()
+                .execute()
+                .value
+
+            deletedIDs = deleted.map(\.id)
+            Logger.supabase.info("clearSlot: server reported \(deletedIDs.count) row(s) deleted")
+        } catch {
+            Logger.supabase.error("clearSlot: delete failed — \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        // 3. Re-read the slot to confirm it is actually empty.
+        let afterRows = await fetchSlotRows(householdID: householdID, iso: iso)
+        Logger.supabase.info("clearSlot: date=\(iso) — \(afterRows.count) row(s) after delete")
+
+        if !afterRows.isEmpty {
+            let leftover = afterRows.map { $0.id.uuidString }.joined(separator: ", ")
+            Logger.supabase.error("clearSlot: \(afterRows.count) row(s) still present after delete (likely RLS blocked the DELETE). leftover=[\(leftover)]")
+            errorMessage = "Couldn't remove this meal. Please try again or check your account permissions."
+            return false
+        }
+
+        if deletedIDs.count != beforeRows.count {
+            Logger.supabase.warning("clearSlot: deleted \(deletedIDs.count) of \(beforeRows.count) row(s) — slot is empty but counts disagree")
+        }
+
+        return true
+    }
+
+    /// Read all current meal_plans rows for a single (household, date)
+    /// directly from the DB. Used by clearSlot for before/after
+    /// verification — bypasses any local cache.
+    private func fetchSlotRows(householdID: UUID, iso: String) async -> [MealPlanRow] {
+        do {
+            return try await supabase
+                .from("meal_plans")
+                .select()
                 .eq("household_id", value: householdID.uuidString)
                 .eq("date", value: iso)
                 .execute()
-
-            plansByDate.removeValue(forKey: iso)
-            Logger.supabase.info("clearSlot: deleted")
-            return true
+                .value
         } catch {
-            Logger.supabase.error("clearSlot: failed — \(error.localizedDescription)")
-            errorMessage = error.localizedDescription
-            return false
+            Logger.supabase.error("fetchSlotRows: failed — \(error.localizedDescription)")
+            return []
         }
     }
 }

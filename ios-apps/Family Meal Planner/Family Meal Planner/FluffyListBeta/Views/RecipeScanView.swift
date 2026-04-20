@@ -37,7 +37,9 @@ struct RecipeScanView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 12)
 
-                // Viewfinder
+                // Viewfinder — no interactive elements, so disable
+                // hit testing to prevent the camera preview UIView
+                // or GeometryReader from intercepting button taps.
                 GeometryReader { geo in
                     let width = geo.size.width - 40
                     let height = width * viewfinderAspect
@@ -60,6 +62,7 @@ struct RecipeScanView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 20)
+                .allowsHitTesting(false)
 
                 Spacer(minLength: 12)
 
@@ -104,6 +107,7 @@ struct RecipeScanView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
+                    .frame(minWidth: 44, minHeight: 44)
             }
 
             Spacer()
@@ -121,6 +125,8 @@ struct RecipeScanView: View {
                 Text("Done")
                     .font(.fluffyButton)
                     .foregroundStyle(pages.isEmpty ? .white.opacity(0.3) : Color.fluffyAmber)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .disabled(pages.isEmpty)
         }
@@ -399,6 +405,9 @@ private struct CameraPreviewRepresentable: UIViewRepresentable {
         let view = CameraPreviewUIView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        // Prevent the preview layer from intercepting touches
+        // meant for the scanner's buttons.
+        view.isUserInteractionEnabled = false
         return view
     }
 

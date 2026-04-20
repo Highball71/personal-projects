@@ -53,6 +53,7 @@ final class SupabaseManager: ObservableObject {
         }
 
         print("[SupabaseManager] Creating SupabaseClient with host: \(url.host!)")
+        projectURL = url
         client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
         print("[SupabaseManager] SupabaseClient created successfully")
     }
@@ -77,5 +78,20 @@ final class SupabaseManager: ObservableObject {
     /// Update the cached household ID after create/join.
     func setCurrentHousehold(_ id: UUID?) {
         currentHouseholdID = id
+    }
+
+    // MARK: - Storage
+
+    /// The project's base URL, read from Info.plist at init.
+    let projectURL: URL
+
+    /// Build a public URL for a file in Supabase Storage.
+    /// Returns nil if the path is nil or empty.
+    func publicStorageURL(path: String?, bucket: String = "recipe-images") -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return projectURL
+            .appendingPathComponent("storage/v1/object/public")
+            .appendingPathComponent(bucket)
+            .appendingPathComponent(path)
     }
 }

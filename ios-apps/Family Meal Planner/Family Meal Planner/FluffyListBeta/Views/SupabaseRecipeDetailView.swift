@@ -9,6 +9,7 @@
 //  Week" button.
 //
 
+import PhotosUI
 import SwiftUI
 
 struct SupabaseRecipeDetailView: View {
@@ -23,6 +24,9 @@ struct SupabaseRecipeDetailView: View {
     @State private var showingEdit = false
     @State private var showingDayPicker = false
     @State private var toastMessage: String?
+    @State private var showingHomemadePhotoPicker = false
+    @State private var homemadePhotoItem: PhotosPickerItem?
+    @State private var isUploadingHomemade = false
 
     /// User-adjustable serving count — defaults to the recipe's saved value.
     @State private var scaledServings: Int = 0
@@ -50,6 +54,16 @@ struct SupabaseRecipeDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if recipe.sourceImagePath != nil || recipe.homemadeImagePath != nil {
+                    RecipeCardImage(recipe: recipe, height: 220)
+                        .clipped()
+                }
+
+                // "Made this? Add your photo" prompt
+                if recipe.homemadeImagePath == nil {
+                    homemadePhotoPrompt
+                }
+
                 titleSection
                 metadataRow
                 sectionDivider
@@ -119,7 +133,19 @@ struct SupabaseRecipeDetailView: View {
                 onCancel: { showingDayPicker = false }
             )
         }
+        .photosPicker(isPresented: $showingHomemadePhotoPicker, selection: $homemadePhotoItem, matching: .images)
+        .onChange(of: homemadePhotoItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await uploadHomemadePhoto(image)
+                }
+                homemadePhotoItem = nil
+            }
+        }
         .overlay { toastOverlay }
+        .overlay { uploadingOverlay }
         .task {
             // Initialize the stepper to the recipe's default servings
             if scaledServings == 0 { scaledServings = max(recipe.servings, 1) }
@@ -266,7 +292,8 @@ struct SupabaseRecipeDetailView: View {
             FluffySectionHeader(title: "Notes")
                 .padding(.horizontal, 20)
             Text(recipe.notes)
-                .font(.fluffyBody)
+                .font(.custom("PlayfairDisplay-Bold", size: 16))
+                .italic()
                 .foregroundStyle(Color.fluffySecondary)
                 .padding(.horizontal, 20)
         }
@@ -297,7 +324,10 @@ struct SupabaseRecipeDetailView: View {
         let scaledQty = ingredient.quantity * scaleFactor
         let qty = FractionFormatter.formatAsFraction(scaledQty)
 
-        if unit == nil || unit == .none {
+        // Spell out the enum case so Swift doesn't think we mean
+        // Optional<IngredientUnit>.none — `unit == nil` already covers
+        // that case; the second branch is for the explicit enum case.
+        if unit == nil || unit == IngredientUnit.none {
             return "\(qty) \(ingredient.name)"
         }
 
@@ -372,6 +402,52 @@ struct SupabaseRecipeDetailView: View {
         }
     }
 
+    // MARK: - Homemade Photo
+
+    private var homemadePhotoPrompt: some View {
+        Button {
+            showingHomemadePhotoPicker = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "camera")
+                    .font(.fluffyCallout)
+                Text("Made this? Add your photo")
+                    .font(.fluffyCallout)
+            }
+            .foregroundStyle(Color.fluffyTertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+    }
+
+    @ViewBuilder
+    private var uploadingOverlay: some View {
+        if isUploadingHomemade {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .scaleEffect(1.3)
+                Text("Saving photo...")
+                    .font(.fluffyHeadline)
+                    .foregroundStyle(Color.fluffyPrimary)
+            }
+            .padding(24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private func uploadHomemadePhoto(_ image: UIImage) async {
+        isUploadingHomemade = true
+        defer { isUploadingHomemade = false }
+
+        guard let path = await recipeService.uploadHomemadeImage(image, recipeID: recipe.id) else {
+            return
+        }
+
+        await recipeService.setHomemadeImagePath(path, recipeID: recipe.id)
+        await recipeService.fetchRecipes()
+        withAnimation { toastMessage = "Photo added" }
+    }
+
     // MARK: - Actions
 
     private func loadIngredients() async {
@@ -380,13 +456,9 @@ struct SupabaseRecipeDetailView: View {
     }
 
     private func addToMealPlan(date: Date) async {
-        let existingPlanID = mealPlanService
-            .plansByDate[MealPlanService.isoDate(from: date)]?.id
-
-        let result = await mealPlanService.assignRecipeWithGroceries(
+        let result = await mealPlanService.addMealWithGroceries(
             recipe: recipe,
             on: date,
-            existingPlanID: existingPlanID,
             recipeService: recipeService,
             groceryService: groceryService
         )

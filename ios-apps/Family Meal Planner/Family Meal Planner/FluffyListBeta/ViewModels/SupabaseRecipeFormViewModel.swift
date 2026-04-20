@@ -9,6 +9,7 @@
 
 import Foundation
 import os
+import UIKit
 
 @MainActor @Observable
 final class SupabaseRecipeFormViewModel {
@@ -23,6 +24,14 @@ final class SupabaseRecipeFormViewModel {
     var ingredientRows: [IngredientFormData] = [IngredientFormData()]
     var sourceType: RecipeSource?
     var sourceDetail: String = ""
+
+    // Image state
+    /// A new image picked by the user (not yet uploaded).
+    var sourceImage: UIImage?
+    /// The current storage path for the source image (from DB or after upload).
+    var sourceImagePath: String?
+    /// True if the user explicitly removed the image.
+    var sourceImageRemoved = false
 
     // Save state
     var isSaving: Bool = false
@@ -49,6 +58,7 @@ final class SupabaseRecipeFormViewModel {
         notes = recipe.notes
         sourceType = recipe.sourceType.flatMap { RecipeSource(rawValue: $0) }
         sourceDetail = recipe.sourceDetail ?? ""
+        sourceImagePath = recipe.sourceImagePath
 
         let sorted = ingredients.sorted { $0.sortOrder < $1.sortOrder }
         if sorted.isEmpty {
@@ -80,12 +90,44 @@ final class SupabaseRecipeFormViewModel {
             ? [IngredientFormData()]
             : extracted.ingredientFormRows
 
+        // Populate the notes field from the extracted description
+        // (recipe headnote) and notes (Notes/Tips/Storage/etc.). Both
+        // are optional. When both are present, separate with a blank
+        // line. Earlier the form's notes field stayed blank even when
+        // the source page had a clearly labeled Notes section.
+        notes = composedNotes(
+            description: extracted.description,
+            notes: extracted.notes
+        )
+
         if let sourceType {
             self.sourceType = sourceType
         }
         if let source = extracted.source, !source.isEmpty {
             self.sourceDetail = source
         }
+    }
+
+    private func composedNotes(description: String?, notes: String?) -> String {
+        let parts: [String] = [description, notes]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.joined(separator: "\n\n")
+    }
+
+    // MARK: - Switch into edit mode (extraction-duplicate flow)
+
+    /// Convert the form into edit mode pointing at an existing recipe,
+    /// preserving any fields the extraction did not provide. Used when
+    /// the user chose "Update Existing Recipe" after an import detected
+    /// a name collision — we want the extracted name/category/servings/
+    /// times/instructions/ingredients to overwrite, but the user's
+    /// previously-entered notes, source detail, and card image to stay.
+    func switchToUpdate(of existing: RecipeRow) {
+        recipeID = existing.id
+        if notes.isEmpty { notes = existing.notes }
+        if sourceImagePath == nil { sourceImagePath = existing.sourceImagePath }
+        if sourceDetail.isEmpty { sourceDetail = existing.sourceDetail ?? "" }
     }
 
     // MARK: - Validation
@@ -121,12 +163,32 @@ final class SupabaseRecipeFormViewModel {
         let trimmedInstructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Resolve the image path to save:
+        //   - If user removed the image, clear it
+        //   - If user picked a new image, upload after we have a recipe ID
+        //   - Otherwise, keep the existing path
+        let imagePath = sourceImageRemoved ? nil : sourceImagePath
+
         Logger.supabase.info("SupabaseRecipeFormVM: \(self.isEditing ? "updating" : "creating") \"\(trimmedName)\" category=\(self.category.rawValue) ingredients=\(ingredientInserts.count)")
 
         let success: Bool
 
         if let editID = recipeID {
-            // Update existing recipe.
+            // Upload new image first if we have one (we already know the recipe ID).
+            var pathForUpdate = imagePath
+            if let newImage = sourceImage {
+                if let uploaded = await recipeService.uploadRecipeImage(newImage, recipeID: editID) {
+                    pathForUpdate = uploaded
+                    sourceImagePath = uploaded
+                    sourceImage = nil
+                }
+            }
+
+            // If image was removed, also delete from storage.
+            if sourceImageRemoved {
+                await recipeService.deleteRecipeImage(recipeID: editID)
+            }
+
             success = await recipeService.updateRecipe(
                 id: editID,
                 name: trimmedName,
@@ -138,10 +200,11 @@ final class SupabaseRecipeFormViewModel {
                 notes: trimmedNotes,
                 sourceType: sourceType?.rawValue,
                 sourceDetail: sourceDetail.isEmpty ? nil : sourceDetail,
+                sourceImagePath: pathForUpdate,
                 ingredients: ingredientInserts
             )
         } else {
-            // Create new recipe.
+            // Create new recipe (no image path yet — we need the ID first).
             let result = await recipeService.addRecipe(
                 name: trimmedName,
                 category: category.rawValue,
@@ -155,13 +218,18 @@ final class SupabaseRecipeFormViewModel {
                 ingredients: ingredientInserts
             )
             success = result != nil
-            // Transition to edit mode on successful create so any
-            // subsequent save() call updates instead of creating
-            // a duplicate. This is what lets photo-scan auto-save
-            // leave the form in a clean editable state.
             if let result {
                 recipeID = result.id
                 Logger.supabase.info("SupabaseRecipeFormVM: transitioned to edit mode id=\(result.id.uuidString)")
+
+                // Now upload the image if one was picked and update the recipe with the path.
+                if let newImage = sourceImage {
+                    if let uploaded = await recipeService.uploadRecipeImage(newImage, recipeID: result.id) {
+                        sourceImagePath = uploaded
+                        sourceImage = nil
+                        await recipeService.setSourceImagePath(uploaded, recipeID: result.id)
+                    }
+                }
             }
         }
 

@@ -8,7 +8,19 @@
       "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' -configuration Debug build)",
       "Bash(xcodebuild -showsdks)",
       "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -showdestinations)",
-      "Bash(xcrun swiftc:*)"
+      "Bash(xcrun swiftc:*)",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination \"generic/platform=iOS\" -quiet build)",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination \"generic/platform=iOS Simulator\" -quiet build)",
+      "Bash(xcodebuild -project \"/Users/davidalbert/Documents/personal-projects/ios-apps/Family Meal Planner/Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -showdestinations)",
+      "Read(//private/tmp/**)",
+      "Bash(unzip -l playfair.zip)",
+      "Bash(unzip -l inter.zip)",
+      "Bash(curl:*)",
+      "Bash(FONTS_DIR=\"/Users/davidalbert/Documents/personal-projects/ios-apps/Family Meal Planner/Family Meal Planner/Design/Fonts\")",
+      "Read(//Users/davidalbert/Documents/personal-projects/ios-apps/Family Meal Planner/$FONTS_DIR/**)",
+      "Bash(grep -E \"\\\\.swift$\")",
+      "Bash(xcodebuild -project \"Family Meal Planner.xcodeproj\" -scheme \"Family Meal Planner\" -destination \"generic/platform=iOS\" CODE_SIGNING_ALLOWED=NO build)",
+      "Bash(ssh-add:*)"
     ]
   }
 }

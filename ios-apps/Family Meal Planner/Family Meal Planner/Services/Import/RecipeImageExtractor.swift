@@ -25,32 +25,74 @@ enum RecipeImageExtractor {
         (no markdown, no code fences, no extra text).
         """
 
+    /// Shared field-list and rules block. Used by both prompts so the
+    /// schema and completeness expectations stay in sync. Exposed
+    /// (non-private) so RecipeWebImporter can reuse it for the URL-
+    /// import Claude fallback prompt — same schema, different framing.
+    static let schemaInstructions = """
+        Extract ALL recipe content visible in the image(s), including:
+          - Recipe headnote / intro / description paragraph above the ingredients
+          - Section headers within the ingredient list (e.g. "Sauce", \
+            "Sauce (optional)", "For the topping", "For the dressing")
+          - Preparation notes printed alongside ingredients (e.g. \
+            "sliced and divided", "softened", "room temperature, divided")
+          - "Notes", "Tips", "Storage", "Make-Ahead", "Substitutions", \
+            "Serving suggestions", "Variations" sections — these are \
+            often at the bottom of the page or on a continuation page
+          - Total time when separately stated
+          - Course / cuisine / keyword tags when present
+          - Any source attribution: book title, cookbook name, website \
+            name, watermark, header, footer, margin
+
+        Return JSON with these fields:
+          name (string),
+          category (one of: breakfast, lunch, dinner, snack, dessert, side, drink),
+          description (string or null) — the headnote / intro paragraph,
+          servingSize (string),
+          prepTime (string),
+          cookTime (string),
+          totalTime (string or null) — only if separately stated,
+          ingredients (array of objects, each with):
+            name (string),
+            amount (string),
+            unit (string),
+            section (string or null) — header this ingredient sits under, \
+              such as "Sauce", "Sauce (optional)", "Topping", \
+              "For the marinade"; null if the recipe has a single flat list,
+            preparation (string or null) — preparation note printed with \
+              the ingredient, e.g. "sliced", "softened, divided"
+          instructions (array of strings),
+          notes (string or null) — combined Notes / Tips / Storage / \
+            Make-Ahead / Substitutions text. Preserve section labels \
+            inline (e.g. "Notes:\\n...\\n\\nStorage:\\n..."). Join \
+            multiple sections with a blank line between them,
+          tags (array of strings or null) — course, cuisine, keyword tags,
+          source (string or null) — book title or website name; if you \
+            can't find one, set null.
+
+        Rules:
+          - Return ONLY valid JSON (no markdown, no code fences, no extra text).
+          - Do NOT stop after the first complete-looking recipe body. \
+            Read every image edge-to-edge for additional sections.
+          - When the same content appears in more than one image \
+            (e.g. an ingredient list that runs across two photos), \
+            deduplicate intelligently and keep the more complete version.
+          - Prefer null over guessing. Empty strings are fine for \
+            required string fields when the page truly doesn't say.
+        """
+
     private static let singleImagePrompt = """
-        Extract the recipe from this image. Return JSON with these fields: \
-        name (string), category (string - one of: breakfast, lunch, dinner, \
-        snack, dessert, side, drink), servingSize (string), prepTime (string), \
-        cookTime (string), ingredients (array of objects with: name, amount, \
-        unit), instructions (array of strings), and source (string or null). \
-        Look carefully at the entire photo for any book title, cookbook name, \
-        website name, or source attribution — check headers, footers, margins, \
-        watermarks, and page edges. Include it in the JSON as "source" \
-        (e.g. "The Whole30 Slow Cooker"). If you can't find one, set source \
-        to null.
+        Extract the recipe from this image.
+
+        \(schemaInstructions)
         """
 
     private static let multiPagePrompt = """
-        These are photos of consecutive pages from a single recipe. \
-        Combine them into one complete recipe. If content overlaps \
-        between pages, deduplicate intelligently. Return the unified \
-        recipe with JSON fields: name (string), category (string - \
-        one of: breakfast, lunch, dinner, snack, dessert, side, drink), \
-        servingSize (string), prepTime (string), cookTime (string), \
-        ingredients (array of objects with: name, amount, unit), \
-        instructions (array of strings), and source (string or null). \
-        Look carefully at all photos for any book title, cookbook name, \
-        website name, or source attribution — check headers, footers, \
-        margins, watermarks, and page edges. Include it in the JSON \
-        as "source". If you can't find one, set source to null.
+        These are consecutive pages or screens of ONE recipe (often \
+        spanning a recipe body + a sauce/topping/notes spread). \
+        Combine them into one complete recipe.
+
+        \(schemaInstructions)
         """
 
     // MARK: - Public

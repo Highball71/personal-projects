@@ -31,6 +31,10 @@ struct IngredientRowView: View {
                 // Quantity — text field that accepts fractions like "1/2" or "1 1/2"
                 TextField("Qty", text: $data.quantityText)
                     .keyboardType(.numbersAndPunctuation)
+                    .font(.fluffyBody)
+                    .foregroundColor(Color.fluffyPrimary)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .tint(Color.fluffyAmber)
                     .frame(width: 55)
                     .onChange(of: data.quantityText) { _, newValue in
                         if let parsed = FractionFormatter.parseFraction(newValue) {
@@ -48,8 +52,17 @@ struct IngredientRowView: View {
             .labelsHidden()
             .frame(width: 80)
 
-            // Ingredient name — takes remaining space
+            // Ingredient name — takes remaining space.
+            // Explicit text color + tint: without these the entered
+            // text was rendering in the ambient .primary color, which
+            // in dark mode is near-white against the hex-locked white
+            // fluffyCard background — so names appeared blank even
+            // though the backing data was populated.
             TextField("Ingredient name", text: $data.name)
+                .font(.fluffyBody)
+                .foregroundColor(Color.fluffyPrimary)
+                .foregroundStyle(Color.fluffyPrimary)
+                .tint(Color.fluffyAmber)
         }
     }
 }

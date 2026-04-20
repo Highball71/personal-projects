@@ -88,6 +88,8 @@ struct RecipeRow: Codable, Identifiable, Equatable {
     let isFavorite: Bool
     let sourceType: String?
     let sourceDetail: String?
+    let sourceImagePath: String?
+    let homemadeImagePath: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -98,6 +100,8 @@ struct RecipeRow: Codable, Identifiable, Equatable {
         case isFavorite = "is_favorite"
         case sourceType = "source_type"
         case sourceDetail = "source_detail"
+        case sourceImagePath = "source_image_path"
+        case homemadeImagePath = "homemade_image_path"
         case createdAt = "created_at"
     }
 
@@ -117,6 +121,8 @@ struct RecipeRow: Codable, Identifiable, Equatable {
         isFavorite     = (try? c.decode(Bool.self, forKey: .isFavorite)) ?? false
         sourceType     = try? c.decode(String.self, forKey: .sourceType)
         sourceDetail   = try? c.decode(String.self, forKey: .sourceDetail)
+        sourceImagePath = try? c.decode(String.self, forKey: .sourceImagePath)
+        homemadeImagePath = try? c.decode(String.self, forKey: .homemadeImagePath)
     }
 
     /// Map the Supabase category string to the existing RecipeCategory enum.
@@ -136,6 +142,7 @@ struct RecipeInsert: Codable {
     let notes: String
     let sourceType: String?
     let sourceDetail: String?
+    let sourceImagePath: String?
 
     enum CodingKeys: String, CodingKey {
         case name, category, servings, instructions, notes
@@ -144,6 +151,7 @@ struct RecipeInsert: Codable {
         case cookTimeMinutes = "cook_time_minutes"
         case sourceType = "source_type"
         case sourceDetail = "source_detail"
+        case sourceImagePath = "source_image_path"
     }
 }
 

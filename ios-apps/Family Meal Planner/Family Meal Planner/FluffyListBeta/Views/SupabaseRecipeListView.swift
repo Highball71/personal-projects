@@ -21,14 +21,23 @@ struct SupabaseRecipeListView: View {
     @State private var showingHouseholdInfo = false
     @State private var searchText = ""
     @State private var selectedTag: BrowseTag = .all
+    @State private var showFavoritesOnly = false
     @State private var recipeToPlan: RecipeRow?
     @State private var toastMessage: String?
+    @State private var recipeToDelete: RecipeRow?
+    @State private var showDeleteBlockedAlert = false
+    @State private var showDeleteConfirmAlert = false
 
     // MARK: - Filtering
 
-    /// Recipes filtered by the selected browse tag, then by search text.
+    /// Recipes filtered by favorites toggle, browse tag, then search text.
     private var displayedRecipes: [RecipeRow] {
         var result = recipeService.recipes
+
+        // Favorites filter
+        if showFavoritesOnly {
+            result = result.filter(\.isFavorite)
+        }
 
         // Browse tag filter
         if selectedTag != .all {
@@ -69,13 +78,22 @@ struct SupabaseRecipeListView: View {
 
     /// The 4 most recently created recipes (by createdAt), excluding
     /// the hero, for the horizontal "Recently Added" strip.
+    /// Deduplicated by `id` — when the same recipe appears more than
+    /// once we keep the most-recently-created occurrence (which sorts
+    /// first under our descending order).
     private var recentlyAdded: [RecipeRow] {
         let heroID = heroRecipe?.id
-        return displayedRecipes
+        let sorted = displayedRecipes
             .filter { $0.id != heroID }
             .sorted { $0.createdAt > $1.createdAt }
-            .prefix(4)
-            .map { $0 }
+
+        var seen = Set<UUID>()
+        var unique: [RecipeRow] = []
+        for recipe in sorted where seen.insert(recipe.id).inserted {
+            unique.append(recipe)
+            if unique.count == 4 { break }
+        }
+        return unique
     }
 
     private let gridColumns = [
@@ -113,8 +131,18 @@ struct SupabaseRecipeListView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingAddRecipe = true } label: {
-                        Image(systemName: "plus")
+                    HStack(spacing: 16) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showFavoritesOnly.toggle()
+                            }
+                        } label: {
+                            Image(systemName: showFavoritesOnly ? "heart.fill" : "heart")
+                                .foregroundStyle(showFavoritesOnly ? Color.fluffyAmber : Color.fluffySecondary)
+                        }
+                        Button { showingAddRecipe = true } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
@@ -138,6 +166,35 @@ struct SupabaseRecipeListView: View {
                 await recipeService.fetchRecipes()
             }
             .overlay { toastOverlay }
+            .onChange(of: recipeService.infoMessage) { _, message in
+                // Service-level info notices (e.g. duplicate-recipe
+                // detection) get surfaced here as a toast. We clear
+                // the service value immediately so it can't re-fire,
+                // but defer the toast briefly so it doesn't appear
+                // underneath the still-dismissing AddRecipeView sheet.
+                guard let message else { return }
+                recipeService.infoMessage = nil
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    withAnimation { toastMessage = message }
+                }
+            }
+            .alert("Recipe In Use", isPresented: $showDeleteBlockedAlert) {
+                Button("OK", role: .cancel) { recipeToDelete = nil }
+            } message: {
+                Text("\(recipeToDelete?.name ?? "This recipe") is on your meal plan. Remove it from the meal plan first before deleting.")
+            }
+            .alert("Delete Recipe?", isPresented: $showDeleteConfirmAlert) {
+                Button("Delete", role: .destructive) {
+                    if let recipe = recipeToDelete {
+                        Task { await recipeService.deleteRecipe(recipe.id) }
+                        recipeToDelete = nil
+                    }
+                }
+                Button("Cancel", role: .cancel) { recipeToDelete = nil }
+            } message: {
+                Text("\"\(recipeToDelete?.name ?? "")\" will be permanently deleted.")
+            }
         }
     }
 
@@ -242,14 +299,7 @@ struct SupabaseRecipeListView: View {
 
     private func heroCard(_ recipe: RecipeRow) -> some View {
         ZStack(alignment: .bottomLeading) {
-            // Gradient background with category icon
-            cardGradient(for: recipe)
-                .frame(height: 200)
-                .overlay(alignment: .center) {
-                    Image(systemName: categoryIcon(for: recipe))
-                        .font(.system(size: 64))
-                        .foregroundStyle(.white.opacity(0.15))
-                }
+            RecipeCardImage(recipe: recipe, height: 200)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
             // Bottom scrim + title
@@ -290,15 +340,8 @@ struct SupabaseRecipeListView: View {
 
     private func gridCard(_ recipe: RecipeRow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Gradient "photo" area
-            ZStack {
-                cardGradient(for: recipe)
-                Image(systemName: categoryIcon(for: recipe))
-                    .font(.system(size: 36))
-                    .foregroundStyle(.white.opacity(0.2))
-            }
-            .frame(height: 120)
-            .clipShape(
+            RecipeCardImage(recipe: recipe, height: 120)
+                .clipShape(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 12,
                     bottomLeadingRadius: 0,
@@ -338,14 +381,9 @@ struct SupabaseRecipeListView: View {
     /// Compact horizontal card for the "Recently Added" strip.
     private func recentCard(_ recipe: RecipeRow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ZStack {
-                cardGradient(for: recipe)
-                Image(systemName: categoryIcon(for: recipe))
-                    .font(.system(size: 24))
-                    .foregroundStyle(.white.opacity(0.2))
-            }
-            .frame(width: 140, height: 90)
-            .clipShape(
+            RecipeCardImage(recipe: recipe, height: 90)
+                .frame(width: 140)
+                .clipShape(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 10,
                     bottomLeadingRadius: 0,
@@ -380,37 +418,6 @@ struct SupabaseRecipeListView: View {
         return recipe.category.capitalized
     }
 
-    /// Deterministic warm gradient based on recipe category.
-    private func cardGradient(for recipe: RecipeRow) -> LinearGradient {
-        let pair: (String, String) = switch recipe.recipeCategory {
-        case .breakfast: ("F5C882", "D4A050")
-        case .lunch:     ("7DB88F", "5A9E6E")
-        case .dinner:    ("D4845A", "B86840")
-        case .snack:     ("B5C9A8", "8EB088")
-        case .dessert:   ("D4A0B0", "C08098")
-        case .side:      ("8AB0A0", "5A9080")
-        case .drink:     ("A0B8D0", "7898B8")
-        }
-        return LinearGradient(
-            colors: [Color(hex: pair.0), Color(hex: pair.1)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    /// SF Symbol per meal category — used as a placeholder in cards.
-    private func categoryIcon(for recipe: RecipeRow) -> String {
-        switch recipe.recipeCategory {
-        case .breakfast: "sunrise.fill"
-        case .lunch:     "sun.max.fill"
-        case .dinner:    "moon.stars.fill"
-        case .snack:     "leaf.fill"
-        case .dessert:   "birthday.cake.fill"
-        case .side:      "carrot.fill"
-        case .drink:     "cup.and.saucer.fill"
-        }
-    }
-
     // MARK: - Context Menu
 
     @ViewBuilder
@@ -429,7 +436,7 @@ struct SupabaseRecipeListView: View {
             )
         }
         Button(role: .destructive) {
-            Task { await recipeService.deleteRecipe(recipe.id) }
+            Task { await confirmDeleteRecipe(recipe) }
         } label: {
             Label("Delete", systemImage: "trash")
         }
@@ -515,15 +522,11 @@ struct SupabaseRecipeListView: View {
     // MARK: - Add to Meal Plan
 
     private func addToMealPlan(recipe: RecipeRow, date: Date) async {
-        let existingPlanID = mealPlanService
-            .plansByDate[MealPlanService.isoDate(from: date)]?.id
-
         Logger.supabase.info("Recipe list: addToMealPlan recipe=\(recipe.id.uuidString) date=\(MealPlanService.isoDate(from: date))")
 
-        let result = await mealPlanService.assignRecipeWithGroceries(
+        let result = await mealPlanService.addMealWithGroceries(
             recipe: recipe,
             on: date,
-            existingPlanID: existingPlanID,
             recipeService: recipeService,
             groceryService: groceryService
         )
@@ -537,6 +540,18 @@ struct SupabaseRecipeListView: View {
         let f = DateFormatter()
         f.dateFormat = "EEEE"
         withAnimation { toastMessage = "Added to \(f.string(from: date))" }
+    }
+
+    /// Check if the recipe is scheduled before allowing deletion.
+    /// If scheduled, show a blocked alert. If not, show a confirmation.
+    private func confirmDeleteRecipe(_ recipe: RecipeRow) async {
+        recipeToDelete = recipe
+        let isScheduled = await mealPlanService.isRecipeScheduled(recipe.id)
+        if isScheduled {
+            showDeleteBlockedAlert = true
+        } else {
+            showDeleteConfirmAlert = true
+        }
     }
 }
 
@@ -634,6 +649,7 @@ struct DayPickerSheet: View {
 
                 Section("Choose a Day") {
                     ForEach(weekDates, id: \.self) { date in
+                        let isPast = Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
                         Button {
                             onPick(date)
                         } label: {
@@ -641,19 +657,22 @@ struct DayPickerSheet: View {
                                 Text(dayName(for: date))
                                     .font(.fluffyCaption)
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.fluffySecondary)
+                                    .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffySecondary)
                                     .frame(width: 40, alignment: .leading)
                                 Text(fullDate(for: date))
                                     .font(.fluffyBody)
-                                    .foregroundStyle(Color.fluffyPrimary)
+                                    .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffyPrimary)
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(Color.fluffyTertiary)
+                                if !isPast {
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(Color.fluffyTertiary)
+                                }
                             }
                             .contentShape(Rectangle())
                         }
                         .tint(Color.fluffyPrimary)
+                        .disabled(isPast)
                     }
                 }
             }
