@@ -1,97 +1,49 @@
 # HANDOFF.md — FluffyList
 
-## One-Paragraph Resume
-FluffyList Beta (Build 92) has a complete Heirloom design system and all views rewritten from Figma. The app has four tabs (Meals/Recipes/Grocery/Settings) with per-tab section-colored tints (teal/amber/slate blue/muted). Recipe detail has a scaled servings stepper that adjusts ingredient quantities proportionally and a free-text notes field. The recipe browse view has a hero card, browse filter chips, a "Recently Added" horizontal scroll, and a two-column grid. The meal plan has an empty-week state with suggested recipes, and the grocery list has auto-categorization, Store Mode (dark high-contrast), and share. A custom AVCaptureSession recipe scanner replaces the old UIImagePickerController flow. First-launch onboarding (splash + household setup step 1) is gated by `@AppStorage("hasSeenOnboarding")`. Backend is Supabase with full service layer. The PROXY_KEY is in `Secrets.xcconfig` (gitignored). Next: create the Supabase project, add the `notes` column, and test end-to-end.
+**Read this first.** Concise current state. Detailed trail lives in `.context/STUDIO_LOG/`.
+
+Last updated: 2026-05-28 (end of day)
 
 ---
 
-## Current Status
-- **Build:** 92 (TestFlight, live — still CloudKit; Supabase path not yet deployed)
-- **Branch:** main
-- **Latest commit:** `1d0a87c` — scaled servings + notes field
-- **Bundle ID:** com.highball71.fluffylist.beta
-- **Display Name:** FluffyList Beta
-- **Feature Flag:** `useSupabase = true` in Family_Meal_PlannerApp.swift
-- **Proxy:** https://fluffylist-proxy.onrender.com (for Claude Vision API)
-- **Design System:** Heirloom palette — all views use design tokens
-- **Secrets:** `Secrets.xcconfig` (gitignored) — PROXY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
+## Where things stand
 
-## Architecture
-- **Source of truth:** Supabase (Postgres + RLS)
-- **Auth:** Sign in with Apple via Supabase Auth
-- **Sharing:** Join-code flow (6-char code per household)
-- **Design System:** Color+FluffyList (palette), Font+FluffyList (typography), FluffyColor (section enum), FluffyFont (shared components)
-- **Old CloudKit path:** Preserved behind `useSupabase = false`, not deleted
+FluffyList's **returning-user auth / onboarding trust path** was hull-checked and hardened today, across both the database and the Swift app, and **verified live on a physical device with a real account and real data.** This was the first full run of the multi-AI loop (Claude = database/architecture via Supabase MCP, Claude Code = Swift, Codex = local executor, David = director).
 
-## What's Done
+### Shipped today
 
-### Design System (Heirloom Palette)
-- Color+FluffyList.swift — surfaces, text, borders, 3 section accents + light variants, semantic colors
-- Font+FluffyList.swift — Playfair Display Bold (display) + Inter Regular/Semi Bold (body/headings)
-- Fonts/ — 3 .ttf files bundled + registered in Info.plist
-- FluffyColor.swift — `FluffySection` enum (accent colors per section)
-- FluffyFont.swift — `FluffySectionHeader`, `FluffyBulletRow`, `FluffyPrimaryButton`, `FluffyMetadataChip`
-- AppColors.swift — slimmed to `RecipeCategory.stripeColor` only
+**Database (Supabase ref `papuusfhtojthtnbsdvs`), applied + committed:**
+- Removed wide-open `households` RLS policies; scoped to owner-writes / owner-or-member reads.
+- Added `join_household_by_code()` SECURITY DEFINER RPC so joining no longer requires exposing every household's join code.
+- Added missing policies: `household_members` leave/edit, `recipes` UPDATE, `recipe_ratings` read + author-update.
+- Fixed the **cascade-delete bug**: deleting a recipe now clears it from the calendar (`meal_plans.recipe_id` → ON DELETE SET NULL) instead of throwing an FK error. Household deletion now cascades meal plans + groceries consistently.
+- Pinned `is_household_member` search_path. Security advisor clean (remaining notices are by-design SECURITY DEFINER + a moot password-protection flag — app uses Sign in with Apple).
+- Captured in migrations **011** and **012** (the latter documents a unique index that existed live but was never in a migration — see "Drift lesson" below).
 
-### Views
-- **SupabaseRecipeListView** — hero card, browse filter chips (All/Chicken/Pasta/Fish/Vegetarian/Pork/Soups), "Recently Added" horizontal scroll (4 newest), two-column LazyVGrid, context menus
-- **SupabaseRecipeDetailView** — Playfair bold title, metadata chips, **scaled servings stepper** (adjusts ingredient quantities proportionally), bullet-dot ingredients, bold ingredient highlighting in prep steps, **notes section**, "Add to This Week" button
-- **SupabaseMealPlanView** — teal day cards, today left bar, **empty-week state** ("Your week is wide open" with frying pan icon, Browse Recipes / Add a Custom Meal buttons, suggested recipes list), Generate Shopping List switches to Grocery tab
-- **SupabaseGroceryListView** — ruled lines, auto-categorized items (Produce/Protein/Dairy/Pantry/Other), **Store Mode** (dark high-contrast toggle with larger text/checkboxes), Share List via ShareLink
-- **RecipeScanView** — custom AVCaptureSession camera with corner bracket guides, animated amber scan line, shutter button, thumbnail strip, page counter (fixed "0 pages" bug with PassthroughSubject)
-- **SupabaseSettingsView** — initials avatar, grouped sections (Household/Recipes/Shopping/App), toggle/stepper/picker rows, Store Mode toggle wired to grocery view
-- **AppRootView** — onboarding gate (hasSeenOnboarding), four-tab layout with per-tab section tints, selectedTab binding for cross-tab navigation
-- **WelcomeSplashView** + **HouseholdSetupView** — first-launch onboarding (household size + dietary prefs)
-- **HouseholdOnboardingView** — restyled with FluffyPrimaryButton + Heirloom tokens
-- **SignInView** — restyled with Playfair Display + Fluffy tokens
+**Swift (commit `338bcf3`):** all 7 hull-check findings fixed — join flow switched to the RPC, launch no longer crashes on missing config (recoverable `ConfigErrorView`), offline session blip no longer dumps users to a sign-in wall (`.restoreFailed` + retry), no more SignInView flash (`.restoring` state), membership-lookup timeout, foreground re-validation, debug cleanup. Live Supabase keys wired into the gitignored `Secrets.xcconfig`. Build green; STUDIO_LOG = R003.
 
-### Data Model Additions
-- `notes: String` on RecipeRow (fallback decoder) + RecipeInsert + RecipeService + ViewModel
-- `@AppStorage` keys: hasSeenOnboarding, householdSize, dietaryPreferences, groceryStoreMode, defaultServings, autoAddGroceries, groupGroceriesByAisle, mealPlanStartDay
+### Verified live (real device, real account, live backend)
+Sign in with Apple → session restore → household membership read → real recipe/meal-plan data all load correctly through the rewritten RLS. The `sb_publishable_` anon key is accepted on live requests (no apikey 401). The trust path is confirmed working.
 
-### Bug Fixes
-- Scanner "0 pages" — replaced `@Published` + `onChange` with `PassthroughSubject` + `onReceive`; added `isRunning` guard + error logging
-- Generate Shopping List race condition — fetch awaited before tab switch
-- ShapeStyle compile errors — all bare `.fluffy*` prefixed with `Color.`
+---
 
-### Polish Pass
-- All system fonts replaced with Fluffy tokens across all views
-- All bare `.red/.green/.secondary` replaced with `.fluffyError/.fluffySuccess/.fluffySecondary`
-- Empty states unified with illustrated circle treatment
-- `.animation(.easeInOut)` transitions on conditional view swaps
-- Consistent toast overlays (icon, font, color, timing)
+## Not done yet (next session)
+1. **Ship a fresh build (103).** TestFlight Build 102 still has the OLD client-side join flow, which the RLS lockdown now blocks. Anyone joining on 102 will fail until a build with `338bcf3` ships. Not urgent (pre-launch, empty DB) but it's the gate before real users.
+2. **Second-account join test** through the new `join_household_by_code` RPC (needs a 2nd Apple ID — couldn't test with one account).
+3. **Cascade-delete runtime check:** delete a recipe that's assigned to a calendar day, confirm the slot clears gracefully.
+4. **Offline-retry view** (`.restoreFailed`) — needs an induced network failure to see.
+5. **Fix stale note:** Claude Code's R003 log still calls the `one_owned_household_per_user` catch branch "dead code." It is NOT — the unique index exists live (now in migration 012). Correct that line when next editing.
 
-### Supabase Backend
-- SQL schema: `supabase/migrations/001_initial_schema.sql` (9 tables + RLS) — **needs `notes` column added to `recipes` table**
-- SPM dependency: `supabase-swift` v2.43.1
-- Config: `Secrets.xcconfig` (gitignored) with real keys
-- Service layer: SupabaseManager, AuthService, HouseholdService, RecipeService, MealPlanService, GroceryService
-- Models: SupabaseModels.swift (Codable Row/Insert structs)
+---
 
-## What's Not Done Yet
-- Supabase project not created (no real URL/key)
-- SQL migration for `notes` column on `recipes` table
-- Sign in with Apple not configured in Supabase dashboard
-- No recipe photos (cards use category gradient + SF Symbol placeholders)
-- No offline/local cache
-- No realtime subscriptions
-- Old CloudKit code not yet removed
+## Drift lesson (worth remembering)
+Today's two-angle hull check exposed that the **live database had drifted from the migration files** in three places (a wide-open policy, a join-code policy, a unique index) — all added via the dashboard, none captured in code. Neither the code-reading AI nor the DB-reading AI caught it alone; together they did. Migrations 011/012 reconciled it. Keep schema changes in migrations, not the dashboard.
 
-## Critical Files
-- `Design/` — Color+FluffyList, Font+FluffyList, FluffyColor, FluffyFont, Fonts/
-- `FluffyListBeta/Views/` — AppRootView, SupabaseRecipeListView, SupabaseRecipeDetailView, SupabaseMealPlanView, SupabaseGroceryListView, SupabaseSettingsView, RecipeScanView, WelcomeSplashView, HouseholdSetupView
-- `FluffyListBeta/Models/SupabaseModels.swift` — includes `notes` field
-- `FluffyListBeta/ViewModels/SupabaseRecipeFormViewModel.swift` — includes `notes`
-- `FluffyListBeta/Services/RecipeService.swift` — `notes` in add/update
-- `Family_Meal_PlannerApp.swift` — feature flag
-- `Family-Meal-Planner-Info.plist` — font registration + proxy key
-- `Secrets.xcconfig` — PROXY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY (gitignored)
+---
 
-## Next Steps (In Order)
-1. Create Supabase project at supabase.com
-2. Run `001_initial_schema.sql` + add `notes TEXT DEFAULT ''` to `recipes` table
-3. Enable Sign in with Apple in Supabase Auth settings
-4. Add real URL + anon key to `Secrets.xcconfig`
-5. Test sign-in → create household → add recipe → meal plan → grocery end-to-end
-6. Add recipe photo support (camera/library → Supabase storage → card thumbnails)
-7. Remove old CloudKit code after Supabase is validated
+## Project facts
+- Supabase: `papuusfhtojthtnbsdvs` (active). Old `dbunenacikpeeplnltrz` should be paused/deleted.
+- Repo: FluffyList at `personal-projects/ios-apps/Family Meal Planner/`; git index is in the **parent** `personal-projects` repo (Codex flagged this — stage paths accordingly).
+- Bundle `com.highball71.fluffylist.beta`, team `A5DP57PZ7N`, device "Dad's iPhone" registered.
+- `PROXY_KEY` is the one real secret — lives in gitignored `Secrets.xcconfig`, never commit it.
+- Known housekeeping (not urgent): repo structure is tangled (Fast No Slow files mixed in); `ACTIVE_TASK.md` had drifted stale — keep `.context` current each session.

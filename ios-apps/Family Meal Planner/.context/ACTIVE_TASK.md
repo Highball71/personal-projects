@@ -42,18 +42,7 @@
 25. Restyled HouseholdOnboardingView + SignInView with Heirloom tokens
 
 ## Next Objective
-**Create Supabase project and test end-to-end.**
-
-### Steps
-1. Go to supabase.com, create new project
-2. Run `supabase/migrations/001_initial_schema.sql` in SQL editor
-3. Add `notes TEXT DEFAULT ''` column to `recipes` table
-4. Configure Sign in with Apple in Supabase Auth settings
-5. Copy project URL and anon key into `Secrets.xcconfig`
-6. Build and run on device
-7. Test: sign in → create household → add recipe → assign to meal plan → verify groceries
-8. Test: second user joins by code, sees shared data
-9. Test: recipe notes save and display correctly
+**Auth/onboarding trust path hardened (DB + Swift) and verified live on device 2026-05-28. NEXT: ship build 103 (102 has the old join flow the RLS now blocks); second-account join test via join_household_by_code RPC; cascade-delete runtime check.**
 
 ## Not In Scope (Future Sessions)
 - Recipe photo support (cards use gradient placeholders)
