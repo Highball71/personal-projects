@@ -75,12 +75,49 @@ failures leave the user in place. No `.restoring` flash on foreground.
 
 ## Verification
 - `bash scripts/build.sh` → **BUILD SUCCEEDED** (iOS simulator, compile-only).
-- Not yet exercised on-device against the live Supabase project (no end-to-end run
-  of sign-in / join / offline / foreground-expiry in this session).
+- Runtime pass against the live Supabase config done as a follow-up — see
+  "Runtime verification" below for what was/wasn't exercised.
+
+## Runtime verification (2026-05-28, follow-up)
+Live Supabase keys were wired into `Secrets.xcconfig` (URL + `sb_publishable_` anon
+key; `PROXY_KEY` untouched; file remains gitignored/untracked). Built and ran on the
+iPhone 17 simulator (`com.highball71.fluffylist.beta`).
+
+Verified in-sim:
+- **No launch crash.** Process stays alive; no crash reports. (Old `fatalError`
+  path is gone now that config is present.)
+- **ConfigErrorView path gone.** With valid keys, the app routes past config — never
+  shows the error screen. The `$()` escaping in the xcconfig held: the built
+  `Info.plist` `SUPABASE_URL` is a clean `https://papuusfhtojthtnbsdvs.supabase.co`
+  (the `//` was not eaten), so `url.host` is non-nil and no `configError` is set.
+- **Fresh user → onboarding.** `hasSeenOnboarding=false` lands on `WelcomeSplashView`
+  (not SignInView, not a blank screen).
+- **Returning user → SignInView, no flash.** Set `hasSeenOnboarding=true`, relaunched:
+  resolves cleanly to SignInView via `sessionGate`. SignInView is only reachable via
+  `.signedOut`, which can only follow the default `.restoring` — so it cannot render
+  *before* the restore check (the old flash). With no stored session the `.restoring`
+  frame is sub-perceptible (`auth.session` throws `sessionMissing` without a network
+  round-trip), so it wasn't screenshot-captured, but the routing guarantee holds.
+
+NOT verifiable in-sim (needs a real Apple ID signed into the simulator, which this
+sim is not):
+- Sign in with Apple itself, and therefore everything gated behind a real session:
+  authenticated session restore, household lookup (`.loading`→`hasHousehold`/`noHousehold`),
+  the `join_household_by_code` RPC, the membership-lookup timeout, and foreground
+  re-validation of a live token.
+- The `.restoreFailed` offline-retry view (needs a stored session + induced network
+  failure) and a visible `.restoring` spinner (needs network latency from a real
+  session refresh).
+- **Anon-key acceptance:** supabase-swift 2.43.1 accepted the `sb_publishable_` format
+  at client construction (no crash / no `configError`), but whether the Supabase
+  gateway accepts it for actual auth/PostgREST requests is unconfirmed until a real
+  network call — blocked by the Sign in with Apple limitation above. If live requests
+  later 401 with an apikey error, fall back to the legacy anon JWT.
 
 ## Follow-ups / not done
 - Verify RPC scalar decodes to `UUID` against the live function (built assuming a
   bare `uuid` scalar return; if it returns a wrapped row, switch to decode-as-row).
+  Still pending — couldn't reach an authenticated request in-sim.
 - Duplicate-household write-race (double-tap Create) remains: the DB has no
   `owner_id` unique constraint, so the client `isUniqueViolation`/`one_owned_household_per_user`
   branch is still dead. Out of scope here (DB-owned) — flagged for the DB Claude.
