@@ -15,6 +15,7 @@ struct ContentView: View {
     // Metronome
     @State private var metronomeMode: MetronomeMode = .continuous
     @State private var showingWorkout = false
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
@@ -62,8 +63,21 @@ struct ContentView: View {
                 }
             }
             .preferredColorScheme(.dark)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(.white)
+                    }
+                }
+            }
             .fullScreenCover(isPresented: $showingWorkout) {
                 WorkoutView(workoutManager: workoutManager, isPresented: $showingWorkout)
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView(workoutManager: workoutManager, isPresented: $showingSettings)
             }
             .onAppear {
                 workoutManager.requestAuthorization()
