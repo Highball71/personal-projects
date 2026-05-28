@@ -1,15 +1,23 @@
 # Active Task
 
-Continue UX audit implementation. Findings 1 and 2 are done. Remaining from the audit:
+## Just shipped (2026-05-28)
+Three features — all built, installed on Dad's iPhone, committed to main:
+1. Coach voice picker + new default (Daniel). See STUDIO_LOG.
+2. Metronome volume slider (Settings, live).
+3. Secondary distance readout near cadence (miles).
 
 ## Next Up
-3. **Cadence number color** — Apply on/off cadence color to the 44pt SPM number (currently always white; only the tiny caption2 label changes). Small change.
-4. **Below-zone ring color** — Change ring from gray to blue when below zone, matching the banner. Small change.
-5. **Differentiate drift vs too-high voice cue** — CoachingEngine uses "Ease up a bit." for both hrDriftingHigh and hrTooHigh. Change drift cue to something softer like "Settle in." or "Easy..." Small change in CoachingEngine.swift.
-6. **Stats grid hierarchy** — Time in Zone should stand out from the other three cards. Small-medium layout change.
-7. **Live Activity HR color** — Apply zone color to HR number on Lock Screen. Small change.
+- **Real-run verification** (outdoors, GPS): confirm the distance readout
+  increments and the metronome volume slider audibly changes a running tick.
+  These compiled + installed but weren't exercised on a live run.
+- **WatchOS companion (separate session):** `Fast No Slow Watch App/` exists in
+  the repo but is **not yet a build target**. Wiring the watch target + HR-on-
+  watch is its own task. The iPhone-side watch-mirror (`WatchConnector`) is
+  already in place.
+- Remaining UX-audit items from the prior list (if still wanted): cadence
+  number color, below-zone ring color, drift-vs-too-high voice differentiation,
+  stats-grid hierarchy, Live Activity HR color.
 
 ## Constraints
-- No new features
-- No screen redesigns
-- Improve clarity, hierarchy, and coaching effectiveness only
+- No third-party deps; SwiftUI; iOS 17+ (running fine on iOS 26.5).
+- Keep HR primary; don't restyle HR/cadence.
