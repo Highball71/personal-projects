@@ -46,23 +46,36 @@ enum CoachVoiceStore {
         return defaultVoice()
     }
 
-    /// A sensible male en-US default, chosen by what's actually installed.
-    /// Preference order: Aaron → Tom → any male en-US → any en-US.
-    /// Aaron and Tom are both reliable male en-US voices across recent iOS
-    /// versions; we resolve by name rather than hardcoding an identifier so
-    /// a missing download degrades gracefully instead of going silent.
+    /// A sensible male default, chosen by what's actually installed.
+    ///
+    /// We resolve by name (not a hardcoded identifier) so a missing download
+    /// degrades gracefully. Verified on-device (iOS 26.5): a stock iPhone has
+    /// NO premium/enhanced en-US male voice installed — the only en-US voice
+    /// tagged `male` is Fred, the robotic legacy voice, which is a poor coach.
+    /// So the ranked list prefers good en-US males when present (Aaron, Tom,
+    /// Evan, Nathan) and then falls to Daniel/Arthur (en-GB) and Rishi (en-IN),
+    /// which ship on most devices without a download and sound far better than
+    /// Fred. Fred is reached only as a true last resort.
     static func defaultVoice() -> AVSpeechSynthesisVoice? {
-        let enUS = AVSpeechSynthesisVoice.speechVoices().filter { $0.language == "en-US" }
+        let english = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en") }
 
-        for preferredName in ["Aaron", "Tom"] {
-            if let match = enUS.first(where: { $0.name.localizedCaseInsensitiveContains(preferredName) }) {
-                return match
+        let ranked = ["Aaron", "Tom", "Evan", "Nathan", "Daniel", "Arthur", "Rishi"]
+        for name in ranked {
+            // If a named voice is installed at multiple qualities, take the best.
+            if let best = english
+                .filter({ $0.name.localizedCaseInsensitiveContains(name) })
+                .max(by: { $0.quality.rawValue < $1.quality.rawValue }) {
+                return best
             }
         }
-        if let male = enUS.first(where: { $0.gender == .male }) {
+        // Any en-US male, then any English male, then a generic en-US voice.
+        if let usMale = english.first(where: { $0.language == "en-US" && $0.gender == .male }) {
+            return usMale
+        }
+        if let male = english.first(where: { $0.gender == .male }) {
             return male
         }
-        return enUS.first ?? AVSpeechSynthesisVoice(language: "en-US")
+        return AVSpeechSynthesisVoice(language: "en-US")
     }
 }
 
