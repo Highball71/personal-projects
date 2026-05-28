@@ -13,7 +13,7 @@ import ActivityKit
 struct WorkoutActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var heartRate: Int
-        var zoneStatus: String   // "ON TRACK", "QUICK FEET", "LIGHTEN UP", "EASE EFFORT"
+        var zoneStatus: String   // "ON TRACK", "PICK IT UP", "LIGHTEN UP", "EASE EFFORT"
         var elapsedTime: TimeInterval
         var cadence: Int
         var isPaused: Bool
@@ -30,6 +30,9 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     @Published var timeInZone: TimeInterval = 0
     @Published var distanceInZone: Double = 0 // meters
     @Published var totalDistance: Double = 0
+    /// Distance in miles, refreshed at most every ~5s for a calm, secondary
+    /// readout in the workout view (totalDistance itself updates far more often).
+    @Published var displayDistanceMiles: Double = 0
     @Published var currentElevation: Double = 0
     @Published var elevationGain: Double = 0
     @Published var elevationLoss: Double = 0
@@ -43,7 +46,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     // HR source, cadence, coaching, compliance
     @Published var hrSource: HRSource = .unknown
     @Published var currentCadence: Double = 0
-    @Published var activeCue: CoachingCue = .holdCadence
+    @Published var activeCue: CoachingCue = .onTrack
     @Published var timeOnCadence: TimeInterval = 0
     @Published var showSummary: Bool = false
     @Published var isPaused: Bool = false
@@ -54,10 +57,15 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         case connected
     }
 
+    // HR zone membership — purely a state label for internal tracking
+    // (ring color, bpm color, "time in zone" stats). This is NOT the
+    // coaching cue shown to the user. User-facing coaching language lives
+    // in `CoachingCue` and is surfaced as: ON TRACK / PICK IT UP /
+    // LIGHTEN UP / EASE EFFORT.
     enum ZoneStatus: String {
-        case belowZone = "SPEED UP"
-        case inZone = "IN THE ZONE"
-        case aboveZone = "SLOW DOWN"
+        case belowZone = "HR Below Zone"
+        case inZone = "HR In Zone"
+        case aboveZone = "HR Above Zone"
     }
 
     // MARK: - Settings (set from ContentView before starting)
@@ -84,18 +92,6 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     private var startDate: Date?
     private var previousElevation: Double?
     private let synthesizer = AVSpeechSynthesizer()
-    // Premium male US English voice — resolved once at init, falls back gracefully.
-    private let preferredVoice: AVSpeechSynthesisVoice? = {
-        // Try Zach (premium male) first
-        if let voice = AVSpeechSynthesisVoice(identifier: "com.apple.voice.premium.en-US.Zach") {
-            return voice
-        }
-        // Fallback: any premium/enhanced en-US voice
-        let enUS = AVSpeechSynthesisVoice.speechVoices().filter {
-            $0.language == "en-US" && $0.quality.rawValue >= AVSpeechSynthesisVoiceQuality.enhanced.rawValue
-        }
-        return enUS.first ?? AVSpeechSynthesisVoice(language: "en-US")
-    }()
 
     // BLE heart rate monitor
     private var centralManager: CBCentralManager!
@@ -118,6 +114,10 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     // Pause tracking
     private var pauseStart: Date?
     private var totalPausedTime: TimeInterval = 0
+
+    // Throttle for the secondary distance readout (refresh ~every 5s)
+    private var lastDistanceDisplayUpdate: Date = .distantPast
+    private let distanceDisplayInterval: TimeInterval = 5
 
     // Live Activity
     private var liveActivity: Activity<WorkoutActivityAttributes>?
@@ -188,6 +188,8 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         timeInZone = 0
         distanceInZone = 0
         totalDistance = 0
+        displayDistanceMiles = 0
+        lastDistanceDisplayUpdate = .distantPast
         elevationGain = 0
         elevationLoss = 0
         elapsedTime = 0
@@ -211,7 +213,9 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         locationManager.startUpdatingLocation()
         cadenceManager.startTracking()
 
-        // Start metronome — 1 beat = 1 step, BPM = cadence target
+        // Start metronome — 1 beat = 1 step, BPM = cadence target.
+        // Apply the user's saved volume scale before the first click.
+        metronomeEngine.volumeScale = MetronomeVolumeStore.volume
         metronomeEngine.start(mode: metronomeMode, targetBPM: Double(cadenceTarget.target), cadenceFloor: Double(cadenceTarget.floor))
 
         // 1-second coaching/tracking timer
@@ -220,7 +224,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         }
 
         startLiveActivity()
-        speak("Workout started. Target cadence: \(cadenceTarget.target) steps per minute.")
+        speak("Let's go. Target cadence \(cadenceTarget.target).")
     }
 
     func stopWorkout() {
@@ -237,7 +241,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         let minutes = Int(timeInZone) / 60
         let seconds = Int(timeInZone) % 60
         let distanceMiles = distanceInZone * 0.000621371
-        speak("Workout complete. You spent \(minutes) minutes and \(seconds) seconds in your zone, covering \(String(format: "%.1f", distanceMiles)) miles.")
+        speak("Good work. \(minutes) minutes \(seconds) seconds in zone. \(String(format: "%.1f", distanceMiles)) miles.")
 
         showSummary = true
     }
@@ -347,9 +351,26 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
             timeOnCadence += 1
         }
         metronomeEngine.updateCadence(currentCadence)
+        refreshDisplayDistance()
         runCoaching()
         checkComplianceStreak()
         updateLiveActivity()
+    }
+
+    /// Refresh the secondary distance readout at most every ~5s so the
+    /// number on screen stays calm rather than twitching on every GPS fix.
+    private func refreshDisplayDistance() {
+        let now = Date()
+        guard now.timeIntervalSince(lastDistanceDisplayUpdate) >= distanceDisplayInterval else { return }
+        lastDistanceDisplayUpdate = now
+        displayDistanceMiles = totalDistance * 0.000621371
+    }
+
+    /// Live metronome volume change (0...1). Persists and applies without
+    /// restarting an in-progress workout.
+    func setMetronomeVolume(_ volume: Float) {
+        MetronomeVolumeStore.volume = volume
+        metronomeEngine.volumeScale = volume
     }
 
     // MARK: - Coaching
@@ -444,7 +465,7 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
             }
             print("  \(qualityLabel.padding(toLength: 9, withPad: " ", startingAt: 0)) | \(gender.padding(toLength: 12, withPad: " ", startingAt: 0)) | \(v.language.padding(toLength: 8, withPad: " ", startingAt: 0)) | \(v.name.padding(toLength: 20, withPad: " ", startingAt: 0)) | \(v.identifier)")
         }
-        print("──── Selected voice: \(preferredVoice?.identifier ?? "nil") ────")
+        print("──── Resolved coach voice: \(CoachVoiceStore.resolvedVoice()?.identifier ?? "nil") ────")
     }
 
     // MARK: - Speech
@@ -452,13 +473,19 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         guard !isPaused else { return }
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.voice = preferredVoice
+        // Resolved per-utterance so a voice change in Settings takes effect
+        // immediately, with graceful fallback if the saved voice is gone.
+        utterance.voice = CoachVoiceStore.resolvedVoice()
         synthesizer.speak(utterance)
     }
 
     // MARK: - Live Activity
 
     private func startLiveActivity() {
+        // Always notify the watch of the start transition, even if
+        // Live Activities are disabled in Settings below.
+        pushWatchState()
+
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             print("Live Activity: activities disabled in Settings")
             return
@@ -487,6 +514,9 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
     }
 
     private func updateLiveActivity() {
+        // Watch mirror is pushed every tick even if Live Activity isn't running.
+        pushWatchState()
+
         guard let activity = liveActivity else { return }
         let state = WorkoutActivityAttributes.ContentState(
             heartRate: Int(heartRate),
@@ -498,16 +528,36 @@ class WorkoutManager: NSObject, ObservableObject, CLLocationManagerDelegate, CBC
         Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
     }
 
+    /// Push a snapshot of workout state to the paired Apple Watch.
+    /// Safe to call every tick; WatchConnectivity throttles internally.
+    private func pushWatchState() {
+        WatchConnector.shared.send(
+            heartRate: Int(heartRate),
+            cueLabel: cueStatusString,
+            elapsedTime: elapsedTime,
+            cadence: Int(currentCadence),
+            isPaused: isPaused,
+            isWorkoutActive: isWorkoutActive,
+            zoneLow: hrGuardrail.low,
+            zoneHigh: hrGuardrail.high,
+            targetCadence: cadenceTarget.target
+        )
+    }
+
     private var cueStatusString: String {
         switch activeCue {
-        case .holdCadence:      return "ON TRACK"
-        case .increaseCadence:  return "QUICK FEET"
-        case .lightenStride:    return "LIGHTEN UP"
-        case .reduceEffort:     return "EASE EFFORT"
+        case .onTrack:  return "ON TRACK"
+        case .hrBelow:  return "PICK IT UP"
+        case .hrRising: return "LIGHTEN UP"
+        case .hrAbove:  return "EASE EFFORT"
         }
     }
 
     private func endLiveActivity() {
+        // Notify the watch of the stop transition so it flips to the
+        // idle layout even if no Live Activity was running.
+        pushWatchState()
+
         guard let activity = liveActivity else { return }
         let finalState = WorkoutActivityAttributes.ContentState(
             heartRate: Int(heartRate),

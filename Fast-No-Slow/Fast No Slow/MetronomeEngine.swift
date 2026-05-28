@@ -30,6 +30,11 @@ class MetronomeEngine {
     private(set) var targetBPM: Double = 170
     private(set) var isRunning = false
 
+    /// User-set volume scale (0...1) applied on top of the mode envelope.
+    /// 1.0 = unchanged from the original behavior. Read live in `tick()`,
+    /// so changing it mid-workout takes effect on the next click.
+    var volumeScale: Float = 1.0
+
     // Fade mode timing
     private var startTime: Date?
     private let fadeFullDuration: TimeInterval = 180    // 3 min at full volume
@@ -174,7 +179,7 @@ class MetronomeEngine {
     private func tick() {
         guard isRunning, let player = playerNode, let buffer = clickBuffer else { return }
 
-        let volume = computeVolume()
+        let volume = computeVolume() * max(0, min(volumeScale, 1))
         player.volume = volume
 
         if volume > 0.01 {

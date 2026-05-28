@@ -15,10 +15,14 @@ struct WorkoutView: View {
     @State private var editHRHigh: Int = 150
 
     // MARK: - Color System
-    // green = on track, yellow = lighten stride, orange = increase cadence, red = reduce effort, blue = below zone
+    // Banner/BPM colors are driven by HR-primary coaching state:
+    //   green  = onTrack (HR in zone)
+    //   blue   = hrBelow (HR under floor — pick it up)
+    //   yellow = hrRising (HR near ceiling & climbing — lighten up)
+    //   red    = hrAbove (HR over ceiling — ease effort)
 
-    private var isLightenStride: Bool {
-        workoutManager.activeCue == .lightenStride
+    private var isHrRising: Bool {
+        workoutManager.activeCue == .hrRising
     }
 
     private var ringColor: Color {
@@ -30,7 +34,7 @@ struct WorkoutView: View {
     }
 
     private var bpmColor: Color {
-        if isLightenStride { return .yellow }
+        if isHrRising { return .yellow }
         switch workoutManager.zoneStatus {
         case .inZone:    return .green
         case .aboveZone: return .red
@@ -41,29 +45,29 @@ struct WorkoutView: View {
     private var bannerColor: Color {
         if workoutManager.isPaused { return .orange }
         switch workoutManager.activeCue {
-        case .holdCadence:      return .green
-        case .increaseCadence:  return .orange
-        case .lightenStride:    return .yellow
-        case .reduceEffort:     return .red
+        case .onTrack:  return .green
+        case .hrBelow:  return .blue
+        case .hrRising: return .yellow
+        case .hrAbove:  return .red
         }
     }
 
     private var bannerIcon: String {
         switch workoutManager.activeCue {
-        case .holdCadence:      return "checkmark.circle.fill"
-        case .increaseCadence:  return "hare"
-        case .lightenStride:    return "arrow.up.forward"
-        case .reduceEffort:     return "tortoise"
+        case .onTrack:  return "checkmark.circle.fill"
+        case .hrBelow:  return "arrow.up.circle.fill"
+        case .hrRising: return "arrow.up.forward"
+        case .hrAbove:  return "exclamationmark.triangle.fill"
         }
     }
 
     private var bannerText: String {
         if workoutManager.isPaused { return "PAUSED" }
         switch workoutManager.activeCue {
-        case .holdCadence:      return "ON TRACK"
-        case .increaseCadence:  return "QUICK FEET"
-        case .lightenStride:    return "LIGHTEN UP"
-        case .reduceEffort:     return "EASE EFFORT"
+        case .onTrack:  return "ON TRACK"
+        case .hrBelow:  return "PICK IT UP"
+        case .hrRising: return "LIGHTEN UP"
+        case .hrAbove:  return "EASE EFFORT"
         }
     }
 
@@ -262,9 +266,15 @@ struct WorkoutView: View {
             Text("\(Int(workoutManager.currentCadence))")
                 .font(.system(size: 44, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            Text("SPM")
-                .font(.subheadline)
-                .foregroundColor(Color(white: 0.45))
+            VStack(alignment: .leading, spacing: 0) {
+                Text("SPM")
+                    .font(.subheadline)
+                    .foregroundColor(Color(white: 0.45))
+                // Secondary distance readout — calm, low-emphasis, refreshed ~5s.
+                Text(formatMiles(workoutManager.displayDistanceMiles))
+                    .font(.caption)
+                    .foregroundColor(Color(white: 0.4))
+            }
 
             Spacer()
 
@@ -563,6 +573,15 @@ struct WorkoutView: View {
     private func formatDistance(_ meters: Double) -> String {
         let miles = meters * 0.000621371
         return String(format: "%.2f mi", miles)
+    }
+
+    /// Secondary readout near cadence: one decimal under 10 mi ("1.2 mi"),
+    /// two decimals at/over 10 mi ("10.45 mi").
+    private func formatMiles(_ miles: Double) -> String {
+        if miles >= 10 {
+            return String(format: "%.2f mi", miles)
+        }
+        return String(format: "%.1f mi", miles)
     }
 
     private func formatElevation(_ meters: Double) -> String {
