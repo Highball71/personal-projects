@@ -27,6 +27,8 @@ struct AppRootView: View {
     @EnvironmentObject private var householdService: HouseholdService
     @EnvironmentObject private var supabaseManager: SupabaseManager
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     /// Tracks which onboarding screen to show before the flag is set.
@@ -39,19 +41,46 @@ struct AppRootView: View {
 
     var body: some View {
         Group {
-            if !hasSeenOnboarding {
+            if let configError = supabaseManager.configError {
+                ConfigErrorView(message: configError)
+            } else if !hasSeenOnboarding {
                 onboardingFlow
-            } else if !authService.isSignedIn {
-                SignInView()
             } else {
-                householdGate
+                sessionGate
             }
         }
         .task {
-            // Only check session if we're past onboarding
-            if hasSeenOnboarding {
+            // Only check session if we're past onboarding and configured.
+            if hasSeenOnboarding && supabaseManager.configError == nil {
                 await authService.checkSession()
             }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            // A token can expire while backgrounded; re-validate on return so
+            // we don't render a logged-in-but-broken app.
+            guard newPhase == .active,
+                  hasSeenOnboarding,
+                  supabaseManager.configError == nil else { return }
+            Task { await authService.revalidateOnForeground() }
+        }
+    }
+
+    /// Routes on the auth-restore state so a returning user sees a brief
+    /// "restoring" view instead of a SignInView flash, and a transient
+    /// failure offers a retry rather than dumping them at the sign-in wall.
+    @ViewBuilder
+    private var sessionGate: some View {
+        switch authService.sessionState {
+        case .restoring:
+            AuthRestoringView()
+        case .restoreFailed(let message):
+            SessionRestoreRetryView(message: message) {
+                Task { await authService.checkSession() }
+            }
+        case .signedOut:
+            SignInView()
+        case .signedIn:
+            householdGate
         }
     }
 
@@ -103,6 +132,74 @@ private struct HouseholdMembershipLoadingView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.fluffyBackground)
+    }
+}
+
+/// Shown while we confirm an existing session at launch — prevents the
+/// SignInView from flashing in front of an already-signed-in returning user.
+private struct AuthRestoringView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Restoring your session…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.fluffyBackground)
+    }
+}
+
+/// Shown when session restore failed transiently (offline/network). The user
+/// is NOT signed out — they can retry once connectivity returns.
+private struct SessionRestoreRetryView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 44))
+                .foregroundStyle(Color.fluffySecondary)
+            Text("Can't reconnect")
+                .font(.headline)
+                .foregroundStyle(Color.fluffyPrimary)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Retry", action: retry)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.fluffyBackground)
+    }
+}
+
+/// Shown when Supabase configuration is missing/invalid. Recoverable screen
+/// instead of a launch crash — tells the developer/user exactly what to fix.
+private struct ConfigErrorView: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.fluffyError)
+            Text("Configuration Problem")
+                .font(.fluffyDisplaySmall)
+                .foregroundStyle(Color.fluffyPrimary)
+            Text(message)
+                .font(.fluffyCallout)
+                .foregroundStyle(Color.fluffySecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.fluffyBackground)
     }
 }
 

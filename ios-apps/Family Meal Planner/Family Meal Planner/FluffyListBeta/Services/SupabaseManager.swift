@@ -33,53 +33,49 @@ final class SupabaseManager: ObservableObject {
     /// never mistaken for "the user genuinely has no household."
     @Published private(set) var householdMembershipState: HouseholdMembershipState = .loading
 
+    /// Non-nil when Supabase configuration is missing or invalid. When set,
+    /// the app shows a recoverable config-error screen instead of crashing
+    /// at launch. The `client`/`projectURL` are placeholders in this state
+    /// and must not be used — routing gates on `configError` first.
+    @Published private(set) var configError: String?
+
     private init() {
         let rawURL = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL")
         let rawKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY")
 
-        // ── Diagnostics ──
-        print("[SupabaseManager] SUPABASE_URL raw: \(String(describing: rawURL))")
-        print("[SupabaseManager] SUPABASE_ANON_KEY present: \(rawKey != nil)")
+        // Safe stand-ins so the singleton can finish init without a session
+        // when config is bad. Never used for real requests — the config-error
+        // screen intercepts routing before any service touches the client.
+        let placeholderURL = URL(string: "https://placeholder.supabase.co")!
 
         guard let urlString = rawURL as? String, !urlString.isEmpty else {
-            fatalError("Missing SUPABASE_URL at runtime. Raw value: \(String(describing: rawURL))")
+            configError = "Supabase URL is missing. Add SUPABASE_URL to Secrets.xcconfig and rebuild."
+            projectURL = placeholderURL
+            client = SupabaseClient(supabaseURL: placeholderURL, supabaseKey: "placeholder")
+            return
         }
 
-        let parsed = URL(string: urlString)
-        print("[SupabaseManager] urlString: \"\(urlString)\"")
-        print("[SupabaseManager] URL absoluteString: \(parsed?.absoluteString ?? "nil")")
-        print("[SupabaseManager] URL scheme: \(parsed?.scheme ?? "nil")")
-        print("[SupabaseManager] URL host: \(parsed?.host ?? "nil")")
-
-        guard let url = parsed, url.host != nil else {
-            fatalError(
-                "Invalid SUPABASE_URL at runtime: \"\(urlString)\". "
-                + "host is nil — the '//' was likely eaten by xcconfig's comment parser. "
-                + "Fix in Secrets.xcconfig: SUPABASE_URL=https:/$()/yourproject.supabase.co"
-            )
+        guard let url = URL(string: urlString), url.host != nil else {
+            // A nil host usually means the '//' was eaten by xcconfig's
+            // comment parser — fix with SUPABASE_URL=https:/$()/host in Secrets.
+            configError = "Supabase URL is invalid (\"\(urlString)\"). Check SUPABASE_URL in Secrets.xcconfig."
+            projectURL = placeholderURL
+            client = SupabaseClient(supabaseURL: placeholderURL, supabaseKey: "placeholder")
+            return
         }
 
         guard let anonKey = rawKey as? String, !anonKey.isEmpty else {
-            fatalError("Missing SUPABASE_ANON_KEY at runtime. Raw value: \(String(describing: rawKey))")
+            configError = "Supabase anon key is missing. Add SUPABASE_ANON_KEY to Secrets.xcconfig and rebuild."
+            projectURL = url
+            client = SupabaseClient(supabaseURL: url, supabaseKey: "placeholder")
+            return
         }
 
-        print("[SupabaseManager] Creating SupabaseClient with host: \(url.host!)")
         projectURL = url
         client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
-        print("[SupabaseManager] SupabaseClient created successfully")
     }
 
     // MARK: - Session State
-
-    /// Check if we have a valid session and update currentUserID.
-    func refreshSession() async {
-        do {
-            let session = try await client.auth.session
-            setCurrentUser(session.user.id)
-        } catch {
-            setCurrentUser(nil)
-        }
-    }
 
     /// Update the cached user ID after sign-in/sign-out.
     func setCurrentUser(_ id: UUID?) {
