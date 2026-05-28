@@ -25,6 +25,7 @@ final class AuthService: ObservableObject {
     func checkSession() async {
         do {
             let session = try await supabase.auth.session
+            SupabaseManager.shared.setHouseholdMembershipLoading()
             isSignedIn = true
             SupabaseManager.shared.setCurrentUser(session.user.id)
 
@@ -57,6 +58,7 @@ final class AuthService: ObservableObject {
                 )
             )
 
+            SupabaseManager.shared.setHouseholdMembershipLoading()
             isSignedIn = true
             SupabaseManager.shared.setCurrentUser(session.user.id)
             await loadHouseholdMembership(for: session.user.id)
@@ -84,6 +86,8 @@ final class AuthService: ObservableObject {
 
     /// Find the first household this user belongs to.
     private func loadHouseholdMembership(for userID: UUID) async {
+        SupabaseManager.shared.setHouseholdMembershipLoading()
+
         do {
             let memberships: [HouseholdMemberRow] = try await supabase
                 .from("household_members")
@@ -95,9 +99,13 @@ final class AuthService: ObservableObject {
 
             if let first = memberships.first {
                 SupabaseManager.shared.setCurrentHousehold(first.householdID)
+            } else {
+                SupabaseManager.shared.setCurrentHousehold(nil)
             }
         } catch {
-            // No membership yet — that's fine, user will create/join.
+            // Failed lookup is distinct from a successful zero-row lookup.
+            // Keep the user out of create/join until they retry successfully.
+            SupabaseManager.shared.setHouseholdMembershipFailed(error.localizedDescription)
         }
     }
 }

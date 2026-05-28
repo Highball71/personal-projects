@@ -5,8 +5,9 @@
 //  Root view that gates on onboarding + auth state:
 //    1. First launch -> WelcomeSplashView -> HouseholdSetupView (Step 1)
 //    2. Not signed in -> SignInView
-//    3. Signed in, no household -> HouseholdOnboardingView (create/join)
-//    4. Signed in + household -> Tab bar (Meals, Recipes, Grocery, Settings)
+//    3. Signed in, household lookup loading/failed -> loading/retry
+//    4. Signed in, confirmed no household -> HouseholdOnboardingView (create/join)
+//    5. Signed in + household -> Tab bar (Meals, Recipes, Grocery, Settings)
 //
 //  This view is used by the Supabase path. The old CloudKit path
 //  still goes directly to ContentView from the app entry point.
@@ -42,10 +43,8 @@ struct AppRootView: View {
                 onboardingFlow
             } else if !authService.isSignedIn {
                 SignInView()
-            } else if supabaseManager.currentHouseholdID == nil {
-                HouseholdOnboardingView()
             } else {
-                SupabaseContentView()
+                householdGate
             }
         }
         .task {
@@ -53,6 +52,22 @@ struct AppRootView: View {
             if hasSeenOnboarding {
                 await authService.checkSession()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var householdGate: some View {
+        switch supabaseManager.householdMembershipState {
+        case .loading:
+            HouseholdMembershipLoadingView()
+        case .failed(let message):
+            HouseholdMembershipRetryView(message: message) {
+                Task { await authService.checkSession() }
+            }
+        case .noHousehold:
+            HouseholdOnboardingView()
+        case .hasHousehold:
+            SupabaseContentView()
         }
     }
 
@@ -77,6 +92,36 @@ struct AppRootView: View {
             }
             .transition(.move(edge: .trailing))
         }
+    }
+}
+
+private struct HouseholdMembershipLoadingView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Loading your household...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct HouseholdMembershipRetryView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("We couldn't load your household.")
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Retry", action: retry)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
     }
 }
 

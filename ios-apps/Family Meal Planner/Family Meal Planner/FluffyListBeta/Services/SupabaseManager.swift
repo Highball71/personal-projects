@@ -10,6 +10,13 @@ import Combine
 import Foundation
 import Supabase
 
+enum HouseholdMembershipState: Equatable {
+    case loading
+    case noHousehold
+    case hasHousehold(UUID)
+    case failed(String)
+}
+
 @MainActor
 final class SupabaseManager: ObservableObject {
     static let shared = SupabaseManager()
@@ -21,6 +28,10 @@ final class SupabaseManager: ObservableObject {
 
     /// The household the current user belongs to, if any.
     @Published private(set) var currentHouseholdID: UUID?
+
+    /// Explicit lookup state so a failed/in-flight membership lookup is
+    /// never mistaken for "the user genuinely has no household."
+    @Published private(set) var householdMembershipState: HouseholdMembershipState = .loading
 
     private init() {
         let rawURL = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL")
@@ -78,6 +89,15 @@ final class SupabaseManager: ObservableObject {
     /// Update the cached household ID after create/join.
     func setCurrentHousehold(_ id: UUID?) {
         currentHouseholdID = id
+        householdMembershipState = id.map { .hasHousehold($0) } ?? .noHousehold
+    }
+
+    func setHouseholdMembershipLoading() {
+        householdMembershipState = .loading
+    }
+
+    func setHouseholdMembershipFailed(_ message: String) {
+        householdMembershipState = .failed(message)
     }
 
     // MARK: - Storage

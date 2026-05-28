@@ -38,6 +38,16 @@ final class HouseholdService: ObservableObject {
             // Temporary debug delay — ensure token is propagated to PostgREST.
             try await Task.sleep(nanoseconds: 500_000_000)
 
+            // Defensive preflight: a returning user may already own/belong to
+            // a household even if root routing landed on onboarding.
+            if let existingHousehold = try await loadExistingHousehold(for: userID) {
+                household = existingHousehold
+                SupabaseManager.shared.setCurrentHousehold(existingHousehold.id)
+                await loadMembers()
+                isLoading = false
+                return true
+            }
+
             // ── DEBUG: households INSERT ──
             let householdPayload = HouseholdInsert(name: name, ownerID: userID)
             print("🟡 [HouseholdService] INSERT households payload: name=\(householdPayload.name), owner_id=\(householdPayload.ownerID)")
@@ -83,6 +93,16 @@ final class HouseholdService: ObservableObject {
             return true
         } catch {
             print("🔴 [HouseholdService] ERROR: \(error)")
+            if isUniqueViolation(error),
+               let session = try? await supabase.auth.session,
+               let existingHousehold = try? await loadExistingHousehold(for: session.user.id) {
+                household = existingHousehold
+                SupabaseManager.shared.setCurrentHousehold(existingHousehold.id)
+                await loadMembers()
+                isLoading = false
+                return true
+            }
+
             errorMessage = error.localizedDescription
             isLoading = false
             return false
@@ -229,5 +249,51 @@ final class HouseholdService: ObservableObject {
             membersLoaded = true
             isLoadingMembers = false
         }
+    }
+
+    private func loadExistingHousehold(for userID: UUID) async throws -> HouseholdRow? {
+        let memberships: [HouseholdMemberRow] = try await supabase
+            .from("household_members")
+            .select()
+            .eq("user_id", value: userID.uuidString)
+            .limit(1)
+            .execute()
+            .value
+
+        if let membership = memberships.first {
+            return try await loadHousehold(id: membership.householdID)
+        }
+
+        let owned: [HouseholdRow] = try await supabase
+            .from("households")
+            .select()
+            .eq("owner_id", value: userID.uuidString)
+            .limit(1)
+            .execute()
+            .value
+
+        return owned.first
+    }
+
+    private func loadHousehold(id: UUID) async throws -> HouseholdRow? {
+        let rows: [HouseholdRow] = try await supabase
+            .from("households")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+
+        return rows.first
+    }
+
+    private func isUniqueViolation(_ error: Error) -> Bool {
+        if let postgrestError = error as? PostgrestError {
+            return postgrestError.code == "23505"
+        }
+
+        let description = "\(error) \(error.localizedDescription)"
+        return description.contains("23505")
+            || description.contains("one_owned_household_per_user")
     }
 }
