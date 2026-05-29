@@ -12,11 +12,11 @@ Scope — what this app IS
 A single-screen WatchOS companion that displays:
 
 Heart rate, big, center-screen. Updates live from the iPhone's Polar H10 stream (the phone is the BLE host, not the watch).
-Zone color applied to the HR number, matching the phone exactly:
+Zone color applied to the HR number — the phone's HR-NUMBER color rule (hard zone membership), phone as the single source of truth:
 Green — in zone
-Yellow — drifting toward out-of-zone
 Red — above zone
 Blue — below zone
+(The yellow "approaching ceiling" tint that the phone applies to its HR number is a coaching/early-warning concept; it is deliberately NOT mirrored to the watch. The watch shows only the three hard zone states above. See R3 zone-color plumbing.)
 A small "connected / waiting" indicator so if the link to the phone drops, the user sees it instead of a frozen stale number.
 
 That's it. No banner, no cadence, no distance, no controls. Phone remains the brain. Watch is a dumb glass on the HR + zone.
@@ -39,17 +39,20 @@ Start an HKWorkoutSession on the watch when a phone-side workout begins, end it 
 Activity type: .running.
 Location type: .outdoor (consistent with the phone's GPS use).
 The session is purely to claim foreground runtime — we don't need its metrics; HR comes from the phone via WatchConnectivity.
+Note: starting the HKWorkoutSession will spin up the watch's onboard HR sensor for the runtime entitlement. We ignore its values — the Polar-via-phone reading remains the displayed number. Brief moments of divergence between the two sensors are expected and harmless.
 R2. Always-On display
 Enable Always-On display so the screen never fully blanks during a run. The HR number and zone color stay visible at low refresh between wrist-raises.
 
-Implement the appropriate WKExtendedRuntimeSession and Always-On view states; render a slightly dimmed, lower-frequency variant when not active.
+The HKWorkoutSession from R1 is what grants BOTH the extended background runtime AND the Always-On frontmost behavior — do NOT use WKExtendedRuntimeSession. It is the wrong API for a workout app and mixes badly with an active workout session; R1 already covers everything WKExtendedRuntimeSession would.
+The Always-On dimmed variant is a VIEW concern, not a separate runtime session: read SwiftUI's @Environment(\.isLuminanceReduced) in WatchWorkoutView and render a dimmer, animation-free variant when luminance is reduced.
 Acceptable that updates throttle to ~1Hz in Always-On vs. live; what's NOT acceptable is the screen blanking entirely or showing a stale number.
 R3. WatchConnectivity push from phone, not pull from watch
-Phone is the BLE host (already proven with Polar). HR streams phone → watch via WCSession.sendMessage or transferUserInfo. The iPhone-side WatchConnector from commit 3ae08fa is the foundation; extend, don't rewrite.
+Phone is the BLE host (already proven with Polar). State streams phone → watch via WCSession. The iPhone-side WatchConnector from commit 3ae08fa is the foundation; extend, don't rewrite.
 
-Use sendMessage(_:replyHandler:) for live HR + zone updates (low latency, in-flight).
-Use updateApplicationContext(_:) for the "workout active / not active" state (durable, replayed on watch wake).
-On the watch side, treat any message older than ~5s as stale and surface the "waiting" indicator.
+updateApplicationContext(_:) is the BACKBONE — it carries HR, the zoneState token, isActive, and timestamp as a single latest-value-wins snapshot, delivered when the watch wakes. That wake-delivery is exactly the wrist-raise reliability requirement, so it is the right primitive for everything. The existing WatchConnector ALREADY uses applicationContext (pushed every ~1s); extend that path, do not replace it.
+sendMessage(_:replyHandler:) is OPTIONAL — a low-latency in-flight nicety only when the watch is reachable. It silently drops when the watch is asleep/unreachable, so it must never be the sole path for any field. Not required for v1.
+Zone-color plumbing: the phone sends an explicit zoneState token ("inZone"/"aboveZone"/"belowZone") derived from the HR-NUMBER color rule (WorkoutManager.zoneStatus), NOT cueLabel/the coaching banner. The watch renders color directly from the token (inZone→green, aboveZone→red, belowZone→blue) and does NO text-to-color interpretation of its own. Phone is the single source of truth.
+On the watch side, treat any snapshot older than ~5s as stale and surface the "waiting"/"reconnecting" indicator.
 R4. Reachability handling
 If the watch loses connection to the phone (BLE / WCSession), show the "Waiting for phone…" indicator immediately. Do NOT show a stale HR number with no warning — that's the failure mode David called out by name.
 R5. Battery trade is accepted
@@ -66,40 +69,44 @@ Architecture
 │  WorkoutManager            │ ◀────────────▶ │  WorkoutMirror         │
 │       │                    │   live HR +    │       │                │
 │       ▼                    │   zone state   │       ▼                │
-│  WatchConnector            │ ──────────────▶│  WatchHRView           │
+│  WatchConnector            │ ──────────────▶│  WatchWorkoutView      │
 │   (from 3ae08fa)           │                │   (HR number + color)  │
 └────────────────────────────┘                └────────────────────────┘
 
-iPhone side: extend WatchConnector to push { hr, zoneState, isActive } whenever HR or zone changes (already partially scaffolded; flesh out send + state encoding). Push isActive=false when workout ends.
-Watch side: WorkoutMirror (scaffolded in 3ae08fa) receives state and publishes it; WatchHRView renders the single-screen UI; an HKWorkoutSession is started/ended in response to the isActive flag.
+iPhone side: extend WatchConnector to push { hr, zoneState, isActive, timestamp } whenever HR or zone changes (already partially scaffolded; flesh out send + state encoding). zoneState is the explicit token "inZone"/"aboveZone"/"belowZone", derived from the phone's HR-NUMBER color rule (WorkoutManager.zoneStatus), NOT from cueLabel/the coaching banner. The current scaffolding sends cueLabel — this session replaces that field with zoneState. Push isActive=false when workout ends.
+Watch side: WorkoutMirror (scaffolded in 3ae08fa) receives state and publishes it; WatchWorkoutView renders the single-screen UI; an HKWorkoutSession is started/ended in response to the isActive flag.
 
-The watch never decides anything about zones — it just renders what the phone says. Phone is the source of truth for the zone color.
+The watch never decides anything about zones — it renders the color directly from the zoneState token (inZone→green, aboveZone→red, belowZone→blue). The existing scaffolding's banner-text-to-color mapping in WatchWorkoutView / WorkoutMirror must be REMOVED and replaced with a direct token→color render. Single source of truth: the phone's HR-number color rule.
 
 
 UI spec
 Single view. Vertical layout:
 
-HR number — system font, ~80pt, weight .bold, monospaced digits, color = the zone color from the phone. Centered.
+HR number — system font, ~80pt, weight .bold, monospaced digits, color = the zoneState token from the phone (inZone→green, aboveZone→red, belowZone→blue). Centered.
 Below it, in .caption2, the literal text "BPM" (or omit if the design reads cleanly without it — Claude Code's call).
 A small status pill at the bottom:
 Hidden when state is fresh (<5s old) and workout is active.
 "Waiting for phone…" when no recent state and no workout active.
 "Reconnecting…" when workout active but state is stale (>5s).
 
-Always-On variant: same layout, dimmer colors, no animation, refresh ~1Hz.
+Always-On variant: same layout, dimmer colors, no animation, refresh ~1Hz (driven by @Environment(\.isLuminanceReduced)).
+
+Scope discipline: this session STRIPS the coaching banner, cadence/SPM, and elapsed-time that the scaffolded WatchWorkoutView currently renders. The watch shows HR number + zone color + status pill, nothing else.
 
 
 Build steps (the work, in order)
-Add the WatchOS app as an actual build target in Fast No Slow.xcodeproj. The Fast No Slow Watch App/ folder already exists from 3ae08fa but is not yet a target — that's step one. Pair it to the iPhone target so it installs together.
-Signing for the watch app: same team A5DP57PZ7N, bundle ID com.highball71.fluffylist.beta.watchkitapp (or current convention — confirm against Xcode's auto-generated default).
-WatchConnectivity wiring (phone side): finish the WatchConnector push. Encode { hr: Int, zoneState: String, isActive: Bool, timestamp: Date } and send on each HR update.
-WatchConnectivity receive (watch side): flesh out WorkoutMirror to receive, decode, and publish to SwiftUI.
-HKWorkoutSession start/end tied to the isActive flag.
-Always-On display support and the dimmed variant.
-WatchHRView with the HR number, zone color, and status pill.
-App icon for the watch app (use the phone app icon scaled — Claude Code's call, or flag if none exists).
-Install to watch. Builds install via the iPhone; the watch app should appear on David's Apple Watch automatically once installed and trusted.
-Verify on a real run before declaring done.
+1. Add the WatchOS app as an actual build target in Fast No Slow.xcodeproj. The Fast No Slow Watch App/ folder already exists from 3ae08fa but is not yet a target — that's step one. Pair it to the iPhone target so it installs together.
+2. Signing for the watch app: same team A5DP57PZ7N, bundle ID com.davidalbert.Fast-No-Slow.watchkitapp (confirm against Xcode's auto-generated default, which should be the iPhone app's com.davidalbert.Fast-No-Slow + .watchkitapp).
+3. Watch target capabilities/entitlements — PREREQUISITE for HKWorkoutSession, must be done before step 6: add the HealthKit entitlement to the watch target; add NSHealthShareUsageDescription and NSHealthUpdateUsageDescription to the watch Info.plist ("Used to keep the heart-rate display alive during your workout."); enable the "Workout Processing" background mode on the watch target.
+4. WatchConnectivity wiring (phone side): extend the WatchConnector applicationContext push. Encode { hr: Int, zoneState: String, isActive: Bool, timestamp: Double }, where zoneState is the token "inZone"/"aboveZone"/"belowZone" derived from WorkoutManager.zoneStatus (the HR-number color rule) — NOT cueLabel. Replace the cueLabel field. Push on each HR/zone change, and isActive=false on workout end.
+5. WatchConnectivity receive (watch side): extend WorkoutMirror to decode { hr, zoneState, isActive, timestamp } and publish to SwiftUI. Store the timestamp (currently dropped on the floor) so staleness can be computed in step 8.
+6. HKWorkoutSession start/end tied to the isActive flag. Before the first session start, request HealthKit authorization at runtime (HKHealthStore.requestAuthorization) — even though we read/write no samples, the session start fails without it.
+7. Always-On display: rely on the HKWorkoutSession (R1) for runtime + Always-On — NO WKExtendedRuntimeSession. In WatchWorkoutView, read @Environment(\.isLuminanceReduced) and render a dimmer, animation-free variant when reduced.
+8. Staleness / reconnect logic — from scratch, this plumbing does NOT exist yet: in WorkoutMirror, compare the received timestamp against now and publish a fresh/stale signal. Drive the status pill from it (hidden when fresh + active; "Reconnecting…" when active + stale >5s; "Waiting for phone…" when not active).
+9. WatchWorkoutView: the single-screen UI — HR number, zoneState→color, and the status pill. REMOVE the coaching banner, cadence/SPM, and elapsed-time the scaffolded view currently renders (scope discipline). NOTE: the spec previously called this "WatchHRView"; the existing file is WatchWorkoutView — extend that single file, do not add a duplicate.
+10. App icon for the watch app (use the phone app icon scaled — Claude Code's call, or flag if none exists).
+11. Install to watch. Builds install via the iPhone; the watch app should appear on David's Apple Watch automatically once installed and trusted.
+12. Verify on a real run before declaring done.
 
 
 Acceptance test (David must be able to do this on a real run)
@@ -116,7 +123,6 @@ If any of these fails, it's not shipped.
 
 Known unknowns / risks Claude Code should flag, not guess at
 App icon: if the watch target's auto-generated icon set is empty, flag it — don't ship without one (Xcode will warn but build).
-HealthKit entitlement: required for HKWorkoutSession even though we aren't reading/writing samples. Add to the watch target's entitlements file and to Info.plist as NSHealthShareUsageDescription / NSHealthUpdateUsageDescription with a one-line explanation ("Used to keep the heart-rate display alive during your workout.").
 First-install pairing: David's Apple Watch must be paired with his iPhone (it is). The app should install automatically when the iPhone build installs; if it doesn't appear on the watch, the watch needs a manual "Install" tap in the iPhone's Watch app. Flag this if it happens.
 
 
