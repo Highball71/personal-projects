@@ -12,6 +12,11 @@ import SwiftUI
 struct SupabaseSettingsView: View {
     @EnvironmentObject private var householdService: HouseholdService
     @EnvironmentObject private var authService: AuthService
+    #if DEBUG
+    /// Only pulled for the debug PlannedMeal screen. Remove with the
+    /// debug row when Phase 3 ships.
+    @EnvironmentObject private var plannedMealService: PlannedMealService
+    #endif
 
     // Persisted preferences
     @AppStorage("householdSize") private var householdSize: Int = 2
@@ -88,6 +93,9 @@ struct SupabaseSettingsView: View {
                             label: "Version",
                             detail: appVersion
                         )
+                        #if DEBUG
+                        plannedMealDebugRow
+                        #endif
                         signOutRow
                     }
                 }
@@ -322,6 +330,34 @@ struct SupabaseSettingsView: View {
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { rowDivider }
     }
+
+    #if DEBUG
+    // MARK: - PlannedMeal Debug Row (temporary)
+
+    /// Navigates to a debug screen that exercises PlannedMealService
+    /// and PlannedMealViewModel against the real household and recipes.
+    /// Removed with Phase 3.
+    private var plannedMealDebugRow: some View {
+        NavigationLink {
+            PlannedMealDebugView(service: plannedMealService)
+        } label: {
+            HStack(spacing: 12) {
+                settingsIcon("hammer")
+                Text("PlannedMeal Debug")
+                    .font(.fluffyBody)
+                    .foregroundStyle(Color.fluffyPrimary)
+                Spacer()
+                Text("DEBUG")
+                    .font(.fluffyFootnote)
+                    .foregroundStyle(.orange)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .overlay(alignment: .bottom) { rowDivider }
+        }
+        .buttonStyle(.plain)
+    }
+    #endif
 
     // MARK: - Sign Out Row
 
