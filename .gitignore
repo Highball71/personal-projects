@@ -28,3 +28,4 @@ Secrets.xcconfig
 
 # Xcode user data
 xcuserdata/
+**/.claude/scheduled_tasks.lock
