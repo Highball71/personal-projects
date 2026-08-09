@@ -35,6 +35,10 @@ struct SupabaseAddRecipeView: View {
     @State private var selectedRecipePhotoItems: [PhotosPickerItem] = []
     @State private var isExtracting = false
     @State private var extractingPageCount: Int = 0
+    /// The in-flight extraction task, kept so the overlay's Cancel
+    /// button can actually cancel the network request (URLSession
+    /// honors Swift task cancellation), not just hide the spinner.
+    @State private var extractionTask: Task<Void, Never>?
     @State private var extractionError: String?
     @State private var showingExtractionError = false
     @State private var showingCameraPermissionDenied = false
@@ -198,7 +202,7 @@ struct SupabaseAddRecipeView: View {
                     onDone: { images in
                         showingCamera = false
                         Logger.supabase.info("Photo import: RecipeScanView onDone with \(images.count) image(s)")
-                        Task { await extractRecipe(from: images) }
+                        extractionTask = Task { await extractRecipe(from: images) }
                     },
                     onCancel: {
                         showingCamera = false
@@ -243,7 +247,7 @@ struct SupabaseAddRecipeView: View {
                 guard !newItems.isEmpty else { return }
                 let items = newItems
                 Logger.supabase.info("Photo import: PhotosPicker returned \(items.count) item(s)")
-                Task {
+                extractionTask = Task {
                     var images: [UIImage] = []
                     for item in items {
                         if let data = try? await item.loadTransferable(type: Data.self),
@@ -691,6 +695,16 @@ struct SupabaseAddRecipeView: View {
                     Text("This may take a few seconds")
                         .font(.fluffyCallout)
                         .foregroundStyle(Color.fluffySecondary)
+
+                    Button("Cancel") {
+                        extractionTask?.cancel()
+                        extractionTask = nil
+                        isExtracting = false
+                        extractingPageCount = 0
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.fluffyAmber)
+                    .padding(.top, 4)
                 }
                 .padding(32)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -1003,6 +1017,14 @@ struct SupabaseAddRecipeView: View {
                 Logger.supabase.error("Photo import: auto-save failed — user must save manually")
             }
         } catch let error as AnthropicClient.ClientError {
+            // User cancelled from the overlay — the aborted request
+            // surfaces as a wrapped URLError.cancelled. Not a failure;
+            // leave the form as it was with no error alert.
+            if Task.isCancelled {
+                isExtracting = false
+                extractingPageCount = 0
+                return
+            }
             Logger.supabase.error("Photo import failed: \(error)")
             switch error {
             case .networkError:
@@ -1023,6 +1045,13 @@ struct SupabaseAddRecipeView: View {
             }
             showingExtractionError = true
         } catch {
+            // Same cancellation guard as above for errors that don't
+            // come wrapped in ClientError (e.g. CancellationError).
+            if Task.isCancelled || error is CancellationError {
+                isExtracting = false
+                extractingPageCount = 0
+                return
+            }
             Logger.supabase.error("Photo import failed: \(error)")
             extractionError = error.localizedDescription
             showingExtractionError = true

@@ -110,10 +110,32 @@ enum RecipeImageExtractor {
 
     // MARK: - Private
 
+    /// Downscale a capture so its longest side is at most `maxDimension`
+    /// pixels before base64-encoding. Mirrors the card-photo resize in
+    /// `RecipeService.uploadRecipeImage` (UIGraphicsImageRenderer +
+    /// aspect-preserving scale), with the renderer scale pinned to 1 so
+    /// the limit is true pixels — the default renderer scale is the
+    /// screen scale, which would triple the bitmap on a 3x device.
+    /// Full-resolution camera captures can exceed the API's per-image
+    /// size limit; OCR doesn't need more than this.
+    private static func resizedForUpload(_ image: UIImage, maxDimension: CGFloat = 1200) -> UIImage {
+        let pixelWidth = image.size.width * image.scale
+        let pixelHeight = image.size.height * image.scale
+        let longestSide = max(pixelWidth, pixelHeight)
+        guard longestSide > maxDimension else { return image }
+
+        let scale = maxDimension / longestSide
+        let newSize = CGSize(width: pixelWidth * scale, height: pixelHeight * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+    }
+
     private static func extractSingle(from image: UIImage) async throws -> ExtractedRecipe {
         Logger.importPipeline.info("Starting recipe extraction...")
 
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+        guard let imageData = resizedForUpload(image).jpegData(compressionQuality: 0.8) else {
             Logger.importPipeline.error("Failed to convert image to JPEG data")
             throw ExtractionError.imageConversionFailed
         }
@@ -143,7 +165,7 @@ enum RecipeImageExtractor {
 
         var imageContents: [[String: Any]] = []
         for (index, image) in images.enumerated() {
-            guard let data = image.jpegData(compressionQuality: 0.8) else {
+            guard let data = resizedForUpload(image).jpegData(compressionQuality: 0.8) else {
                 Logger.importPipeline.error("Failed to convert page \(index + 1, privacy: .public) to JPEG")
                 throw ExtractionError.imageConversionFailed
             }

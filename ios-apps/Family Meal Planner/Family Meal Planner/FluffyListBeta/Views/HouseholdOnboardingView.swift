@@ -98,7 +98,7 @@ struct HouseholdOnboardingView: View {
                 .font(.fluffyDisplaySmall)
                 .foregroundStyle(Color.fluffyPrimary)
 
-            TextField("Household name (e.g. The Alberts)", text: $householdName)
+            TextField("Household name (e.g. The Smith Family)", text: $householdName)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Your name", text: $displayName)

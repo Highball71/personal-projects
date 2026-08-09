@@ -43,6 +43,12 @@ struct SignInView: View {
                         }
                     }
                 case .failure(let error):
+                    // The user backing out of the Apple sheet is a deliberate
+                    // cancel, not a failure — don't surface an error for it.
+                    if let authError = error as? ASAuthorizationError,
+                       authError.code == .canceled {
+                        return
+                    }
                     authService.errorMessage = error.localizedDescription
                 }
             }
