@@ -4,6 +4,37 @@ Append-only log of work completed. Add one entry per session.
 
 ---
 
+## August 9–10, 2026 — Tester-Readiness Review, Fixes, Build 102 Shipped
+**Goal:** Cold-user first-hour review of the app, fix everything that would stop a day-one tester, ship to TestFlight.
+
+**What Changed** (commits `c067a83`, `49632a7`, `61de30b`):
+
+### First-hour review
+- Full walkthrough as a first-time user: onboarding path, empty states, failure paths, dead ends, multi-user assumptions. Six SHOWSTOPPERs found; all fixed this weekend. POLISH items documented in HANDOFF, deferred by design.
+
+### Fixes (`c067a83`)
+- Sign in with Apple cancel no longer surfaces a raw ASAuthorizationError — deliberate cancel is silent
+- Scan photos downscaled to max 1200px (longest side, renderer scale pinned to 1) before base64 upload — full-res captures could exceed the API's per-image limit
+- Extraction overlay got a Cancel button with real task cancellation (in-flight URLSession request aborts; no error alert on deliberate cancel)
+- Household-name placeholder de-personalized ("The Alberts" → "The Smith Family")
+
+### Error visibility (`49632a7`)
+- New shared `FluffyErrorBanner` component (compact, dismissable, optional Retry)
+- Fetch failures in Meals / Recipes / Grocery tabs now show banner+Retry instead of masquerading as empty states ("No recipes yet", "Nothing to buy yet", empty week) — verified on device via airplane-mode pull-to-refresh
+- Write failures show a dismissable banner: add/remove meal (3 call sites), grocery toggle/delete/clear-checked, favorite toggles, recipe delete
+- Services gained `@discardableResult Bool` returns on fetch/write methods so views detect failure without parsing raw Postgrest text
+
+### Ship (`61de30b`)
+- Build bumped 101 → 102, archived and uploaded to App Store Connect entirely from the CLI (first time) — API key auth, `xcodebuild archive` + `-exportArchive` with `destination: upload`
+
+**Outcome:** Build 1.0 (102) uploaded Aug 10, awaiting Apple processing. Remaining steps are human/website-side: export compliance if prompted, assign to external TestFlight group, send public link to 3–5 friend testers.
+
+**Known Issues:** see HANDOFF.md "Known issues / deferred" — card-photo 3x scale quirk, legacy CloudKit stack noise, POLISH items, join-flow untested with a second Apple ID.
+
+**Next:** TestFlight distribution steps above; **next build number is 110** (skips stale TestFlight history at 104).
+
+---
+
 ## April 15, 2026 — Figma Design System + Full View Rewrite
 **Goal:** Implement the 14-screen Figma design pass (Heirloom palette) as code — design tokens, shared components, and all main views.
 

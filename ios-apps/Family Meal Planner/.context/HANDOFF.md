@@ -1,49 +1,53 @@
 # HANDOFF.md — FluffyList
 
-**Read this first.** Concise current state. Detailed trail lives in `.context/STUDIO_LOG/`.
+**Read this first.** Concise current state. Detailed trail lives in `.context/STUDIO_LOG/` and `SESSION_LOG.md`.
 
-Last updated: 2026-05-28 (end of day)
+Last updated: 2026-08-10 (session close)
 
 ---
 
 ## Where things stand
 
-FluffyList's **returning-user auth / onboarding trust path** was hull-checked and hardened today, across both the database and the Swift app, and **verified live on a physical device with a real account and real data.** This was the first full run of the multi-AI loop (Claude = database/architecture via Supabase MCP, Claude Code = Swift, Codex = local executor, David = director).
+**Build 1.0 (102) uploaded to App Store Connect on Aug 10** from commit `61de30b`, awaiting Apple processing. This is the first build carrying the weekend's tester-readiness fixes — all SHOWSTOPPER items from the first-hour review are fixed.
 
-### Shipped today
+### Remaining human steps (App Store Connect website, not CLI)
+1. Answer the export-compliance question if prompted.
+2. Assign build 102 to the external TestFlight group.
+3. Send the public link to 3–5 friend testers.
 
-**Database (Supabase ref `papuusfhtojthtnbsdvs`), applied + committed:**
-- Removed wide-open `households` RLS policies; scoped to owner-writes / owner-or-member reads.
-- Added `join_household_by_code()` SECURITY DEFINER RPC so joining no longer requires exposing every household's join code.
-- Added missing policies: `household_members` leave/edit, `recipes` UPDATE, `recipe_ratings` read + author-update.
-- Fixed the **cascade-delete bug**: deleting a recipe now clears it from the calendar (`meal_plans.recipe_id` → ON DELETE SET NULL) instead of throwing an FK error. Household deletion now cascades meal plans + groceries consistently.
-- Pinned `is_household_member` search_path. Security advisor clean (remaining notices are by-design SECURITY DEFINER + a moot password-protection flag — app uses Sign in with Apple).
-- Captured in migrations **011** and **012** (the latter documents a unique index that existed live but was never in a migration — see "Drift lesson" below).
-
-**Swift (commit `338bcf3`):** all 7 hull-check findings fixed — join flow switched to the RPC, launch no longer crashes on missing config (recoverable `ConfigErrorView`), offline session blip no longer dumps users to a sign-in wall (`.restoreFailed` + retry), no more SignInView flash (`.restoring` state), membership-lookup timeout, foreground re-validation, debug cleanup. Live Supabase keys wired into the gitignored `Secrets.xcconfig`. Build green; STUDIO_LOG = R003.
-
-### Verified live (real device, real account, live backend)
-Sign in with Apple → session restore → household membership read → real recipe/meal-plan data all load correctly through the rewritten RLS. The `sb_publishable_` anon key is accepted on live requests (no apikey 401). The trust path is confirmed working.
+### Shipped this weekend (commits `c067a83`, `49632a7`, `61de30b`)
+- First-hour tester-readiness review completed; all showstoppers fixed.
+- Sign-in cancel no longer shows a raw ASAuthorization error.
+- Scan uploads resized to max 1200px (renderer scale pinned to 1).
+- Extraction overlay is cancellable with real task cancellation (URLSession request aborts).
+- "The Alberts" placeholder de-personalized.
+- New shared `FluffyErrorBanner`: fetch failures show banner+Retry instead of masquerading as empty states (verified on device via airplane-mode pull-to-refresh); write failures (add/remove meal, grocery toggles/deletes/clear, favorites, recipe delete) show a dismissable banner.
 
 ---
 
-## Not done yet (next session)
-1. **Ship a fresh build (103).** TestFlight Build 102 still has the OLD client-side join flow, which the RLS lockdown now blocks. Anyone joining on 102 will fail until a build with `338bcf3` ships. Not urgent (pre-launch, empty DB) but it's the gate before real users.
-2. **Second-account join test** through the new `join_household_by_code` RPC (needs a 2nd Apple ID — couldn't test with one account).
-3. **Cascade-delete runtime check:** delete a recipe that's assigned to a calendar day, confirm the slot clears gracefully.
-4. **Offline-retry view** (`.restoreFailed`) — needs an induced network failure to see.
-5. **Fix stale note:** Claude Code's R003 log still calls the `one_owned_household_per_user` catch branch "dead code." It is NOT — the unique index exists live (now in migration 012). Correct that line when next editing.
+## Known issues / deferred (do not fix without a decision)
+
+- **`RecipeService.uploadRecipeImage` 3x renderer-scale quirk:** card photos upload at ~3600px, not 1200. Harmless (storage only); fix for consistency someday.
+- **Legacy CoreData+CloudKit V1 sync stack** still initializes on every launch, errors and resets ("Change Token Expired" noise in logs). Dead machinery; candidate for removal.
+- **POLISH items from the first-hour review remain unfixed by design** — dead settings toggles, "Step 1 of 3" indicator, unkept dietary-preferences promise, raw onboarding errors. Revisit after tester feedback.
+- **Join-by-code household flow still untested with a second Apple ID.** Does not gate solo friend testing; test before inviting anyone to a shared household.
+- Older loose ends from May: cascade-delete runtime check (delete a recipe assigned to a calendar day) never run; R003 log still mislabels the `one_owned_household_per_user` catch branch as dead code.
 
 ---
 
-## Drift lesson (worth remembering)
-Today's two-angle hull check exposed that the **live database had drifted from the migration files** in three places (a wide-open policy, a join-code policy, a unique index) — all added via the dashboard, none captured in code. Neither the code-reading AI nor the DB-reading AI caught it alone; together they did. Migrations 011/012 reconciled it. Keep schema changes in migrations, not the dashboard.
+## Build pipeline (new this session — proven end-to-end)
+
+Command-line archive + upload works:
+- Archive: `xcodebuild archive -scheme "Family Meal Planner" -destination "generic/platform=iOS" -archivePath <path> -allowProvisioningUpdates` + the API-key auth flags.
+- Upload: `xcodebuild -exportArchive` with ExportOptions.plist (`method: app-store-connect`, `destination: upload`, team `A5DP57PZ7N`).
+- App Store Connect API key `AuthKey_W2DSSJX5TY.p8` at `~/.appstoreconnect/private_keys/` on the home iMac; Issuer ID `fc1e95cb-d040-4676-a773-349e35abab67`. Highball71 team only (Placatto needs its own key from pureevilindustries).
+- **NEXT BUILD NUMBER: use 110** (skips stale TestFlight history at 104; the project file had drifted from actual uploads).
 
 ---
 
 ## Project facts
 - Supabase: `papuusfhtojthtnbsdvs` (active). Old `dbunenacikpeeplnltrz` should be paused/deleted.
-- Repo: FluffyList at `personal-projects/ios-apps/Family Meal Planner/`; git index is in the **parent** `personal-projects` repo (Codex flagged this — stage paths accordingly).
+- Repo: FluffyList at `personal-projects/ios-apps/Family Meal Planner/`; git index is in the **parent** `personal-projects` repo (stage paths accordingly).
 - Bundle `com.highball71.fluffylist.beta`, team `A5DP57PZ7N`, device "Dad's iPhone" registered.
 - `PROXY_KEY` is the one real secret — lives in gitignored `Secrets.xcconfig`, never commit it.
-- Known housekeeping (not urgent): repo structure is tangled (Fast No Slow files mixed in); `ACTIVE_TASK.md` had drifted stale — keep `.context` current each session.
+- Known housekeeping (not urgent): repo structure is tangled (Fast No Slow files mixed in); keep `.context` current each session.
