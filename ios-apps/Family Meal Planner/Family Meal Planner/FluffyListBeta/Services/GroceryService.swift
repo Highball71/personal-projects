@@ -23,11 +23,14 @@ final class GroceryService: ObservableObject {
     // MARK: - Fetch
 
     /// Load all grocery items for the current household.
-    func fetchItems() async {
+    /// Returns false when the load failed (so the UI can show an error
+    /// instead of "Nothing to buy yet"); discardable for legacy call sites.
+    @discardableResult
+    func fetchItems() async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.warning("fetchItems: no household ID set, returning empty list")
             items = []
-            return
+            return true
         }
 
         Logger.supabase.info("fetchItems: loading for household \(householdID.uuidString)")
@@ -45,10 +48,12 @@ final class GroceryService: ObservableObject {
 
             Logger.supabase.info("fetchItems: loaded \(self.items.count) item(s)")
             isLoading = false
+            return true
         } catch {
             Logger.supabase.error("fetchItems: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             isLoading = false
+            return false
         }
     }
 
@@ -325,7 +330,8 @@ final class GroceryService: ObservableObject {
     // MARK: - Update
 
     /// Flip the is_checked flag for a single item.
-    func toggleChecked(_ item: SupabaseGroceryItem) async {
+    @discardableResult
+    func toggleChecked(_ item: SupabaseGroceryItem) async -> Bool {
         do {
             try await supabase
                 .from("grocery_items")
@@ -335,15 +341,18 @@ final class GroceryService: ObservableObject {
 
             Logger.supabase.info("toggleChecked: item id=\(item.id.uuidString) now=\(!item.isChecked)")
             await fetchItems()
+            return true
         } catch {
             Logger.supabase.error("toggleChecked: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     // MARK: - Delete
 
-    func deleteItem(_ id: UUID) async {
+    @discardableResult
+    func deleteItem(_ id: UUID) async -> Bool {
         do {
             try await supabase
                 .from("grocery_items")
@@ -353,15 +362,18 @@ final class GroceryService: ObservableObject {
 
             items.removeAll { $0.id == id }
             Logger.supabase.info("deleteItem: deleted id=\(id.uuidString)")
+            return true
         } catch {
             Logger.supabase.error("deleteItem: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     /// Delete all checked items (useful for "clear completed").
-    func clearChecked() async {
-        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return }
+    @discardableResult
+    func clearChecked() async -> Bool {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return true }
 
         do {
             try await supabase
@@ -373,9 +385,11 @@ final class GroceryService: ObservableObject {
 
             Logger.supabase.info("clearChecked: cleared checked items")
             await fetchItems()
+            return true
         } catch {
             Logger.supabase.error("clearChecked: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
+            return false
         }
     }
 }

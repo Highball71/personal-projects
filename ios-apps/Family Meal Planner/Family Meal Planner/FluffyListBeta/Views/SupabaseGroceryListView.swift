@@ -15,6 +15,15 @@ struct SupabaseGroceryListView: View {
     @EnvironmentObject private var groceryService: GroceryService
     @AppStorage("groceryStoreMode") private var storeMode = false
 
+    /// True when the last grocery fetch failed — drives the retry banner
+    /// and stops a failed load from rendering as "Nothing to buy yet."
+    @State private var fetchFailed = false
+    /// Short human message for a failed write (check/delete/clear).
+    @State private var actionErrorMessage: String?
+
+    private static let fetchErrorText =
+        "Couldn't load your grocery list. Check your connection and tap Retry."
+
     /// Items grouped by auto-detected category, sorted with unchecked
     /// items first within each group.
     private var groupedItems: [(GroceryCategory, [SupabaseGroceryItem])] {
@@ -68,14 +77,34 @@ struct SupabaseGroceryListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if groceryService.isLoading && groceryService.items.isEmpty {
-                    ProgressView("Loading groceries...")
-                } else if groceryService.items.isEmpty {
-                    emptyState
-                } else {
-                    groceryList
+            VStack(spacing: 0) {
+                if fetchFailed {
+                    FluffyErrorBanner(
+                        message: Self.fetchErrorText,
+                        onRetry: { Task { await reloadGroceries() } },
+                        onDismiss: { fetchFailed = false }
+                    )
+                } else if let message = actionErrorMessage {
+                    FluffyErrorBanner(
+                        message: message,
+                        onDismiss: { actionErrorMessage = nil }
+                    )
                 }
+
+                Group {
+                    if fetchFailed && groceryService.items.isEmpty {
+                        // A failed load with nothing cached must not render
+                        // as "Nothing to buy yet" — the banner explains it.
+                        Color.clear
+                    } else if groceryService.isLoading && groceryService.items.isEmpty {
+                        ProgressView("Loading groceries...")
+                    } else if groceryService.items.isEmpty {
+                        emptyState
+                    } else {
+                        groceryList
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .animation(.easeInOut(duration: 0.25), value: groceryService.isLoading)
             .animation(.easeInOut(duration: 0.25), value: storeMode)
@@ -98,19 +127,32 @@ struct SupabaseGroceryListView: View {
                 if hasCheckedItems {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Clear Checked") {
-                            Task { await groceryService.clearChecked() }
+                            Task {
+                                if !(await groceryService.clearChecked()) {
+                                    actionErrorMessage = "Couldn't clear checked items. Please try again."
+                                }
+                            }
                         }
                         .foregroundStyle(accentColor)
                     }
                 }
             }
             .refreshable {
-                await groceryService.fetchItems()
+                await reloadGroceries()
             }
             .task {
-                await groceryService.fetchItems()
+                await reloadGroceries()
             }
         }
+    }
+
+    // MARK: - Reload
+
+    /// Fetch grocery items and record whether it succeeded, so a failed
+    /// load shows the retry banner instead of "Nothing to buy yet."
+    private func reloadGroceries() async {
+        let ok = await groceryService.fetchItems()
+        fetchFailed = !ok
     }
 
     // MARK: - Empty State
@@ -212,7 +254,11 @@ struct SupabaseGroceryListView: View {
 
     private func itemRow(_ item: SupabaseGroceryItem) -> some View {
         Button {
-            Task { await groceryService.toggleChecked(item) }
+            Task {
+                if !(await groceryService.toggleChecked(item)) {
+                    actionErrorMessage = "Couldn't update that item. Please try again."
+                }
+            }
         } label: {
             HStack(spacing: storeMode ? 16 : 12) {
                 // Checkbox
@@ -246,7 +292,11 @@ struct SupabaseGroceryListView: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button(role: .destructive) {
-                Task { await groceryService.deleteItem(item.id) }
+                Task {
+                    if !(await groceryService.deleteItem(item.id)) {
+                        actionErrorMessage = "Couldn't delete that item. Please try again."
+                    }
+                }
             } label: {
                 Label("Delete", systemImage: "trash")
             }

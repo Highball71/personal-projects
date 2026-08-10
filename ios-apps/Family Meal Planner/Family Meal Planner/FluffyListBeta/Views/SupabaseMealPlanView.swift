@@ -27,6 +27,14 @@ struct SupabaseMealPlanView: View {
     @State private var isAssigning = false
     @State private var toastMessage: String?
     @State private var showingAddRecipe = false
+    /// True when the last week fetch failed — drives the retry banner
+    /// and stops the view from rendering a failed load as an empty week.
+    @State private var fetchFailed = false
+    /// Short human message for a failed write (add/remove meal).
+    @State private var actionErrorMessage: String?
+
+    private static let fetchErrorText =
+        "Couldn't load your meal plan. Check your connection and tap Retry."
 
     private var weekDates: [Date] {
         (0..<7).compactMap { offset in
@@ -75,20 +83,40 @@ struct SupabaseMealPlanView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if mealPlanService.isLoading && mealPlanService.plansByDate.isEmpty {
-                    ProgressView("Loading meal plan...")
-                } else if isWeekEmpty && !recipeService.recipes.isEmpty {
-                    emptyWeekView
-                } else {
-                    weekContent
+            VStack(spacing: 0) {
+                if fetchFailed {
+                    FluffyErrorBanner(
+                        message: Self.fetchErrorText,
+                        onRetry: { Task { await reloadWeek() } },
+                        onDismiss: { fetchFailed = false }
+                    )
+                } else if let message = actionErrorMessage {
+                    FluffyErrorBanner(
+                        message: message,
+                        onDismiss: { actionErrorMessage = nil }
+                    )
                 }
+
+                Group {
+                    if fetchFailed && mealPlanService.plansByDate.isEmpty {
+                        // A failed load with nothing cached must not render
+                        // as an empty week — the banner above explains it.
+                        Color.clear
+                    } else if mealPlanService.isLoading && mealPlanService.plansByDate.isEmpty {
+                        ProgressView("Loading meal plan...")
+                    } else if isWeekEmpty && !recipeService.recipes.isEmpty {
+                        emptyWeekView
+                    } else {
+                        weekContent
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .animation(.easeInOut(duration: 0.25), value: mealPlanService.isLoading)
             .background(Color.fluffyBackground)
             .navigationTitle("This Week")
             .refreshable {
-                await mealPlanService.fetchPlans(weekStart: weekStart)
+                await reloadWeek()
             }
             .task(id: selectedTab) {
                 // Re-fires whenever the user switches into the Meals tab,
@@ -98,7 +126,7 @@ struct SupabaseMealPlanView: View {
                 // local cache: navigating away and back always reads
                 // fresh from Supabase.
                 guard selectedTab == .mealPlan else { return }
-                await mealPlanService.fetchPlans(weekStart: weekStart)
+                await reloadWeek()
                 await recipeService.fetchRecipes()
             }
             .sheet(item: $pickerDate) { date in
@@ -562,6 +590,13 @@ struct SupabaseMealPlanView: View {
 
     // MARK: - Actions
 
+    /// Fetch the current week and record whether it succeeded, so a
+    /// failed load shows the retry banner instead of an empty week.
+    private func reloadWeek() async {
+        let ok = await mealPlanService.fetchPlans(weekStart: weekStart)
+        fetchFailed = !ok
+    }
+
     private func addMeal(_ recipe: RecipeRow, to date: Date) async {
         isAssigning = true
         defer { isAssigning = false }
@@ -573,8 +608,11 @@ struct SupabaseMealPlanView: View {
             groceryService: groceryService
         )
 
-        guard result != nil else { return }
-        await mealPlanService.fetchPlans(weekStart: weekStart)
+        guard result != nil else {
+            actionErrorMessage = "Couldn't add that meal. Please try again."
+            return
+        }
+        await reloadWeek()
         withAnimation { toastMessage = "Added to \(fullDayName(for: date))" }
     }
 
@@ -582,8 +620,11 @@ struct SupabaseMealPlanView: View {
     /// so legacy multi-row slots also collapse cleanly.
     private func removeSlot(date: Date) async {
         Logger.supabase.info("MealPlan removeSlot: date=\(MealPlanService.isoDate(from: date))")
-        _ = await mealPlanService.clearDayWithGroceries(on: date, groceryService: groceryService)
-        await mealPlanService.fetchPlans(weekStart: weekStart)
+        let cleared = await mealPlanService.clearDayWithGroceries(on: date, groceryService: groceryService)
+        if !cleared {
+            actionErrorMessage = "Couldn't remove that meal. Please try again."
+        }
+        await reloadWeek()
     }
 }
 

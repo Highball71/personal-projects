@@ -31,12 +31,15 @@ final class RecipeService: ObservableObject {
 
     /// Load all recipes for the current household, then load all of
     /// their ingredients so client-side search can match by name.
-    func fetchRecipes() async {
+    /// Returns false when the load failed (so the UI can show an error
+    /// instead of "No recipes yet"); discardable for legacy call sites.
+    @discardableResult
+    func fetchRecipes() async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.warning("fetchRecipes: no household ID set, returning empty list")
             recipes = []
             ingredientsByRecipeID = [:]
-            return
+            return true
         }
 
         Logger.supabase.info("fetchRecipes: loading for household \(householdID.uuidString)")
@@ -58,10 +61,12 @@ final class RecipeService: ObservableObject {
             await fetchAllIngredients()
 
             isLoading = false
+            return true
         } catch {
             Logger.supabase.error("fetchRecipes: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             isLoading = false
+            return false
         }
     }
 
@@ -543,7 +548,8 @@ final class RecipeService: ObservableObject {
 
     // MARK: - Favorite
 
-    func toggleFavorite(_ recipe: RecipeRow) async {
+    @discardableResult
+    func toggleFavorite(_ recipe: RecipeRow) async -> Bool {
         do {
             try await supabase
                 .from("recipes")
@@ -552,8 +558,10 @@ final class RecipeService: ObservableObject {
                 .execute()
 
             await fetchRecipes()
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 }

@@ -44,11 +44,14 @@ final class MealPlanService: ObservableObject {
     // MARK: - Fetch
 
     /// Load all meal plans for the 7 days starting at weekStart.
-    func fetchPlans(weekStart: Date) async {
+    /// Returns false when the load failed (so the UI can show an error
+    /// instead of an empty week); discardable for legacy call sites.
+    @discardableResult
+    func fetchPlans(weekStart: Date) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.warning("fetchPlans: no household ID set")
             plansByDate = [:]
-            return
+            return true
         }
 
         let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
@@ -76,10 +79,12 @@ final class MealPlanService: ObservableObject {
 
             Logger.supabase.info("fetchPlans: loaded \(rows.count) plan(s)")
             isLoading = false
+            return true
         } catch {
             Logger.supabase.error("fetchPlans: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             isLoading = false
+            return false
         }
     }
 

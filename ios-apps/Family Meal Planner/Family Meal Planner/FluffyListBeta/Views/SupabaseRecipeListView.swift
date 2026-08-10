@@ -27,6 +27,14 @@ struct SupabaseRecipeListView: View {
     @State private var recipeToDelete: RecipeRow?
     @State private var showDeleteBlockedAlert = false
     @State private var showDeleteConfirmAlert = false
+    /// True when the last recipe fetch failed — drives the retry banner
+    /// and stops a failed load from rendering as "No recipes yet."
+    @State private var fetchFailed = false
+    /// Short human message for a failed write (plan/favorite/delete).
+    @State private var actionErrorMessage: String?
+
+    private static let fetchErrorText =
+        "Couldn't load your recipes. Check your connection and tap Retry."
 
     // MARK: - Filtering
 
@@ -105,16 +113,36 @@ struct SupabaseRecipeListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if recipeService.isLoading && recipeService.recipes.isEmpty {
-                    ProgressView("Loading recipes...")
-                } else if recipeService.recipes.isEmpty {
-                    emptyState
-                } else if displayedRecipes.isEmpty {
-                    noMatchesState
-                } else {
-                    browseContent
+            VStack(spacing: 0) {
+                if fetchFailed {
+                    FluffyErrorBanner(
+                        message: Self.fetchErrorText,
+                        onRetry: { Task { await reloadRecipes() } },
+                        onDismiss: { fetchFailed = false }
+                    )
+                } else if let message = actionErrorMessage {
+                    FluffyErrorBanner(
+                        message: message,
+                        onDismiss: { actionErrorMessage = nil }
+                    )
                 }
+
+                Group {
+                    if fetchFailed && recipeService.recipes.isEmpty {
+                        // A failed load with nothing cached must not render
+                        // as "No recipes yet" — the banner above explains it.
+                        Color.clear
+                    } else if recipeService.isLoading && recipeService.recipes.isEmpty {
+                        ProgressView("Loading recipes...")
+                    } else if recipeService.recipes.isEmpty {
+                        emptyState
+                    } else if displayedRecipes.isEmpty {
+                        noMatchesState
+                    } else {
+                        browseContent
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .animation(.easeInOut(duration: 0.25), value: recipeService.isLoading)
             .background(Color.fluffyBackground)
@@ -163,7 +191,14 @@ struct SupabaseRecipeListView: View {
                 HouseholdInfoView()
             }
             .refreshable {
-                await recipeService.fetchRecipes()
+                await reloadRecipes()
+            }
+            .task {
+                // The initial fetch runs from SupabaseContentView, which
+                // can't surface a failure here. Re-fetch when this tab
+                // first appears so a failed load shows the banner instead
+                // of the empty state.
+                await reloadRecipes()
             }
             .overlay { toastOverlay }
             .onChange(of: recipeService.infoMessage) { _, message in
@@ -187,7 +222,11 @@ struct SupabaseRecipeListView: View {
             .alert("Delete Recipe?", isPresented: $showDeleteConfirmAlert) {
                 Button("Delete", role: .destructive) {
                     if let recipe = recipeToDelete {
-                        Task { await recipeService.deleteRecipe(recipe.id) }
+                        Task {
+                            if !(await recipeService.deleteRecipe(recipe.id)) {
+                                actionErrorMessage = "Couldn't delete that recipe. Please try again."
+                            }
+                        }
                         recipeToDelete = nil
                     }
                 }
@@ -428,7 +467,11 @@ struct SupabaseRecipeListView: View {
             Label("Add to Meal Plan", systemImage: "calendar.badge.plus")
         }
         Button {
-            Task { await recipeService.toggleFavorite(recipe) }
+            Task {
+                if !(await recipeService.toggleFavorite(recipe)) {
+                    actionErrorMessage = "Couldn't update favorites. Please try again."
+                }
+            }
         } label: {
             Label(
                 recipe.isFavorite ? "Unfavorite" : "Favorite",
@@ -519,6 +562,15 @@ struct SupabaseRecipeListView: View {
         }
     }
 
+    // MARK: - Reload
+
+    /// Fetch recipes and record whether it succeeded, so a failed load
+    /// shows the retry banner instead of "No recipes yet."
+    private func reloadRecipes() async {
+        let ok = await recipeService.fetchRecipes()
+        fetchFailed = !ok
+    }
+
     // MARK: - Add to Meal Plan
 
     private func addToMealPlan(recipe: RecipeRow, date: Date) async {
@@ -531,7 +583,10 @@ struct SupabaseRecipeListView: View {
             groceryService: groceryService
         )
 
-        guard result != nil else { return }
+        guard result != nil else {
+            actionErrorMessage = "Couldn't add that meal. Please try again."
+            return
+        }
 
         await mealPlanService.fetchPlans(
             weekStart: DateHelper.startOfWeek(containing: date)

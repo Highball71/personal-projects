@@ -27,6 +27,8 @@ struct SupabaseRecipeDetailView: View {
     @State private var showingHomemadePhotoPicker = false
     @State private var homemadePhotoItem: PhotosPickerItem?
     @State private var isUploadingHomemade = false
+    /// Short human message for a failed write (plan/favorite).
+    @State private var actionErrorMessage: String?
 
     /// User-adjustable serving count — defaults to the recipe's saved value.
     @State private var scaledServings: Int = 0
@@ -106,11 +108,24 @@ struct SupabaseRecipeDetailView: View {
         }
         .background(Color.fluffyBackground)
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let message = actionErrorMessage {
+                FluffyErrorBanner(
+                    message: message,
+                    onDismiss: { actionErrorMessage = nil }
+                )
+                .background(Color.fluffyBackground)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 16) {
                     Button {
-                        Task { await recipeService.toggleFavorite(recipe) }
+                        Task {
+                            if !(await recipeService.toggleFavorite(recipe)) {
+                                actionErrorMessage = "Couldn't update favorites. Please try again."
+                            }
+                        }
                     } label: {
                         Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
                             .foregroundStyle(recipe.isFavorite ? Color.fluffyAmber : Color.fluffySecondary)
@@ -463,7 +478,10 @@ struct SupabaseRecipeDetailView: View {
             groceryService: groceryService
         )
 
-        guard result != nil else { return }
+        guard result != nil else {
+            actionErrorMessage = "Couldn't add that meal. Please try again."
+            return
+        }
 
         await mealPlanService.fetchPlans(
             weekStart: DateHelper.startOfWeek(containing: date)
