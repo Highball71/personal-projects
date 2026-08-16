@@ -2,9 +2,10 @@
 //  SupabaseRecipeListView.swift
 //  FluffyList
 //
-//  Recipe browse view with amber accent, horizontal category filter
-//  chips, a featured hero card, and a two-column grid of recipe cards.
-//  Figma Heirloom design.
+//  "The Press" recipe browse. Masthead with the recipe count as
+//  dateline, an underlined search rule, plain underlined-word
+//  category chips, a full-width halftone hero with an ink-2 kicker,
+//  and ruled vertical lists — the card grid is retired.
 //
 
 import os
@@ -104,11 +105,6 @@ struct SupabaseRecipeListView: View {
         return unique
     }
 
-    private let gridColumns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
-    ]
-
     // MARK: - Body
 
     var body: some View {
@@ -133,7 +129,18 @@ struct SupabaseRecipeListView: View {
                         // as "No recipes yet" — the banner above explains it.
                         Color.clear
                     } else if recipeService.isLoading && recipeService.recipes.isEmpty {
-                        ProgressView("Loading recipes...")
+                        // Never visually empty: masthead + italic status.
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                masthead
+                                Text("Fetching your recipes\u{2026}")
+                                    .font(.fluffyCallout)
+                                    .foregroundStyle(Color.fluffySecondary)
+                                    .padding(.horizontal, 22)
+                                    .padding(.top, 15)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     } else if recipeService.recipes.isEmpty {
                         emptyState
                     } else if displayedRecipes.isEmpty {
@@ -146,16 +153,15 @@ struct SupabaseRecipeListView: View {
             }
             .animation(.easeInOut(duration: 0.25), value: recipeService.isLoading)
             .background(Color.fluffyBackground)
-            .navigationTitle("Recipes")
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search name or ingredient"
-            )
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
+            .tint(Color.fluffyAccent)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingHouseholdInfo = true } label: {
-                        Image(systemName: "house.fill")
+                        Image(systemName: "house")
+                            .foregroundStyle(Color.fluffyAccent)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -166,10 +172,11 @@ struct SupabaseRecipeListView: View {
                             }
                         } label: {
                             Image(systemName: showFavoritesOnly ? "heart.fill" : "heart")
-                                .foregroundStyle(showFavoritesOnly ? Color.fluffyAmber : Color.fluffySecondary)
+                                .foregroundStyle(showFavoritesOnly ? Color.fluffyAccent : Color.fluffySecondary)
                         }
                         Button { showingAddRecipe = true } label: {
                             Image(systemName: "plus")
+                                .foregroundStyle(Color.fluffyAccent)
                         }
                     }
                 }
@@ -237,214 +244,217 @@ struct SupabaseRecipeListView: View {
         }
     }
 
+    // MARK: - Masthead
+
+    private var masthead: some View {
+        FluffyMasthead(
+            title: "Recipes",
+            dateline: "\(recipeService.recipes.count) RECIPES"
+        )
+        .padding(.horizontal, 22)
+    }
+
     // MARK: - Browse Content
 
     private var browseContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Category filter chips
-                chipBar
-                    .padding(.top, 4)
+                masthead
                     .padding(.bottom, 20)
 
-                // Hero card
+                searchRule
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
+
+                chipBar
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
+
+                // Hero — full-width halftone image, square corners, no
+                // scrim; kicker, title, and metadata sit below it.
                 if let hero = heroRecipe {
                     NavigationLink {
                         SupabaseRecipeDetailView(recipe: hero)
                     } label: {
-                        heroCard(hero)
+                        heroBlock(hero)
                     }
                     .buttonStyle(.plain)
                     .contextMenu { recipeContextMenu(hero) }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 30)
                 }
 
-                // Recently Added horizontal scroll
+                // Recently added — a ruled vertical list, not a strip.
                 if !recentlyAdded.isEmpty {
-                    FluffySectionHeader(title: "Recently Added", section: .recipes)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
+                    FluffySectionHead(title: "Recently added")
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 10)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(recentlyAdded) { recipe in
-                                NavigationLink {
-                                    SupabaseRecipeDetailView(recipe: recipe)
-                                } label: {
-                                    recentCard(recipe)
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu { recipeContextMenu(recipe) }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    .padding(.bottom, 24)
+                    ruledRecipeList(recentlyAdded)
+                        .padding(.bottom, 30)
                 }
 
-                // Two-column grid
+                // The rest of the box — same ruled list treatment.
                 if !gridRecipes.isEmpty {
-                    LazyVGrid(columns: gridColumns, spacing: 14) {
-                        ForEach(gridRecipes) { recipe in
-                            NavigationLink {
-                                SupabaseRecipeDetailView(recipe: recipe)
-                            } label: {
-                                gridCard(recipe)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu { recipeContextMenu(recipe) }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    FluffySectionHead(title: "The recipe box")
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 10)
+
+                    ruledRecipeList(gridRecipes)
+                        .padding(.bottom, 40)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: - Search Rule
+
+    /// Not a filled field: an italic placeholder with a magnifying
+    /// glass on a single hairline bottom rule.
+    private var searchRule: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(Color.fluffySecondary)
+                ZStack(alignment: .leading) {
+                    if searchText.isEmpty {
+                        Text("Search name or ingredient")
+                            .font(.fluffyCallout)
+                            .foregroundStyle(Color.fluffyTertiary)
+                    }
+                    TextField("", text: $searchText)
+                        .font(.custom(FluffyFace.regular, size: 15))
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.fluffySecondary)
+                    }
+                }
+            }
+            FluffyRule(weight: 1, color: .fluffyFieldRule)
         }
     }
 
     // MARK: - Chip Bar
 
+    /// Category chips as plain uppercase words in a wrapping row —
+    /// not capsules. The selected word takes ink 1 and a 2px
+    /// underline; the rest sit in fluffySecondary with no rule.
     private var chipBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(BrowseTag.allCases) { tag in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedTag = tag
-                        }
-                    } label: {
-                        Text(tag.rawValue)
-                            .font(.fluffySubheadline)
+        FluffyFlowLayout(hSpacing: 18, vSpacing: 12) {
+            ForEach(BrowseTag.allCases) { tag in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTag = tag
+                    }
+                } label: {
+                    VStack(spacing: 3) {
+                        Text(tag.rawValue.uppercased())
+                            .font(.custom(FluffyFace.regular, size: 14))
+                            .fluffyTracking(0.06, at: 14)
                             .foregroundStyle(
-                                selectedTag == tag ? .white : Color.fluffyAmber
+                                selectedTag == tag ? Color.fluffyAccent : Color.fluffySecondary
                             )
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                selectedTag == tag
-                                    ? Color.fluffyAmber
-                                    : Color.fluffyAmber.opacity(0.12),
-                                in: Capsule()
-                            )
+                        FluffyRule(
+                            weight: 2,
+                            color: selectedTag == tag ? .fluffyAccent : .clear
+                        )
                     }
+                    .fixedSize()
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 20)
         }
     }
 
-    // MARK: - Hero Card
+    // MARK: - Hero
 
-    private func heroCard(_ recipe: RecipeRow) -> some View {
-        ZStack(alignment: .bottomLeading) {
+    private func heroBlock(_ recipe: RecipeRow) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             RecipeCardImage(recipe: recipe, height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipped()
+                .padding(.bottom, 15)
 
-            // Bottom scrim + title
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(recipe.name)
-                        .font(.fluffyDisplay)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    Spacer()
-                    if recipe.isFavorite {
-                        Image(systemName: "heart.fill")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                }
-                Text(recipeSubtitle(recipe))
-                    .font(.fluffyCallout)
-                    .foregroundStyle(.white.opacity(0.85))
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.55)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 16)
-                )
-            )
-        }
-        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-    }
+            VStack(alignment: .leading, spacing: 8) {
+                Text(recipe.isFavorite ? "FAVOURITE" : "NEWEST")
+                    .font(.fluffyMastheadLabel)
+                    .fluffyTracking(0.16, at: 10)
+                    .foregroundStyle(Color.fluffyInk2)
 
-    // MARK: - Grid Card
-
-    private func gridCard(_ recipe: RecipeRow) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RecipeCardImage(recipe: recipe, height: 120)
-                .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 12,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 12
-                )
-            )
-
-            // Info area
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .top) {
-                    Text(recipe.name)
-                        .font(.fluffyHeadline)
-                        .foregroundStyle(Color.fluffyPrimary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    Spacer(minLength: 4)
-                    if recipe.isFavorite {
-                        Image(systemName: "heart.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.fluffyAmber)
-                    }
-                }
-                Text(recipeSubtitle(recipe))
-                    .font(.fluffyCaption)
-                    .foregroundStyle(Color.fluffySecondary)
-                    .lineLimit(1)
-            }
-            .padding(10)
-        }
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
-    }
-
-    // MARK: - Recent Card
-
-    /// Compact horizontal card for the "Recently Added" strip.
-    private func recentCard(_ recipe: RecipeRow) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RecipeCardImage(recipe: recipe, height: 90)
-                .frame(width: 140)
-                .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 10,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 10
-                )
-            )
-
-            VStack(alignment: .leading, spacing: 2) {
                 Text(recipe.name)
-                    .font(.fluffySubheadline)
+                    .font(.custom(FluffyFace.bold, size: 27))
+                    .fluffyTracking(-0.02, at: 27)
                     .foregroundStyle(Color.fluffyPrimary)
-                    .lineLimit(1)
-                Text(recipe.category.capitalized)
-                    .font(.fluffyCaption)
-                    .foregroundStyle(Color.fluffySecondary)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+
+                FluffyMetadataLine(text: recipeSubtitle(recipe))
             }
-            .padding(8)
+            .padding(.horizontal, 22)
         }
-        .frame(width: 140)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+
+    // MARK: - Ruled Recipe List
+
+    /// Vertical ruled list: 58\u{00D7}58 halftone thumbnail, title over
+    /// uppercase metadata, a persimmon chevron at the trailing edge.
+    private func ruledRecipeList(_ recipes: [RecipeRow]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(recipes) { recipe in
+                VStack(spacing: 0) {
+                    FluffyRule().padding(.horizontal, 22)
+                    NavigationLink {
+                        SupabaseRecipeDetailView(recipe: recipe)
+                    } label: {
+                        listRow(recipe)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { recipeContextMenu(recipe) }
+                }
+            }
+            FluffyRule().padding(.horizontal, 22)
+        }
+    }
+
+    private func listRow(_ recipe: RecipeRow) -> some View {
+        HStack(spacing: 14) {
+            RecipeCardImage(recipe: recipe, height: 58)
+                .frame(width: 58, height: 58)
+                .clipped()
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(recipe.name)
+                        .font(.custom(FluffyFace.semibold, size: 18))
+                        .fluffyTracking(-0.01, at: 18)
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .lineLimit(1)
+                    if recipe.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.fluffyInk2)
+                    }
+                }
+                FluffyMetadataLine(text: recipeSubtitle(recipe))
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(Color.fluffyAccent)
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Card Helpers
@@ -452,9 +462,9 @@ struct SupabaseRecipeListView: View {
     private func recipeSubtitle(_ recipe: RecipeRow) -> String {
         let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
         if total > 0 {
-            return "\(recipe.category.capitalized) · \(total) min"
+            return "\(recipe.category) \u{00B7} \(total) min"
         }
-        return recipe.category.capitalized
+        return recipe.category
     }
 
     // MARK: - Context Menu
@@ -488,54 +498,67 @@ struct SupabaseRecipeListView: View {
     // MARK: - Empty / No-Matches
 
     private var emptyState: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            ZStack {
-                Circle()
-                    .fill(Color.fluffyAmberLight)
-                    .frame(width: 120, height: 120)
-                Image(systemName: "book.closed")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.fluffyAmber)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                masthead
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundStyle(Color.fluffyAccent)
+                        .padding(.bottom, 30)
+
+                    Text("The box is empty.")
+                        .font(.fluffyDisplaySmall)
+                        .fluffyTracking(-0.025, at: 30)
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .padding(.bottom, 10)
+
+                    Text("Add your first recipe and it will take the front page.")
+                        .font(.fluffyCallout)
+                        .foregroundStyle(Color.fluffySecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 30)
+
+                    FluffyTextLink(title: "Add a recipe") {
+                        showingAddRecipe = true
+                    }
+                }
+                .padding(.top, 60)
+                .padding(.horizontal, 22)
             }
-            .padding(.bottom, 24)
-            Text("No recipes yet")
-                .font(.fluffyDisplay)
-                .foregroundStyle(Color.fluffyPrimary)
-                .padding(.bottom, 8)
-            Text("Tap + to add your first recipe.")
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffySecondary)
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 
     private var noMatchesState: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            ZStack {
-                Circle()
-                    .fill(Color.fluffyAmberLight)
-                    .frame(width: 120, height: 120)
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.fluffyAmber)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                masthead
+                    .padding(.bottom, 20)
+
+                searchRule
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
+
+                chipBar
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 40)
+
+                Text("Nothing matches.")
+                    .font(.fluffyDisplaySmall)
+                    .fluffyTracking(-0.025, at: 30)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 10)
+
+                Text("Try a different search or filter.")
+                    .font(.fluffyCallout)
+                    .foregroundStyle(Color.fluffySecondary)
+                    .padding(.horizontal, 22)
             }
-            .padding(.bottom, 24)
-            Text("No matches")
-                .font(.fluffyDisplay)
-                .foregroundStyle(Color.fluffyPrimary)
-                .padding(.bottom, 8)
-            Text("Try a different search or filter.")
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffySecondary)
-                .multilineTextAlignment(.center)
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 
     // MARK: - Toast
@@ -552,7 +575,7 @@ struct SupabaseRecipeListView: View {
                     .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThinMaterial)
             .transition(.opacity)
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -752,5 +775,60 @@ struct DayPickerSheet: View {
         let f = DateFormatter()
         f.dateFormat = "EEEE, MMM d"
         return f.string(from: date)
+    }
+}
+
+// MARK: - Flow Layout
+
+/// Minimal left-aligned wrapping layout for the underlined-word
+/// category chips. iOS 16+ Layout protocol; the project targets 17+.
+struct FluffyFlowLayout: Layout {
+    var hSpacing: CGFloat = 18
+    var vSpacing: CGFloat = 12
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += rowHeight + vSpacing
+                rowHeight = 0
+            }
+            x += size.width + hSpacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: maxWidth == .infinity ? x : maxWidth,
+                      height: y + rowHeight)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let maxWidth = bounds.width
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += rowHeight + vSpacing
+                rowHeight = 0
+            }
+            subview.place(
+                at: CGPoint(x: bounds.minX + x, y: bounds.minY + y),
+                anchor: .topLeading,
+                proposal: .unspecified
+            )
+            x += size.width + hSpacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
