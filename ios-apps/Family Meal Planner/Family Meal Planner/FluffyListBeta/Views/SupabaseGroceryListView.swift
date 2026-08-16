@@ -2,11 +2,11 @@
 //  SupabaseGroceryListView.swift
 //  FluffyList
 //
-//  Grocery list with slate blue accent, cream background with subtle
-//  ruled lines, items grouped by category, checkboxes with
-//  strikethrough, right-aligned quantities, Share List button, and
-//  a Store Mode toggle for high-contrast dark shopping experience.
-//  Figma Heirloom design.
+//  "The Press" grocery list. Paper ground, masthead, category heads
+//  as tracked uppercase section labels, square checkboxes, ruled
+//  rows, quantities right-aligned in tabular numerals, and the share
+//  affordance as an underlined text link. Store Mode is the one
+//  screen with an ink ground.
 //
 
 import SwiftUI
@@ -15,8 +15,11 @@ struct SupabaseGroceryListView: View {
     @EnvironmentObject private var groceryService: GroceryService
     @AppStorage("groceryStoreMode") private var storeMode = false
 
+    /// Lets the empty state's "Plan a night" link jump to the Meals tab.
+    @Binding var selectedTab: AppTab
+
     /// True when the last grocery fetch failed — drives the retry banner
-    /// and stops a failed load from rendering as "Nothing to buy yet."
+    /// and stops a failed load from rendering as an empty list.
     @State private var fetchFailed = false
     /// Short human message for a failed write (check/delete/clear).
     @State private var actionErrorMessage: String?
@@ -63,15 +66,18 @@ struct SupabaseGroceryListView: View {
         groceryService.items.contains { $0.isChecked }
     }
 
-    // MARK: - Store Mode Colors
+    private var checkedCount: Int {
+        groceryService.items.filter { $0.isChecked }.count
+    }
 
-    private var bgColor: Color { storeMode ? Color(hex: "141414") : Color.fluffyBackground }
-    private var textColor: Color { storeMode ? .white : Color.fluffyPrimary }
-    private var secondaryTextColor: Color { storeMode ? .white.opacity(0.6) : Color.fluffySecondary }
-    private var dimTextColor: Color { storeMode ? .white.opacity(0.35) : Color.fluffyTertiary }
-    private var lineColor: Color { storeMode ? .white.opacity(0.1) : Color.fluffyDivider }
-    private var accentColor: Color { storeMode ? Color(hex: "6B9FE8") : Color.fluffySlateBlue }
-    private var checkboxOff: Color { storeMode ? .white.opacity(0.3) : Color.fluffyBorder }
+    // MARK: - Press / Store Mode Colors
+
+    private var bgColor: Color { storeMode ? .fluffyInkGround : .fluffyBackground }
+    private var textColor: Color { storeMode ? .fluffyPaperOnInk : .fluffyPrimary }
+    private var secondaryTextColor: Color { storeMode ? .fluffyPaperDimOnInk : .fluffySecondary }
+    private var dimTextColor: Color { storeMode ? .fluffyPaperDimOnInk : .fluffyTertiary }
+    private var lineColor: Color { storeMode ? .fluffyRuleOnInk : .fluffyDivider }
+    private var headColor: Color { storeMode ? .fluffyAccentPale : .fluffySecondary }
 
     // MARK: - Body
 
@@ -94,10 +100,10 @@ struct SupabaseGroceryListView: View {
                 Group {
                     if fetchFailed && groceryService.items.isEmpty {
                         // A failed load with nothing cached must not render
-                        // as "Nothing to buy yet" — the banner explains it.
-                        Color.clear
+                        // as an empty list — the banner explains it.
+                        loadingOrFailedShell(line: nil)
                     } else if groceryService.isLoading && groceryService.items.isEmpty {
-                        ProgressView("Loading groceries...")
+                        loadingOrFailedShell(line: "Fetching your groceries\u{2026}")
                     } else if groceryService.items.isEmpty {
                         emptyState
                     } else {
@@ -109,7 +115,9 @@ struct SupabaseGroceryListView: View {
             .animation(.easeInOut(duration: 0.25), value: groceryService.isLoading)
             .animation(.easeInOut(duration: 0.25), value: storeMode)
             .background(bgColor.ignoresSafeArea())
-            .navigationTitle("Groceries")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarColorScheme(storeMode ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -119,21 +127,22 @@ struct SupabaseGroceryListView: View {
                         }
                     } label: {
                         Image(systemName: storeMode ? "sun.max.fill" : "flashlight.on.fill")
-                            .foregroundStyle(accentColor)
+                            .foregroundStyle(storeMode ? Color.fluffyAccentPale : Color.fluffyAccent)
                     }
                     .accessibilityLabel(storeMode ? "Exit Store Mode" : "Store Mode")
                 }
 
                 if hasCheckedItems {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Clear Checked") {
+                        Button("Clear checked") {
                             Task {
                                 if !(await groceryService.clearChecked()) {
                                     actionErrorMessage = "Couldn't clear checked items. Please try again."
                                 }
                             }
                         }
-                        .foregroundStyle(accentColor)
+                        .font(.fluffyButton)
+                        .foregroundStyle(storeMode ? Color.fluffyAccentPale : Color.fluffyAccent)
                     }
                 }
             }
@@ -146,41 +155,84 @@ struct SupabaseGroceryListView: View {
         }
     }
 
+    // MARK: - Masthead
+
+    private var masthead: some View {
+        FluffyMasthead(
+            title: storeMode ? "Aisle by aisle" : "Grocery",
+            dateline: storeMode
+                ? "\(groceryService.items.count) ITEMS"
+                : "\(checkedCount) IN THE CART",
+            onInk: storeMode,
+            brand: storeMode ? "STORE MODE" : "FLUFFYLIST"
+        )
+        .padding(.horizontal, 22)
+    }
+
     // MARK: - Reload
 
     /// Fetch grocery items and record whether it succeeded, so a failed
-    /// load shows the retry banner instead of "Nothing to buy yet."
+    /// load shows the retry banner instead of an empty state.
     private func reloadGroceries() async {
         let ok = await groceryService.fetchItems()
         fetchFailed = !ok
     }
 
+    // MARK: - Loading / Failed Shell
+
+    /// The page is never visually empty: masthead already drawn, plus an
+    /// optional italic status line while fetching.
+    private func loadingOrFailedShell(line: String?) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                masthead
+                if let line {
+                    Text(line)
+                        .font(.fluffyCallout)
+                        .foregroundStyle(secondaryTextColor)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 15)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            ZStack {
-                Circle()
-                    .fill(storeMode ? accentColor.opacity(0.15) : Color.fluffySlateBlueLight)
-                    .frame(width: 120, height: 120)
-                Image(systemName: "cart")
-                    .font(.system(size: 48))
-                    .foregroundStyle(accentColor)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                masthead
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Image(systemName: "cart")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundStyle(Color.fluffyAccent)
+                        .padding(.bottom, 30)
+
+                    Text("The list writes itself.")
+                        .font(.fluffyDisplaySmall)
+                        .fluffyTracking(-0.025, at: 30)
+                        .foregroundStyle(textColor)
+                        .padding(.bottom, 10)
+
+                    Text("Plan a few dinners and every ingredient lands here, sorted by aisle.")
+                        .font(.fluffyCallout)
+                        .foregroundStyle(secondaryTextColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 30)
+
+                    FluffyTextLink(title: "Plan a night") {
+                        selectedTab = .mealPlan
+                    }
+                }
+                .padding(.top, 60)
+                .padding(.horizontal, 22)
             }
-            .padding(.bottom, 24)
-            Text("Nothing to buy yet")
-                .font(.fluffyDisplay)
-                .foregroundStyle(textColor)
-                .padding(.bottom, 8)
-            Text("Assign recipes to your Meal Plan\nto build your grocery list.")
-                .font(.fluffyBody)
-                .foregroundStyle(secondaryTextColor)
-                .multilineTextAlignment(.center)
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 
     // MARK: - Grocery List
@@ -188,40 +240,28 @@ struct SupabaseGroceryListView: View {
     private var groceryList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Store mode banner
-                if storeMode {
-                    HStack(spacing: 8) {
-                        Image(systemName: "flashlight.on.fill")
-                            .font(.system(size: 14))
-                        Text("Store Mode")
-                            .font(.fluffySubheadline)
-                    }
-                    .foregroundStyle(accentColor)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                }
+                masthead
 
                 ForEach(groupedItems, id: \.0) { category, items in
                     categorySection(category, items: items)
                 }
 
-                // Share List button
+                // Share affordance — an underlined text link, not a
+                // filled button.
                 ShareLink(item: shareText) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Share List")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Share the list \u{2192}")
+                            .font(.fluffyButton)
+                            .foregroundStyle(storeMode ? Color.fluffyAccentPale : Color.fluffyAccent)
+                        FluffyRule(weight: 2, color: storeMode ? .fluffyAccentPale : .fluffyAccent)
                     }
-                    .font(.fluffyButton)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(accentColor, in: RoundedRectangle(cornerRadius: 14))
+                    .fixedSize()
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 32)
+                .padding(.horizontal, 22)
+                .padding(.top, 30)
                 .padding(.bottom, 40)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -232,13 +272,10 @@ struct SupabaseGroceryListView: View {
         items: [SupabaseGroceryItem]
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(category.rawValue.uppercased())
-                .font(.fluffySubheadline)
-                .foregroundStyle(accentColor)
-                .tracking(1.2)
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 8)
+            FluffySectionHead(title: category.rawValue, color: headColor)
+                .padding(.horizontal, 22)
+                .padding(.top, 30)
+                .padding(.bottom, 10)
 
             ForEach(items) { item in
                 VStack(spacing: 0) {
@@ -260,32 +297,30 @@ struct SupabaseGroceryListView: View {
                 }
             }
         } label: {
-            HStack(spacing: storeMode ? 16 : 12) {
-                // Checkbox
-                Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: storeMode ? 28 : 22))
-                    .foregroundStyle(item.isChecked ? accentColor : checkboxOff)
+            HStack(spacing: storeMode ? 16 : 14) {
+                FluffyCheckbox(
+                    isChecked: item.isChecked,
+                    size: storeMode ? 30 : 20,
+                    onInk: storeMode
+                )
 
-                // Item name
                 Text(item.name)
-                    .font(storeMode
-                        ? .custom("Inter-Regular", size: 18)
-                        : .fluffyBody)
+                    .font(.custom(FluffyFace.regular, size: storeMode ? 21 : 17))
                     .foregroundStyle(item.isChecked ? dimTextColor : textColor)
                     .strikethrough(item.isChecked, color: dimTextColor)
+                    .animation(.easeInOut(duration: 0.18), value: item.isChecked)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
                 Spacer()
 
-                // Right-aligned quantity
                 Text(quantityText(item))
-                    .font(storeMode
-                        ? .custom("Inter-Regular", size: 16)
-                        : .fluffyFootnote)
+                    .font(.custom(FluffyFace.regular, size: storeMode ? 16 : 13))
+                    .monospacedDigit()
+                    .fixedSize()
                     .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 22)
             .padding(.vertical, storeMode ? 16 : 12)
             .contentShape(Rectangle())
         }
@@ -306,11 +341,8 @@ struct SupabaseGroceryListView: View {
     // MARK: - Ruled Line
 
     private var ruledLine: some View {
-        Rectangle()
-            .fill(lineColor)
-            .frame(height: 1)
-            .padding(.leading, storeMode ? 64 : 54)
-            .padding(.trailing, 20)
+        FluffyRule(weight: 1, color: lineColor)
+            .padding(.horizontal, 22)
     }
 
     // MARK: - Quantity Formatting

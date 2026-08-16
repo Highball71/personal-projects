@@ -2,7 +2,9 @@
 //  FluffyErrorBanner.swift
 //  FluffyList
 //
-//  Compact, dismissable error banner shared by the tab views.
+//  "The Press" error band. No rounded card, no shadow: a paper band
+//  with a 2px ink-1 rule top and bottom, an uppercase "PROBLEM"
+//  kicker, the message at 15pt, and a "Retry" text link in ink 1.
 //  Two uses:
 //    - Fetch failures: pass `onRetry` so the user can re-run the load.
 //      Shown INSTEAD of an empty state — a load failure must never
@@ -21,39 +23,49 @@ struct FluffyErrorBanner: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.fluffyCallout)
-                .foregroundStyle(Color.fluffyError)
+        VStack(alignment: .leading, spacing: 0) {
+            FluffyRule(weight: 2, color: .fluffyAccent)
 
-            Text(message)
-                .font(.fluffyFootnote)
-                .foregroundStyle(Color.fluffyPrimary)
-                .multilineTextAlignment(.leading)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("PROBLEM")
+                        .font(.fluffySectionHead)
+                        .fluffyTracking(0.16, at: 11)
+                        .foregroundStyle(Color.fluffyAccent)
+
+                    Text(message)
+                        .font(.custom(FluffyFace.regular, size: 15))
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let onRetry {
-                Button("Retry", action: onRetry)
-                    .font(.fluffySubheadline)
-                    .foregroundStyle(Color.fluffyError)
-            }
+                if let onRetry {
+                    Button(action: onRetry) {
+                        VStack(spacing: 2) {
+                            Text("Retry")
+                                .font(.fluffyButton)
+                                .foregroundStyle(Color.fluffyAccent)
+                            FluffyRule(weight: 2, color: .fluffyAccent)
+                        }
+                        .fixedSize()
+                    }
+                }
 
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.fluffyCaption)
-                    .foregroundStyle(Color.fluffySecondary)
-                    .frame(minWidth: 28, minHeight: 28)
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.fluffySecondary)
+                        .frame(minWidth: 28, minHeight: 28)
+                }
+                .accessibilityLabel("Dismiss")
             }
-            .accessibilityLabel("Dismiss")
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
+            .background(Color.fluffyBackground)
+
+            FluffyRule(weight: 2, color: .fluffyAccent)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.fluffyError.opacity(0.35), lineWidth: 1)
-        )
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
     }
 }

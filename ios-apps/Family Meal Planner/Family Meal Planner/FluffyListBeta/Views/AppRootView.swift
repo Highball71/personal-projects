@@ -222,9 +222,10 @@ private struct HouseholdMembershipRetryView: View {
     }
 }
 
-/// Main tab bar for the Supabase path. Each tab is tinted with its
-/// section accent colour: teal for Meals, amber for Recipes, slate
-/// blue for Grocery, muted for Settings.
+/// Main tab bar for the Supabase path, styled for "The Press":
+/// paper ground, a 1px ink rule along the top, the active tab in
+/// ink 1 (persimmon), inactive tabs in #7D7979, and 10pt uppercase
+/// tracked serif labels. No filled pill, no per-tab tint.
 struct SupabaseContentView: View {
     @EnvironmentObject private var householdService: HouseholdService
     @EnvironmentObject private var recipeService: RecipeService
@@ -234,46 +235,68 @@ struct SupabaseContentView: View {
     /// screen for weekly planning.
     @State private var selectedTab: AppTab = .mealPlan
 
+    init() {
+        // UITabBar appearance: The Press tab bar. SwiftUI's tabItem
+        // can't set fonts/tracking, so this is configured once here.
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(Color.fluffyBackground)
+        // 1px ink top rule.
+        appearance.shadowColor = UIColor(Color.fluffyPrimary)
+
+        let inactive = UIColor(red: 0x7D / 255, green: 0x79 / 255, blue: 0x79 / 255, alpha: 1)
+        let active = UIColor(Color.fluffyAccent)
+        let labelFont = UIFont(name: FluffyFace.regular, size: 10)
+            ?? UIFont.systemFont(ofSize: 10)
+        // 0.12em at 10pt = 1.2pt of kern.
+        let normalAttrs: [NSAttributedString.Key: Any] = [
+            .font: labelFont, .kern: 1.2, .foregroundColor: inactive
+        ]
+        let selectedAttrs: [NSAttributedString.Key: Any] = [
+            .font: labelFont, .kern: 1.2, .foregroundColor: active
+        ]
+        for item in [appearance.stackedLayoutAppearance,
+                     appearance.inlineLayoutAppearance,
+                     appearance.compactInlineLayoutAppearance] {
+            item.normal.iconColor = inactive
+            item.normal.titleTextAttributes = normalAttrs
+            item.selected.iconColor = active
+            item.selected.titleTextAttributes = selectedAttrs
+        }
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             SupabaseMealPlanView(selectedTab: $selectedTab)
                 .tabItem {
-                    Label("Meals", systemImage: "calendar")
+                    Label("MEALS", systemImage: "calendar")
                 }
                 .tag(AppTab.mealPlan)
 
             SupabaseRecipeListView()
                 .tabItem {
-                    Label("Recipes", systemImage: "book")
+                    Label("RECIPES", systemImage: "book")
                 }
                 .tag(AppTab.recipes)
 
-            SupabaseGroceryListView()
+            SupabaseGroceryListView(selectedTab: $selectedTab)
                 .tabItem {
-                    Label("Grocery", systemImage: "cart")
+                    Label("GROCERY", systemImage: "cart")
                 }
                 .tag(AppTab.groceries)
 
             SupabaseSettingsView()
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape")
+                    Label("SETTINGS", systemImage: "gearshape")
                 }
                 .tag(AppTab.settings)
         }
-        .tint(tintColor(for: selectedTab))
+        .tint(Color.fluffyAccent)
         .task {
             await householdService.loadCurrentHousehold()
             await recipeService.fetchRecipes()
-        }
-    }
-
-    /// Maps each tab to its FluffySection accent colour.
-    private func tintColor(for tab: AppTab) -> Color {
-        switch tab {
-        case .mealPlan:  return .fluffyTeal
-        case .recipes:   return .fluffyAmber
-        case .groceries: return .fluffySlateBlue
-        case .settings:  return .fluffySecondary
         }
     }
 }
