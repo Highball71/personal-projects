@@ -103,6 +103,18 @@ struct SupabaseAddRecipeView: View {
     private var formContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                // The Press header furniture: a 4px ink rule, then the
+                // screen title. Cancel/Save live in the nav bar row above.
+                VStack(alignment: .leading, spacing: 0) {
+                    FluffyRule(weight: 4, color: .fluffyPrimary)
+                    Text(viewModel.isEditing ? "Edit recipe" : "New recipe")
+                        .font(.custom(FluffyFace.bold, size: 34))
+                        .fluffyTracking(-0.025, at: 34)
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .padding(.top, 15)
+                }
+                .padding(.horizontal, 22)
+
                 photoBlock
                 scanBlock
                 urlImportBlock
@@ -125,12 +137,21 @@ struct SupabaseAddRecipeView: View {
             .padding(.bottom, 40)
         }
         .background(Color.fluffyBackground)
-        .navigationTitle(viewModel.isEditing ? "Edit Recipe" : "New Recipe")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
-                    .foregroundStyle(Color.fluffySecondary)
+                    .font(.custom(FluffyFace.regular, size: 17))
+                    .foregroundStyle(Color.fluffyAccent)
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { Task { await saveRecipe() } }
+                    .font(.custom(FluffyFace.semibold, size: 17))
+                    .foregroundStyle(Color.fluffyAccent)
+                    .disabled(!viewModel.validate() || viewModel.isSaving)
+                    .opacity(viewModel.validate() && !viewModel.isSaving ? 1 : 0.5)
             }
         }
         .alert("Delete this recipe?", isPresented: $showingDeleteConfirmation) {
@@ -149,21 +170,21 @@ struct SupabaseAddRecipeView: View {
             Text(error)
                 .font(.fluffyCallout)
                 .foregroundStyle(Color.fluffyError)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 22)
         }
     }
 
+    /// Save moved to the header row per The Press spec; this keeps a
+    /// full-width fallback affordance at the end of a long form so the
+    /// user isn't forced to scroll back up. Same action, filled ink-1,
+    /// square corners.
     private var saveButton: some View {
-        FluffyPrimaryButton(
-            "Save Recipe",
-            icon: "checkmark",
-            section: .recipes
-        ) {
+        FluffyFilledButton(title: viewModel.isSaving ? "Saving\u{2026}" : "Save recipe") {
             Task { await saveRecipe() }
         }
         .disabled(!viewModel.validate() || viewModel.isSaving)
         .opacity(viewModel.validate() && !viewModel.isSaving ? 1 : 0.5)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
         .padding(.top, 8)
     }
 
@@ -376,167 +397,169 @@ struct SupabaseAddRecipeView: View {
                 } label: {
                     VStack(spacing: 8) {
                         Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 28))
-                        Text("Add Recipe Photo")
+                            .font(.system(size: 26, weight: .light))
+                            .foregroundStyle(Color.fluffyPrimary)
+                        Text("Add a recipe photo")
                             .font(.fluffyCallout)
+                            .foregroundStyle(Color.fluffySecondary)
                     }
-                    .foregroundStyle(Color.fluffyTertiary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 140)
-                    .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(Rectangle().strokeBorder(Color.fluffyPrimary, lineWidth: 2))
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 22)
             }
         }
     }
 
     // MARK: - Scan Block
 
+    /// The scan affordance: a 2px ink-outlined box, square corners —
+    /// camera icon, SemiBold label over an italic hint, persimmon
+    /// chevron trailing.
     private var scanBlock: some View {
         Button {
             showingPhotoOptions = true
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "camera.fill")
-                    .font(.fluffyHeadline)
-                Text("Scan from Photo")
-                    .font(.fluffyButton)
+            HStack(spacing: 14) {
+                Image(systemName: "camera")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundStyle(Color.fluffyPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Scan from a photo")
+                        .font(.custom(FluffyFace.semibold, size: 16))
+                        .foregroundStyle(Color.fluffyPrimary)
+                    Text("Point it at a cookbook page or a card.")
+                        .font(.custom(FluffyFace.italic, size: 13))
+                        .foregroundStyle(Color.fluffySecondary)
+                }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.fluffyCaption)
-                    .foregroundStyle(Color.fluffyTertiary)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.fluffyAccent)
             }
-            .foregroundStyle(Color.fluffyAmber)
             .padding(16)
-            .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(Rectangle().strokeBorder(Color.fluffyPrimary, lineWidth: 2))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(isExtracting || isImportingFromURL)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
     private var urlImportBlock: some View {
-        Button {
+        FluffyTextLink(title: "Import from a URL") {
             showingURLImport = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "link")
-                    .font(.fluffyHeadline)
-                Text("Import from URL")
-                    .font(.fluffyButton)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.fluffyCaption)
-                    .foregroundStyle(Color.fluffyTertiary)
-            }
-            .foregroundStyle(Color.fluffyAmber)
-            .padding(16)
-            .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
         }
         .disabled(isExtracting || isImportingFromURL)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Name
 
     private var nameBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Recipe Name")
-                .font(.fluffyCaption)
-                .foregroundStyle(Color.fluffyTertiary)
-
-            TextField("e.g. Grandma's Chicken Soup", text: $viewModel.name)
-                .font(.fluffyTitle)
-                .foregroundStyle(Color.fluffyPrimary)
-                .padding(.bottom, 8)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.fluffyDivider)
-                        .frame(height: 1)
+        fieldOverRule(label: "Recipe name") {
+            ZStack(alignment: .leading) {
+                if viewModel.name.isEmpty {
+                    Text("e.g. Grandma's chicken soup")
+                        .font(.custom(FluffyFace.regular, size: 20))
+                        .foregroundStyle(Color.fluffyTertiary)
                 }
+                TextField("", text: $viewModel.name)
+                    .font(.custom(FluffyFace.regular, size: 20))
+                    .foregroundStyle(Color.fluffyPrimary)
+            }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
+    }
+
+    /// Label-over-rule field: uppercase 11pt/0.16em label in
+    /// fluffySecondary, the value on a 2px rule, 7pt padding-bottom.
+    /// Fields are never filled boxes.
+    private func fieldOverRule<Content: View>(
+        label: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            FluffySectionHead(title: label)
+            VStack(spacing: 7) {
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                FluffyRule(weight: 2, color: .fluffyFieldRule)
+            }
+        }
     }
 
     // MARK: - Category Chips
 
     private var categoryChips: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Category")
-                .font(.fluffyCaption)
-                .foregroundStyle(Color.fluffyTertiary)
-                .padding(.horizontal, 20)
+        VStack(alignment: .leading, spacing: 12) {
+            FluffySectionHead(title: "Category")
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(RecipeCategory.allCases) { cat in
-                        Button {
-                            viewModel.category = cat
-                        } label: {
-                            Text(cat.rawValue)
-                                .font(.fluffySubheadline)
+            // Underlined-word chips, same treatment as the Recipes
+            // screen — not capsules.
+            FluffyFlowLayout(hSpacing: 18, vSpacing: 12) {
+                ForEach(RecipeCategory.allCases) { cat in
+                    Button {
+                        viewModel.category = cat
+                    } label: {
+                        VStack(spacing: 3) {
+                            Text(cat.rawValue.uppercased())
+                                .font(.custom(FluffyFace.regular, size: 14))
+                                .fluffyTracking(0.06, at: 14)
                                 .foregroundStyle(
-                                    viewModel.category == cat ? .white : Color.fluffyAmber
-                                )
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(
                                     viewModel.category == cat
-                                        ? Color.fluffyAmber
-                                        : Color.fluffyAmber.opacity(0.12),
-                                    in: Capsule()
+                                        ? Color.fluffyAccent : Color.fluffySecondary
                                 )
+                            FluffyRule(
+                                weight: 2,
+                                color: viewModel.category == cat ? .fluffyAccent : .clear
+                            )
                         }
+                        .fixedSize()
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 20)
             }
         }
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Details Card
 
     private var detailsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FluffySectionHeader(title: "Details")
-                .padding(.bottom, 14)
+            FluffySectionHead(title: "Details")
+                .padding(.bottom, 10)
 
-            detailRow(icon: "person.2", label: "Servings") {
+            detailRow(label: "Servings") {
                 Stepper("\(viewModel.servings)", value: $viewModel.servings, in: 1...20)
-                    .font(.fluffyCallout)
+                    .font(.custom(FluffyFace.regular, size: 15))
             }
-
-            Rectangle().fill(Color.fluffyDivider).frame(height: 1)
-                .padding(.vertical, 10)
-
-            detailRow(icon: "clock", label: "Prep Time") {
+            detailRow(label: "Prep time") {
                 Stepper("\(viewModel.prepTimeMinutes) min", value: $viewModel.prepTimeMinutes, in: 0...480, step: 5)
-                    .font(.fluffyCallout)
+                    .font(.custom(FluffyFace.regular, size: 15))
             }
-
-            Rectangle().fill(Color.fluffyDivider).frame(height: 1)
-                .padding(.vertical, 10)
-
-            detailRow(icon: "flame", label: "Cook Time") {
+            detailRow(label: "Cook time") {
                 Stepper("\(viewModel.cookTimeMinutes) min", value: $viewModel.cookTimeMinutes, in: 0...480, step: 5)
-                    .font(.fluffyCallout)
+                    .font(.custom(FluffyFace.regular, size: 15))
             }
+            FluffyRule()
         }
-        .padding(16)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
-    private func detailRow<Content: View>(icon: String, label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.fluffyCallout)
-                .foregroundStyle(Color.fluffyAmber)
-                .frame(width: 20)
-            Text(label)
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffyPrimary)
-            Spacer()
-            content()
+    private func detailRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            FluffyRule()
+            HStack(spacing: 12) {
+                Text(label)
+                    .font(.custom(FluffyFace.regular, size: 17))
+                    .foregroundStyle(Color.fluffyPrimary)
+                Spacer()
+                content()
+            }
+            .padding(.vertical, 10)
         }
     }
 
@@ -544,41 +567,42 @@ struct SupabaseAddRecipeView: View {
 
     private var ingredientsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Ingredients")
+            HStack {
+                FluffySectionHead(title: "Ingredients")
+                Spacer()
+                Button {
+                    viewModel.ingredientRows.append(IngredientFormData())
+                } label: {
+                    Text("+ Add")
+                        .font(.fluffyButton)
+                        .foregroundStyle(Color.fluffyAccent)
+                }
+            }
 
             ForEach($viewModel.ingredientRows) { $row in
-                IngredientRowView(data: $row)
+                VStack(spacing: 12) {
+                    FluffyRule()
+                    IngredientRowView(data: $row)
+                }
             }
             .onDelete { indexSet in
                 viewModel.ingredientRows.remove(atOffsets: indexSet)
             }
-
-            Button {
-                viewModel.ingredientRows.append(IngredientFormData())
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus.circle")
-                    Text("Add Ingredient")
-                }
-                .font(.fluffyCallout)
-                .foregroundStyle(Color.fluffyAmber)
-            }
+            FluffyRule()
         }
-        .padding(16)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Instructions Card
 
     private var instructionsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Preparation")
+        VStack(alignment: .leading, spacing: 10) {
+            FluffySectionHead(title: "Method")
 
             ZStack(alignment: .topLeading) {
                 if viewModel.instructions.isEmpty {
-                    Text("Add cooking steps...")
-                        .font(.fluffyBody)
+                    Text("One step per line\u{2026}")
+                        .font(.custom(FluffyFace.italic, size: 15))
                         .foregroundStyle(Color.fluffyTertiary)
                         .padding(.top, 8)
                         .padding(.leading, 4)
@@ -589,37 +613,35 @@ struct SupabaseAddRecipeView: View {
                     .frame(minHeight: 120)
                     .scrollContentBackground(.hidden)
             }
+            FluffyRule(weight: 2, color: .fluffyFieldRule)
         }
-        .padding(16)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Notes Card
 
     private var notesCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Notes")
-
-            TextField(
-                "e.g. kids loved this, add more garlic next time",
-                text: $viewModel.notes,
-                axis: .vertical
-            )
-            .font(.fluffyBody)
-            .foregroundStyle(Color.fluffyPrimary)
-            .lineLimit(3...6)
+        fieldOverRule(label: "Notes") {
+            ZStack(alignment: .leading) {
+                if viewModel.notes.isEmpty {
+                    Text("e.g. kids loved this, add more garlic next time")
+                        .font(.custom(FluffyFace.italic, size: 15))
+                        .foregroundStyle(Color.fluffyTertiary)
+                }
+                TextField("", text: $viewModel.notes, axis: .vertical)
+                    .font(.fluffyBody)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .lineLimit(3...6)
+            }
         }
-        .padding(16)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Source Card
 
     private var sourceCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Source")
+        VStack(alignment: .leading, spacing: 10) {
+            FluffySectionHead(title: "Source")
 
             Picker("Source", selection: $viewModel.sourceType) {
                 Text("None").tag(RecipeSource?.none)
@@ -628,38 +650,26 @@ struct SupabaseAddRecipeView: View {
                 }
             }
             .pickerStyle(.menu)
-            .tint(Color.fluffyAmber)
+            .tint(Color.fluffyAccent)
 
             if viewModel.sourceType != nil {
-                TextField(viewModel.sourcePlaceholder, text: $viewModel.sourceDetail)
-                    .font(.fluffyBody)
-                    .foregroundStyle(Color.fluffyPrimary)
+                VStack(spacing: 7) {
+                    TextField(viewModel.sourcePlaceholder, text: $viewModel.sourceDetail)
+                        .font(.fluffyBody)
+                        .foregroundStyle(Color.fluffyPrimary)
+                    FluffyRule(weight: 2, color: .fluffyFieldRule)
+                }
             }
         }
-        .padding(16)
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Edit Actions
 
     private var editActions: some View {
-        VStack(spacing: 12) {
-            Button {
+        VStack(alignment: .leading, spacing: 20) {
+            FluffyTextLink(title: "Add ingredients to the grocery list") {
                 Task { await addIngredientsToGroceryList() }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "cart.badge.plus")
-                    Text("Add Ingredients to Grocery List")
-                }
-                .font(.fluffyButton)
-                .foregroundStyle(Color.fluffySlateBlue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.fluffySlateBlue, lineWidth: 1.5)
-                )
             }
             .disabled(isAddingToGrocery || nonEmptyIngredientCount == 0)
             .opacity(nonEmptyIngredientCount > 0 ? 1 : 0.4)
@@ -667,14 +677,13 @@ struct SupabaseAddRecipeView: View {
             Button {
                 showingDeleteConfirmation = true
             } label: {
-                Text("Delete Recipe")
+                Text("Delete recipe")
                     .font(.fluffyButton)
                     .foregroundStyle(Color.fluffyError)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
+        .padding(.top, 8)
     }
 
     // MARK: - Overlays
@@ -703,11 +712,11 @@ struct SupabaseAddRecipeView: View {
                         extractingPageCount = 0
                     }
                     .buttonStyle(.bordered)
-                    .tint(Color.fluffyAmber)
+                    .tint(Color.fluffyAccent)
                     .padding(.top, 4)
                 }
                 .padding(32)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .background(.ultraThinMaterial)
             }
         }
     }
@@ -724,7 +733,7 @@ struct SupabaseAddRecipeView: View {
                     .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThinMaterial)
             .transition(.opacity)
         }
     }
@@ -741,7 +750,7 @@ struct SupabaseAddRecipeView: View {
                     .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThinMaterial)
             .transition(.opacity)
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -1185,12 +1194,12 @@ private struct URLImportSheet: View {
                     .font(.body)
                     .foregroundColor(Color.fluffyPrimary)
                     .foregroundStyle(Color.fluffyPrimary)
-                    .tint(Color.fluffyAmber)
+                    .tint(Color.fluffyAccent)
                     .padding(12)
-                    .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 10))
+                    .background(Color.fluffyBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.fluffyDivider, lineWidth: 1)
+                        Rectangle()
+                            .strokeBorder(Color.fluffyFieldRule, lineWidth: 2)
                     )
                     .focused($urlFieldFocused)
                     .disabled(isImporting)
