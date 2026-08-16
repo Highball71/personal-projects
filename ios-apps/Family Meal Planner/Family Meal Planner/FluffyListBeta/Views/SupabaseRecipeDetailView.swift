@@ -2,11 +2,11 @@
 //  SupabaseRecipeDetailView.swift
 //  FluffyList
 //
-//  Read-only recipe detail screen for the Supabase path.
-//  Figma spec: Playfair Display bold title, amber section headers,
-//  bullet-dot ingredients with a servings scaler, bold ingredient
-//  names in prep steps, notes section, and an amber "Add to This
-//  Week" button.
+//  "The Press" recipe detail. 230pt halftone photo, ink-2 kicker,
+//  36pt Bold title, uppercase metadata, ruled ingredient rows with a
+//  servings scaler, numbered METHOD steps with a fixed numeral
+//  column, and a sticky bottom bar carrying the one filled button in
+//  the app: "Add to the week".
 //
 
 import PhotosUI
@@ -57,7 +57,8 @@ struct SupabaseRecipeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if recipe.sourceImagePath != nil || recipe.homemadeImagePath != nil {
-                    RecipeCardImage(recipe: recipe, height: 220)
+                    // Full-bleed halftone photo, square corners, no scrim.
+                    RecipeCardImage(recipe: recipe, height: 230)
                         .clipped()
                 }
 
@@ -67,47 +68,48 @@ struct SupabaseRecipeDetailView: View {
                 }
 
                 titleSection
-                metadataRow
-                sectionDivider
 
                 ingredientsSection
-                    .padding(.top, 24)
+                    .padding(.top, 30)
 
                 if !recipe.instructions.isEmpty {
-                    sectionDivider.padding(.top, 24)
-                    preparationSection
-                        .padding(.top, 24)
+                    methodSection
+                        .padding(.top, 30)
                 }
 
                 if !recipe.notes.isEmpty {
-                    sectionDivider.padding(.top, 24)
                     notesSection
-                        .padding(.top, 24)
+                        .padding(.top, 30)
                 }
 
                 if let source = sourceAttribution {
                     Text(source)
-                        .font(.fluffyCaption)
+                        .font(.custom(FluffyFace.italic, size: 13))
                         .foregroundStyle(Color.fluffyTertiary)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 22)
                         .padding(.top, 20)
                 }
 
-                // Primary CTA
-                FluffyPrimaryButton(
-                    "Add to This Week",
-                    icon: "calendar.badge.plus",
-                    section: .recipes
-                ) {
-                    showingDayPicker = true
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 32)
-                .padding(.bottom, 40)
+                Spacer(minLength: 40)
             }
         }
         .background(Color.fluffyBackground)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
+        .tint(Color.fluffyAccent)
+        // Sticky bottom bar on paper with a 1px ink top rule — the one
+        // place a filled button appears in the app.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                FluffyRule(weight: 1, color: .fluffyPrimary)
+                FluffyFilledButton(title: "Add to the week") {
+                    showingDayPicker = true
+                }
+                .padding(.horizontal, 22)
+                .padding(.vertical, 12)
+            }
+            .background(Color.fluffyBackground)
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if let message = actionErrorMessage {
                 FluffyErrorBanner(
@@ -128,10 +130,12 @@ struct SupabaseRecipeDetailView: View {
                         }
                     } label: {
                         Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
-                            .foregroundStyle(recipe.isFavorite ? Color.fluffyAmber : Color.fluffySecondary)
+                            .foregroundStyle(recipe.isFavorite ? Color.fluffyAccent : Color.fluffySecondary)
                     }
-                    Button("Edit") { showingEdit = true }
-                        .foregroundStyle(Color.fluffyAmber)
+                    Button { showingEdit = true } label: {
+                        Image(systemName: "pencil")
+                            .foregroundStyle(Color.fluffyAccent)
+                    }
                 }
             }
         }
@@ -170,72 +174,94 @@ struct SupabaseRecipeDetailView: View {
 
     // MARK: - Title
 
+    /// Ink-2 kicker, 36pt Bold title, one line of uppercase metadata.
     private var titleSection: some View {
-        Text(recipe.name)
-            .font(.fluffyDisplay)
-            .foregroundStyle(Color.fluffyPrimary)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(kickerText)
+                .font(.fluffyMastheadLabel)
+                .fluffyTracking(0.16, at: 10)
+                .foregroundStyle(Color.fluffyInk2)
+                .padding(.bottom, 8)
+
+            Text(recipe.name)
+                .font(.fluffyTitle)
+                .fluffyTracking(-0.03, at: 36)
+                .lineSpacing(36 * 0.02)
+                .foregroundStyle(Color.fluffyPrimary)
+                .padding(.bottom, 10)
+
+            FluffyMetadataLine(text: metadataText)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 20)
     }
 
-    // MARK: - Metadata Chips
+    private var kickerText: String {
+        recipe.isFavorite ? "FAVOURITE" : recipe.category.uppercased()
+    }
 
-    private var metadataRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                FluffyMetadataChip(
-                    icon: "tag",
-                    value: recipe.category.capitalized
-                )
-                if recipe.servings > 0 {
-                    FluffyMetadataChip(
-                        icon: "person.2",
-                        value: "Serves \(recipe.servings)"
-                    )
-                }
-                if totalMinutes > 0 {
-                    FluffyMetadataChip(
-                        icon: "clock",
-                        value: "\(totalMinutes) min"
-                    )
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-        .padding(.bottom, 24)
+    private var metadataText: String {
+        var parts = [recipe.category]
+        if recipe.servings > 0 { parts.append("Serves \(recipe.servings)") }
+        if totalMinutes > 0 { parts.append("\(totalMinutes) min") }
+        return parts.joined(separator: " \u{00B7} ")
     }
 
     // MARK: - Ingredients
 
     private var ingredientsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Section header + serving scaler on the same line
+        VStack(alignment: .leading, spacing: 0) {
+            // Section head + serving scaler on the same line
             HStack {
-                FluffySectionHeader(title: "Ingredients")
+                FluffySectionHead(title: "Ingredients")
                 Spacer()
                 servingsScaler
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 10)
 
             if isLoadingIngredients {
-                ProgressView()
-                    .frame(maxWidth: .infinity, alignment: .center)
+                Text("Fetching ingredients\u{2026}")
+                    .font(.fluffyCallout)
+                    .foregroundStyle(Color.fluffySecondary)
+                    .padding(.horizontal, 22)
                     .padding(.vertical, 8)
             } else if ingredients.isEmpty {
-                Text("No ingredients listed")
-                    .font(.fluffyBody)
+                Text("No ingredients listed.")
+                    .font(.fluffyCallout)
                     .foregroundStyle(Color.fluffyTertiary)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 22)
             } else {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 0) {
                     ForEach(ingredients) { ingredient in
-                        FluffyBulletRow(text: formatIngredient(ingredient))
-                            .padding(.horizontal, 20)
+                        VStack(spacing: 0) {
+                            FluffyRule().padding(.horizontal, 22)
+                            ingredientRow(ingredient)
+                        }
                     }
+                    FluffyRule().padding(.horizontal, 22)
                 }
             }
         }
+    }
+
+    /// Ruled ingredient row: name left at 17pt, scaled quantity right
+    /// at 14pt in fluffySecondary, tabular numerals, never wrapping.
+    private func ingredientRow(_ ingredient: RecipeIngredientRow) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(ingredient.name)
+                .font(.custom(FluffyFace.regular, size: 17))
+                .foregroundStyle(Color.fluffyPrimary)
+                .multilineTextAlignment(.leading)
+            Spacer()
+            Text(quantityText(ingredient))
+                .font(.custom(FluffyFace.regular, size: 14))
+                .monospacedDigit()
+                .fixedSize()
+                .foregroundStyle(Color.fluffySecondary)
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
     }
 
     /// Compact stepper that adjusts the scaled servings count.
@@ -249,7 +275,7 @@ struct SupabaseRecipeDetailView: View {
                 Image(systemName: "minus.circle")
                     .font(.system(size: 20))
                     .foregroundStyle(
-                        scaledServings > 1 ? Color.fluffyAmber : Color.fluffyDivider
+                        scaledServings > 1 ? Color.fluffyAccent : Color.fluffyBorder
                     )
             }
             .disabled(scaledServings <= 1)
@@ -268,7 +294,7 @@ struct SupabaseRecipeDetailView: View {
                 Image(systemName: "plus.circle")
                     .font(.system(size: 20))
                     .foregroundStyle(
-                        scaledServings < 24 ? Color.fluffyAmber : Color.fluffyDivider
+                        scaledServings < 24 ? Color.fluffyAccent : Color.fluffyBorder
                     )
             }
             .disabled(scaledServings >= 24)
@@ -279,22 +305,32 @@ struct SupabaseRecipeDetailView: View {
         }
     }
 
-    // MARK: - Preparation
+    // MARK: - Method
 
-    private var preparationSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Preparation")
-                .padding(.horizontal, 20)
+    private var methodSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            FluffySectionHead(title: "Method")
+                .padding(.horizontal, 22)
+                .padding(.bottom, 15)
 
             let steps = recipe.instructions
                 .components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
 
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach(Array(steps.enumerated()), id: \.offset) { _, step in
-                    Text(highlightIngredients(in: step))
-                        .padding(.horizontal, 20)
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        // 28pt Bold ink-1 numeral in a fixed 34pt column.
+                        Text("\(index + 1)")
+                            .font(.custom(FluffyFace.bold, size: 28))
+                            .fluffyTracking(-0.03, at: 28)
+                            .foregroundStyle(Color.fluffyAccent)
+                            .frame(width: 34, alignment: .leading)
+                        Text(highlightIngredients(in: step))
+                            .lineSpacing(17 * 0.5)
+                    }
+                    .padding(.horizontal, 22)
                 }
             }
         }
@@ -303,38 +339,26 @@ struct SupabaseRecipeDetailView: View {
     // MARK: - Notes
 
     private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FluffySectionHeader(title: "Notes")
-                .padding(.horizontal, 20)
+        VStack(alignment: .leading, spacing: 0) {
+            FluffySectionHead(title: "Notes")
+                .padding(.horizontal, 22)
+                .padding(.bottom, 10)
             Text(recipe.notes)
-                .font(.custom("PlayfairDisplay-Bold", size: 16))
-                .italic()
+                .font(.fluffyCalloutLarge)
                 .foregroundStyle(Color.fluffySecondary)
-                .padding(.horizontal, 20)
+                .lineSpacing(17 * 0.4)
+                .padding(.horizontal, 22)
         }
-    }
-
-    // MARK: - Divider
-
-    private var sectionDivider: some View {
-        Rectangle()
-            .fill(Color.fluffyDivider)
-            .frame(height: 1)
-            .padding(.horizontal, 20)
     }
 
     // MARK: - Ingredient Formatting
 
-    /// Format a single ingredient with the current scale factor applied.
-    /// "to taste" → "Salt, to taste"
-    /// "—" (none) → "3 eggs"
-    /// Normal → "1 1/2 cups all-purpose flour"
-    private func formatIngredient(_ ingredient: RecipeIngredientRow) -> String {
+    /// The right-column quantity for an ingredient with the current
+    /// scale factor applied — "1 1/2 lb", "to taste", "3".
+    private func quantityText(_ ingredient: RecipeIngredientRow) -> String {
         let unit = IngredientUnit(rawValue: ingredient.unit)
 
-        if unit == .toTaste {
-            return "\(ingredient.name), to taste"
-        }
+        if unit == .toTaste { return "to taste" }
 
         let scaledQty = ingredient.quantity * scaleFactor
         let qty = FractionFormatter.formatAsFraction(scaledQty)
@@ -342,11 +366,9 @@ struct SupabaseRecipeDetailView: View {
         // Spell out the enum case so Swift doesn't think we mean
         // Optional<IngredientUnit>.none — `unit == nil` already covers
         // that case; the second branch is for the explicit enum case.
-        if unit == nil || unit == IngredientUnit.none {
-            return "\(qty) \(ingredient.name)"
-        }
+        if unit == nil || unit == IngredientUnit.none { return qty }
 
-        return "\(qty) \(unit!.displayName) \(ingredient.name)"
+        return "\(qty) \(unit!.displayName)"
     }
 
     // MARK: - Ingredient Highlighting
@@ -354,7 +376,7 @@ struct SupabaseRecipeDetailView: View {
     /// Build an AttributedString with ingredient names set to Inter Semi Bold.
     private func highlightIngredients(in text: String) -> AttributedString {
         var result = AttributedString(text)
-        result.font = .custom("Inter-Regular", size: 16)
+        result.font = .custom(FluffyFace.regular, size: 17)
         result.foregroundColor = Color.fluffyPrimary
 
         for name in ingredientNames {
@@ -366,7 +388,7 @@ struct SupabaseRecipeDetailView: View {
                       of: name,
                       options: .caseInsensitive
                   ) {
-                result[range].font = .custom("Inter-SemiBold", size: 16)
+                result[range].font = .custom(FluffyFace.semibold, size: 17)
                 searchStart = range.upperBound
             }
         }
@@ -407,7 +429,7 @@ struct SupabaseRecipeDetailView: View {
                     .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThinMaterial)
             .transition(.opacity)
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -429,7 +451,7 @@ struct SupabaseRecipeDetailView: View {
                 Text("Made this? Add your photo")
                     .font(.fluffyCallout)
             }
-            .foregroundStyle(Color.fluffyTertiary)
+            .foregroundStyle(Color.fluffySecondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
         }
@@ -446,7 +468,7 @@ struct SupabaseRecipeDetailView: View {
                     .foregroundStyle(Color.fluffyPrimary)
             }
             .padding(24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThinMaterial)
         }
     }
 
