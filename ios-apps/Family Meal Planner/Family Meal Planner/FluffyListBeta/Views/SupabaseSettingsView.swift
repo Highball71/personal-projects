@@ -2,9 +2,10 @@
 //  SupabaseSettingsView.swift
 //  FluffyList
 //
-//  Settings tab — Figma design with initials avatar, grouped
-//  sections for Household, Recipes, Shopping, and App, with
-//  toggle rows and navigation rows. Heirloom design.
+//  "The Press" settings. Masthead with the household name as the
+//  dateline, then plain label/value ruled rows — no grouped-inset
+//  list, no chevrons, no icons. All controls and persistence are
+//  unchanged from the shipped app.
 //
 
 import SwiftUI
@@ -25,28 +26,37 @@ struct SupabaseSettingsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    profileHeader
-                        .padding(.top, 8)
+                VStack(alignment: .leading, spacing: 0) {
+                    FluffyMasthead(
+                        title: "Settings",
+                        dateline: householdService.household?.name ?? "FLUFFYLIST BETA"
+                    )
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 10)
+
+                    if let name = currentMemberName {
+                        Text("Signed in as \(name).")
+                            .font(.custom(FluffyFace.italic, size: 15))
+                            .foregroundStyle(Color.fluffySecondary)
+                            .padding(.horizontal, 22)
+                            .padding(.bottom, 15)
+                    }
 
                     settingsGroup("Household") {
                         if let household = householdService.household {
-                            navRow(
-                                icon: "house",
+                            labelValueRow(
                                 label: household.name,
-                                detail: "\(householdService.members.count) member\(householdService.members.count == 1 ? "" : "s")"
+                                value: "\(householdService.members.count) member\(householdService.members.count == 1 ? "" : "s")"
                             )
                         }
                         joinCodeRow
                         stepperRow(
-                            icon: "person.2",
-                            label: "Household Size",
+                            label: "Household size",
                             value: $householdSize,
                             range: 1...12
                         )
                         pickerRow(
-                            icon: "calendar",
-                            label: "Week Starts",
+                            label: "Week starts",
                             selection: $startDay,
                             options: ["Sunday", "Monday", "Saturday"]
                         )
@@ -54,14 +64,12 @@ struct SupabaseSettingsView: View {
 
                     settingsGroup("Recipes") {
                         stepperRow(
-                            icon: "fork.knife",
-                            label: "Default Servings",
+                            label: "Default servings",
                             value: $defaultServings,
                             range: 1...20
                         )
                         toggleRow(
-                            icon: "cart.badge.plus",
-                            label: "Auto-Add Groceries",
+                            label: "Auto-add groceries",
                             detail: "When a recipe is planned",
                             isOn: $autoAddGroceries
                         )
@@ -69,13 +77,11 @@ struct SupabaseSettingsView: View {
 
                     settingsGroup("Shopping") {
                         toggleRow(
-                            icon: "list.bullet",
-                            label: "Group by Aisle",
+                            label: "Group by aisle",
                             detail: "Produce, Dairy, Pantry, etc.",
                             isOn: $groupByAisle
                         )
                         toggleRow(
-                            icon: "flashlight.on.fill",
                             label: "Store Mode",
                             detail: "Dark, large text for shopping",
                             isOn: $storeMode
@@ -83,70 +89,28 @@ struct SupabaseSettingsView: View {
                     }
 
                     settingsGroup("App") {
-                        navRow(
-                            icon: "info.circle",
-                            label: "Version",
-                            detail: appVersion
-                        )
+                        labelValueRow(label: "Version", value: appVersion)
                         signOutRow
                     }
+
+                    Spacer(minLength: 40)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Color.fluffyBackground)
-            .navigationTitle("Settings")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
             .task {
                 await householdService.loadMembers()
             }
         }
     }
 
-    // MARK: - Profile Header
-
-    private var profileHeader: some View {
-        VStack(spacing: 12) {
-            // Initials avatar
-            ZStack {
-                Circle()
-                    .fill(Color.fluffyAmber)
-                    .frame(width: 72, height: 72)
-                Text(initials)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-            }
-
-            // Display name
-            if let name = currentMemberName {
-                Text(name)
-                    .font(.fluffyTitle)
-                    .foregroundStyle(Color.fluffyPrimary)
-            }
-
-            // Household name
-            if let household = householdService.household {
-                Text(household.name)
-                    .font(.fluffyCallout)
-                    .foregroundStyle(Color.fluffySecondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-    }
-
     private var currentMemberName: String? {
         // The current user is identified by their Supabase auth ID
         guard let userID = SupabaseManager.shared.currentUserID else { return nil }
         return householdService.members.first { $0.userID == userID }?.displayName
-    }
-
-    private var initials: String {
-        guard let name = currentMemberName, !name.isEmpty else { return "?" }
-        let parts = name.split(separator: " ")
-        if parts.count >= 2 {
-            return "\(parts[0].prefix(1))\(parts[1].prefix(1))".uppercased()
-        }
-        return String(name.prefix(2)).uppercased()
     }
 
     // MARK: - Settings Group
@@ -156,216 +120,206 @@ struct SupabaseSettingsView: View {
         @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title.uppercased())
-                .font(.fluffyCaption)
-                .foregroundStyle(Color.fluffySecondary)
-                .tracking(1)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 8)
+            FluffySectionHead(title: title)
+                .padding(.horizontal, 22)
+                .padding(.top, 30)
+                .padding(.bottom, 10)
 
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+            rule
         }
     }
 
     // MARK: - Row Types
 
-    private func navRow(icon: String, label: String, detail: String) -> some View {
-        HStack(spacing: 12) {
-            settingsIcon(icon)
-            Text(label)
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffyPrimary)
-            Spacer()
-            Text(detail)
-                .font(.fluffyFootnote)
-                .foregroundStyle(Color.fluffyTertiary)
+    /// Plain label/value row: 17pt label left, 14pt secondary value
+    /// right, 15pt vertical padding, hairline rule above.
+    private func labelValueRow(label: String, value: String) -> some View {
+        VStack(spacing: 0) {
+            rule
+            HStack(alignment: .firstTextBaseline) {
+                Text(label)
+                    .font(.custom(FluffyFace.regular, size: 17))
+                    .foregroundStyle(Color.fluffyPrimary)
+                Spacer()
+                Text(value)
+                    .font(.custom(FluffyFace.regular, size: 14))
+                    .foregroundStyle(Color.fluffySecondary)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 15)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
-        .overlay(alignment: .bottom) { rowDivider }
     }
 
     private func toggleRow(
-        icon: String,
         label: String,
         detail: String? = nil,
         isOn: Binding<Bool>
     ) -> some View {
-        HStack(spacing: 12) {
-            settingsIcon(icon)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.fluffyBody)
-                    .foregroundStyle(Color.fluffyPrimary)
-                if let detail {
-                    Text(detail)
-                        .font(.fluffyCaption)
-                        .foregroundStyle(Color.fluffyTertiary)
+        VStack(spacing: 0) {
+            rule
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.custom(FluffyFace.regular, size: 17))
+                        .foregroundStyle(Color.fluffyPrimary)
+                    if let detail {
+                        Text(detail)
+                            .font(.custom(FluffyFace.italic, size: 13))
+                            .foregroundStyle(Color.fluffySecondary)
+                    }
                 }
+                Spacer()
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .tint(Color.fluffyAccent)
             }
-            Spacer()
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(Color.fluffyAmber)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) { rowDivider }
     }
 
     private func stepperRow(
-        icon: String,
         label: String,
         value: Binding<Int>,
         range: ClosedRange<Int>
     ) -> some View {
-        HStack(spacing: 12) {
-            settingsIcon(icon)
-            Text(label)
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffyPrimary)
-            Spacer()
-
+        VStack(spacing: 0) {
+            rule
             HStack(spacing: 12) {
-                Button {
-                    if value.wrappedValue > range.lowerBound {
-                        value.wrappedValue -= 1
-                    }
-                } label: {
-                    Image(systemName: "minus.circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(
-                            value.wrappedValue > range.lowerBound
-                                ? Color.fluffyAmber
-                                : Color.fluffyDivider
-                        )
-                }
-                .disabled(value.wrappedValue <= range.lowerBound)
-
-                Text("\(value.wrappedValue)")
-                    .font(.fluffyHeadline)
+                Text(label)
+                    .font(.custom(FluffyFace.regular, size: 17))
                     .foregroundStyle(Color.fluffyPrimary)
-                    .frame(minWidth: 24)
-                    .contentTransition(.numericText())
+                Spacer()
 
-                Button {
-                    if value.wrappedValue < range.upperBound {
-                        value.wrappedValue += 1
+                HStack(spacing: 16) {
+                    Button {
+                        if value.wrappedValue > range.lowerBound {
+                            value.wrappedValue -= 1
+                        }
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(
+                                value.wrappedValue > range.lowerBound
+                                    ? Color.fluffyAccent
+                                    : Color.fluffyBorder
+                            )
+                            .frame(minWidth: 28, minHeight: 28)
                     }
-                } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(
-                            value.wrappedValue < range.upperBound
-                                ? Color.fluffyAmber
-                                : Color.fluffyDivider
-                        )
+                    .disabled(value.wrappedValue <= range.lowerBound)
+
+                    Text("\(value.wrappedValue)")
+                        .font(.custom(FluffyFace.bold, size: 19))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .frame(minWidth: 24)
+                        .contentTransition(.numericText())
+
+                    Button {
+                        if value.wrappedValue < range.upperBound {
+                            value.wrappedValue += 1
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(
+                                value.wrappedValue < range.upperBound
+                                    ? Color.fluffyAccent
+                                    : Color.fluffyBorder
+                            )
+                            .frame(minWidth: 28, minHeight: 28)
+                    }
+                    .disabled(value.wrappedValue >= range.upperBound)
                 }
-                .disabled(value.wrappedValue >= range.upperBound)
             }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) { rowDivider }
     }
 
     private func pickerRow(
-        icon: String,
         label: String,
         selection: Binding<String>,
         options: [String]
     ) -> some View {
-        HStack(spacing: 12) {
-            settingsIcon(icon)
-            Text(label)
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffyPrimary)
-            Spacer()
-            Picker("", selection: selection) {
-                ForEach(options, id: \.self) { option in
-                    Text(option).tag(option)
+        VStack(spacing: 0) {
+            rule
+            HStack(spacing: 12) {
+                Text(label)
+                    .font(.custom(FluffyFace.regular, size: 17))
+                    .foregroundStyle(Color.fluffyPrimary)
+                Spacer()
+                Picker("", selection: selection) {
+                    ForEach(options, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
                 }
+                .tint(Color.fluffyAccent)
             }
-            .tint(Color.fluffyAmber)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 6)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .overlay(alignment: .bottom) { rowDivider }
     }
 
     // MARK: - Join Code Row
 
     private var joinCodeRow: some View {
-        HStack(spacing: 12) {
-            settingsIcon("link")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Join Code")
-                    .font(.fluffyBody)
-                    .foregroundStyle(Color.fluffyPrimary)
-                Text((householdService.household?.joinCode ?? "------").uppercased())
-                    .font(.system(.callout, design: .monospaced, weight: .bold))
-                    .foregroundStyle(Color.fluffyAmber)
+        VStack(spacing: 0) {
+            rule
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Join code")
+                        .font(.custom(FluffyFace.regular, size: 17))
+                        .foregroundStyle(Color.fluffyPrimary)
+                    Text((householdService.household?.joinCode ?? "------").uppercased())
+                        .font(.custom(FluffyFace.semibold, size: 15))
+                        .fluffyTracking(0.10, at: 15)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.fluffyAccent)
+                }
+                Spacer()
+                Button {
+                    UIPasteboard.general.string = householdService.household?.joinCode ?? ""
+                } label: {
+                    Text("Copy")
+                        .font(.fluffyButton)
+                        .foregroundStyle(Color.fluffyAccent)
+                }
             }
-            Spacer()
-            Button {
-                UIPasteboard.general.string = householdService.household?.joinCode ?? ""
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.fluffySecondary)
-            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) { rowDivider }
     }
 
     // MARK: - Sign Out Row
 
     private var signOutRow: some View {
-        Button {
-            Task { await authService.signOut() }
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.fluffyError.opacity(0.12))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: "arrow.right.square")
-                        .font(.system(size: 14))
+        VStack(spacing: 0) {
+            rule
+            Button {
+                Task { await authService.signOut() }
+            } label: {
+                HStack {
+                    Text("Sign out")
+                        .font(.custom(FluffyFace.semibold, size: 17))
                         .foregroundStyle(Color.fluffyError)
+                    Spacer()
                 }
-                Text("Sign Out")
-                    .font(.fluffyBody)
-                    .foregroundStyle(Color.fluffyError)
-                Spacer()
+                .padding(.horizontal, 22)
+                .padding(.vertical, 15)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
+            .buttonStyle(.plain)
         }
     }
 
     // MARK: - Shared Helpers
 
-    private func settingsIcon(_ name: String) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.fluffyAmber.opacity(0.12))
-                .frame(width: 30, height: 30)
-            Image(systemName: name)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.fluffyAmber)
-        }
-    }
-
-    private var rowDivider: some View {
-        Rectangle()
-            .fill(Color.fluffyDivider)
-            .frame(height: 1)
-            .padding(.leading, 58)
+    private var rule: some View {
+        FluffyRule().padding(.horizontal, 22)
     }
 
     private var appVersion: String {
