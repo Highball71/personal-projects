@@ -1,52 +1,29 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** Feature additions + bug fixes — complete. Ready for Supabase integration testing.
+**Session Focus:** "The Press" visual overhaul — implemented on branch `press-overhaul`, awaiting compile + device verification.
 
 ---
 
-## Completed This Session (April 15, 2026)
+## Completed This Session (August 16, 2026)
 
-### Design System Foundation
-1. Color+FluffyList.swift — Heirloom color palette
-2. Font+FluffyList.swift — typography scale (Playfair Display Bold + Inter)
-3. Bundled 3 Google Fonts + registered in Info.plist
-4. FluffyColor.swift — FluffySection enum
-5. FluffyFont.swift — shared components (section header, bullet row, primary button, metadata chip)
+Implemented per `design_handoff_press_overhaul/README.md` (the zip bundle; HTML prototype "1a — The Press"). Presentation layer only; all services, view models, @AppStorage keys, and navigation unchanged.
 
-### View Rewrites (Figma Design Pass)
-6. SupabaseRecipeListView — hero card, browse chips, Recently Added, two-column grid
-7. SupabaseRecipeDetailView (NEW) — scaled servings stepper, ingredient highlighting, notes section
-8. SupabaseMealPlanView — teal day cards, empty-week state with suggested recipes
-9. SupabaseGroceryListView — ruled lines, auto-categorized items, Store Mode, Share List
-10. RecipeScanView (NEW) — custom AVCaptureSession camera with bracket guides + scan line
-11. SupabaseSettingsView (NEW) — initials avatar, grouped settings sections
-12. WelcomeSplashView + HouseholdSetupView (NEW) — first-launch onboarding
-13. AppRootView — four-tab layout with onboarding gate + per-tab tints
+1. **Tokens**: `Color+FluffyList.swift` → paper/ink/persimmon palette (ink 2 spruce, ink 3 reserved); retired amber/teal/slate accents kept as compile aliases → persimmon. `Font+FluffyList.swift` → Source Serif 4 everywhere + em-tracking helpers.
+2. **Fonts**: Source Serif 4 Regular/Semibold/Bold/It TTFs bundled (Adobe 4.005 release, OFL) + registered in Info.plist. **Actual PostScript names differ from the design README**: `SourceSerif4-Semibold` (lowercase b), `SourceSerif4-It` (not -Italic). Old Playfair/Inter files retained (RULES: no deletions) — remove font files + registration in a later cleanup once confirmed dead.
+3. **Components** (`FluffyFont.swift`): FluffyMasthead, FluffyRule, FluffySectionHead, FluffyMetadataLine, FluffyTextLink, FluffyFilledButton, FluffyCheckbox, halftone modifier; legacy shims for old component names.
+4. **Screens**: Grocery + Store Mode (ink ground, pale-persimmon heads), Meals (ruled day rows, state line, CTA text link), Settings (label/value rules), Recipe detail (kicker, ruled ingredients, METHOD numerals, sticky "Add to the week"), Recipes (search rule, underlined word chips, halftone hero, ruled lists — grid removed), Add/edit recipe (header rule, toolbar Save, ink-outlined scan box, label-over-rule fields), Welcome/SignIn ("Dinner, decided.", numbered value rows), HouseholdSetup + HouseholdOnboarding (ink-rule fields, six-cell code, OR JOIN ONE divider).
+5. **Chrome**: Tab bar via UITabBarAppearance (paper, 1px ink top rule, serif 10pt uppercase, active persimmon / inactive #7D7979). FluffyErrorBanner → PROBLEM band. Toasts/overlays squared.
 
-### Features
-14. Scaled servings stepper on recipe detail (proportional ingredient adjustment)
-15. Notes field on recipes (model, service, form, detail view)
-16. Recently Added horizontal scroll section on recipe browse
-17. Store Mode toggle on grocery list (dark high-contrast)
-18. Empty-week state on meal plan with Browse Recipes + Add a Custom Meal buttons
+## Deliberate deviations from the design README (flag if wrong)
+- **Save also kept as a filled button at the end of the Add Recipe form** (in addition to the header Save) — long form, avoids scroll-back. Delete `saveButton` from formContent if unwanted.
+- **Icons are SF Symbols throughout** (spec permits substitution); Phosphor SVGs not bundled.
+- **Store Mode toggle + Clear checked stay in the (inline, paper-tinted) nav bar** — spec doesn't place them.
+- **Grocery empty-state "Plan a night →"** required passing `selectedTab` binding into `SupabaseGroceryListView` (same pattern as Meals).
+- **Detail-screen kicker** uses FAVOURITE/category (no cook-count data exists).
 
-### Bug Fixes
-19. Scanner "0 pages" — PassthroughSubject replaces fragile onChange pattern
-20. Generate Shopping List race condition — await fetch before tab switch
-21. ShapeStyle compile errors — Color. prefix on all .fluffy* references
-
-### Polish
-22. Full font/color audit — all system fonts → Fluffy tokens, all bare colors → Fluffy colors
-23. Unified empty states with illustrated circle treatment
-24. Added .animation(.easeInOut) transitions on conditional view swaps
-25. Restyled HouseholdOnboardingView + SignInView with Heirloom tokens
-
-## Next Objective
-**Auth/onboarding trust path hardened (DB + Swift) and verified live on device 2026-05-28. NEXT: ship build 103 (102 has the old join flow the RLS now blocks); second-account join test via join_household_by_code RPC; cascade-delete runtime check.**
-
-## Not In Scope (Future Sessions)
-- Recipe photo support (cards use gradient placeholders)
-- Offline caching
-- Realtime subscriptions
-- Removing old CloudKit code
-- App Store submission
+## Verification checklist (on a Mac, before merge)
+1. `git fetch && git checkout press-overhaul` (or apply the patch bundle), build for device.
+2. Confirm the four Source Serif faces render (wrong PS name = silent system-font fallback).
+3. Dynamic Type pass at largest supported size — grocery rows, ingredient rows (Source Serif sets wider than Inter).
+4. Store Mode cross-fade, checkbox animation, code-entry cells with hardware + software keyboard.
+5. Tab bar appearance on scroll edge (iOS 26 behavior).

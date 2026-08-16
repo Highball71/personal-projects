@@ -47,14 +47,14 @@ struct RecipeScanView: View {
                         // Camera preview
                         CameraPreviewRepresentable(session: camera.session)
                             .frame(width: width, height: height)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(Rectangle())
 
                         // Corner bracket guides
                         cornerBrackets(size: CGSize(width: width, height: height))
 
                         // Animated amber scan line
                         Rectangle()
-                            .fill(Color.fluffyAmber.opacity(0.6))
+                            .fill(Color.fluffyAccent.opacity(0.6))
                             .frame(width: width - 32, height: 2)
                             .offset(y: scanLineOffset)
                     }
@@ -124,7 +124,7 @@ struct RecipeScanView: View {
             } label: {
                 Text("Done")
                     .font(.fluffyButton)
-                    .foregroundStyle(pages.isEmpty ? .white.opacity(0.3) : Color.fluffyAmber)
+                    .foregroundStyle(pages.isEmpty ? .white.opacity(0.3) : Color.fluffyAccent)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -144,7 +144,7 @@ struct RecipeScanView: View {
         let length: CGFloat = 28
         let thickness: CGFloat = 3
         let inset: CGFloat = 6
-        let color = Color.fluffyAmber
+        let color = Color.fluffyAccent
 
         return ZStack {
             // Top-left
@@ -233,9 +233,9 @@ struct RecipeScanView: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: 56, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(Rectangle())
                             .overlay(
-                                RoundedRectangle(cornerRadius: 6)
+                                Rectangle()
                                     .stroke(.white.opacity(0.2), lineWidth: 1)
                             )
                             .overlay(alignment: .bottomLeading) {
@@ -243,7 +243,7 @@ struct RecipeScanView: View {
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(.white)
                                     .padding(3)
-                                    .background(Circle().fill(Color.fluffyAmber))
+                                    .background(Circle().fill(Color.fluffyAccent))
                                     .padding(3)
                             }
 
@@ -280,7 +280,7 @@ struct RecipeScanView: View {
                 ZStack {
                     // Outer ring
                     Circle()
-                        .stroke(Color.fluffyAmber, lineWidth: 4)
+                        .stroke(Color.fluffyAccent, lineWidth: 4)
                         .frame(width: 72, height: 72)
                     // Inner fill
                     Circle()

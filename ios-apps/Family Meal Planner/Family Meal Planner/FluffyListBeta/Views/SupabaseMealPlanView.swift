@@ -658,7 +658,7 @@ struct RecipePickerSheet: View {
                                 HStack(spacing: 10) {
                                     Image(systemName: "dice.fill")
                                         .font(.title3)
-                                        .foregroundStyle(Color.fluffyTeal)
+                                        .foregroundStyle(Color.fluffyAccent)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Surprise Me")
                                             .font(.fluffyHeadline)

@@ -2,11 +2,14 @@
 
 **Read this first.** Concise current state. Detailed trail lives in `.context/STUDIO_LOG/` and `SESSION_LOG.md`.
 
-Last updated: 2026-08-10 (session close)
+Last updated: 2026-08-16 (Press overhaul session)
 
 ---
 
 ## Where things stand
+
+**NEW 2026-08-16 — "The Press" visual overhaul implemented on branch `press-overhaul`** (8 commits, presentation layer only — no service/model/state changes). Chosen direction from the design bundle; Full Bleed (1b) rejected. NOT yet compiled — authored off-Mac; run a build + device pass before merging to main or archiving. See ACTIVE_TASK.md for the verification checklist. Note: the design handoff referenced a `ROADMAP_2026.md` in `.context/` that does not exist in the repo; HANDOFF.md remains canonical.
+
 
 **Build 1.0 (102) uploaded to App Store Connect on Aug 10** from commit `61de30b`, awaiting Apple processing. This is the first build carrying the weekend's tester-readiness fixes — all SHOWSTOPPER items from the first-hour review are fixed.
 

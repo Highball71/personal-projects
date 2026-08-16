@@ -25,7 +25,7 @@ struct HouseholdInfoView: View {
                         HStack {
                             Text((household.joinCode ?? "------").uppercased())
                                 .font(.system(.title2, design: .monospaced, weight: .bold))
-                                .foregroundStyle(Color.fluffyAmber)
+                                .foregroundStyle(Color.fluffyAccent)
 
                             Spacer()
 
@@ -67,7 +67,7 @@ struct HouseholdInfoView: View {
                                 if member.isHeadCook {
                                     Text("Head Cook")
                                         .font(.fluffyCaption)
-                                        .foregroundStyle(Color.fluffyAmber)
+                                        .foregroundStyle(Color.fluffyAccent)
                                 }
                             }
                         }
