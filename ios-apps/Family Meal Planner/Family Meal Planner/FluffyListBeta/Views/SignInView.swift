@@ -2,7 +2,10 @@
 //  SignInView.swift
 //  FluffyList
 //
-//  Sign in with Apple screen — shown before the main app.
+//  Sign in with Apple — "The Press" treatment. Masthead with a BETA
+//  dateline, the "Dinner, decided." headline, italic sub-paragraph,
+//  numbered value rows, and the one solid-ink block: Sign in with
+//  Apple. Auth behaviour unchanged.
 //
 
 import AuthenticationServices
@@ -12,26 +15,33 @@ struct SignInView: View {
     @EnvironmentObject private var authService: AuthService
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            FluffyMasthead(title: "", dateline: "BETA")
+                .padding(.horizontal, 22)
 
-            // App icon area
-            Image(systemName: "fork.knife.circle.fill")
-                .font(.system(size: 80))
-                .foregroundStyle(Color.fluffyAccent)
-
-            Text("FluffyList")
+            Text("Dinner,\ndecided.")
                 .font(.fluffyDisplayLarge)
+                .fluffyTracking(-0.035, at: 52)
+                .lineSpacing(-52 * 0.02)
                 .foregroundStyle(Color.fluffyPrimary)
+                .padding(.horizontal, 22)
+                .padding(.top, 40)
+                .padding(.bottom, 20)
 
-            Text("Household meal planning,\nmade simple.")
-                .font(.fluffyCallout)
+            Text("Sign in to plan\nwith your household.")
+                .font(.custom(FluffyFace.italic, size: 19))
                 .foregroundStyle(Color.fluffySecondary)
-                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 22)
 
             Spacer()
 
-            // Sign in with Apple button
+            FluffyValueRows()
+                .padding(.horizontal, 22)
+                .padding(.bottom, 30)
+
+            // Sign in with Apple — full-width solid ink block, square
+            // corners (Apple's own button, black style).
             SignInWithAppleButton(.signIn) { request in
                 request.requestedScopes = [.fullName, .email]
             } onCompletion: { result in
@@ -53,24 +63,33 @@ struct SignInView: View {
                 }
             }
             .signInWithAppleButtonStyle(.black)
-            .frame(height: 50)
-            .padding(.horizontal, 40)
+            .frame(height: 52)
+            .padding(.horizontal, 22)
 
             if authService.isLoading {
-                ProgressView("Signing in...")
+                Text("Signing in\u{2026}")
+                    .font(.fluffyCallout)
+                    .foregroundStyle(Color.fluffySecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 10)
             }
 
             if let error = authService.errorMessage {
                 Text(error)
-                    .font(.fluffyCaption)
+                    .font(.custom(FluffyFace.regular, size: 13))
                     .foregroundStyle(Color.fluffyError)
-                    .padding(.horizontal)
+                    .padding(.horizontal, 22)
+                    .padding(.top, 10)
             }
 
-            Spacer()
-                .frame(height: 40)
+            Text("Free while in beta.")
+                .font(.custom(FluffyFace.italic, size: 13))
+                .foregroundStyle(Color.fluffySecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(Color.fluffyBackground)
     }
 }

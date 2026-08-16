@@ -2,9 +2,11 @@
 //  HouseholdSetupView.swift
 //  FluffyList
 //
-//  Onboarding Step 1 of 3 — household size and dietary preferences.
-//  Preferences are stored locally in UserDefaults so they survive
-//  before a Supabase account exists. Heirloom design.
+//  Onboarding — household size and dietary preferences, in "The
+//  Press" dress: masthead with a step dateline, underlined-word
+//  dietary chips, and a solid ink-1 Continue. Preferences are stored
+//  locally in UserDefaults so they survive before a Supabase account
+//  exists.
 //
 
 import SwiftUI
@@ -22,36 +24,41 @@ struct HouseholdSetupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Step indicator
-            stepIndicator
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 24)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Title
-                    Text("Tell us about\nyour household")
+                    FluffyMasthead(title: "", dateline: "STEP 1 OF 2")
+                        .padding(.horizontal, 22)
+
+                    Text("Tell us about\nyour household.")
                         .font(.fluffyDisplay)
+                        .fluffyTracking(-0.025, at: 38)
                         .foregroundStyle(Color.fluffyPrimary)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 32)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 30)
+                        .padding(.bottom, 12)
+
+                    Text("We use this to size recipes and lists. You can change it later.")
+                        .font(.custom(FluffyFace.italic, size: 16))
+                        .foregroundStyle(Color.fluffySecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 30)
 
                     // Household size
                     householdSizeSection
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 32)
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 30)
 
                     // Dietary preferences
                     dietarySection
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 22)
                         .padding(.bottom, 40)
                 }
             }
 
             // Bottom actions
             VStack(spacing: 12) {
-                FluffyPrimaryButton("Continue", section: .recipes) {
+                FluffyFilledButton(title: "Continue") {
                     savePreferences()
                     onContinue()
                 }
@@ -64,56 +71,37 @@ struct HouseholdSetupView: View {
                         .foregroundStyle(Color.fluffySecondary)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 36)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 30)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.fluffyBackground)
         .onAppear { loadPreferences() }
     }
 
-    // MARK: - Step Indicator
-
-    private var stepIndicator: some View {
-        HStack(spacing: 6) {
-            Text("Step 1")
-                .font(.fluffySubheadline)
-                .foregroundStyle(Color.fluffyAmber)
-            Text("of 3")
-                .font(.fluffySubheadline)
-                .foregroundStyle(Color.fluffyTertiary)
-
-            Spacer()
-
-            // Progress dots
-            HStack(spacing: 6) {
-                Circle().fill(Color.fluffyAmber).frame(width: 8, height: 8)
-                Circle().fill(Color.fluffyDivider).frame(width: 8, height: 8)
-                Circle().fill(Color.fluffyDivider).frame(width: 8, height: 8)
-            }
-        }
-    }
-
     // MARK: - Household Size
 
     private var householdSizeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            FluffySectionHeader(title: "How many people?", section: .recipes)
+            FluffySectionHead(title: "How many people?")
 
-            HStack(spacing: 24) {
+            HStack(spacing: 30) {
                 Button {
                     if householdSize > 1 { householdSize -= 1 }
                 } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 36))
+                    Image(systemName: "minus")
+                        .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(
-                            householdSize > 1 ? Color.fluffyAmber : Color.fluffyDivider
+                            householdSize > 1 ? Color.fluffyAccent : Color.fluffyBorder
                         )
+                        .frame(minWidth: 34, minHeight: 34)
                 }
                 .disabled(householdSize <= 1)
 
                 Text("\(householdSize)")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.custom(FluffyFace.bold, size: 48))
+                    .fluffyTracking(-0.03, at: 48)
+                    .monospacedDigit()
                     .foregroundStyle(Color.fluffyPrimary)
                     .frame(minWidth: 60)
                     .contentTransition(.numericText())
@@ -121,18 +109,19 @@ struct HouseholdSetupView: View {
                 Button {
                     if householdSize < 12 { householdSize += 1 }
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 36))
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(
-                            householdSize < 12 ? Color.fluffyAmber : Color.fluffyDivider
+                            householdSize < 12 ? Color.fluffyAccent : Color.fluffyBorder
                         )
+                        .frame(minWidth: 34, minHeight: 34)
                 }
                 .disabled(householdSize >= 12)
             }
             .frame(maxWidth: .infinity)
 
             Text(householdSizeLabel)
-                .font(.fluffyFootnote)
+                .font(.custom(FluffyFace.italic, size: 14))
                 .foregroundStyle(Color.fluffySecondary)
                 .frame(maxWidth: .infinity)
         }
@@ -151,15 +140,16 @@ struct HouseholdSetupView: View {
     // MARK: - Dietary Preferences
 
     private var dietarySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            FluffySectionHeader(title: "Any dietary preferences?", section: .recipes)
+        VStack(alignment: .leading, spacing: 14) {
+            FluffySectionHead(title: "Any dietary preferences?")
 
             Text("We'll use these to suggest recipes. You can change this later.")
-                .font(.fluffyFootnote)
+                .font(.custom(FluffyFace.italic, size: 13))
                 .foregroundStyle(Color.fluffySecondary)
 
-            // Chip grid — wrapping flow layout
-            FlowLayout(spacing: 10) {
+            // Underlined-word chips — not capsules. Multi-select:
+            // chosen words take ink 1 and a 2px underline.
+            FlowLayout(spacing: 18) {
                 ForEach(DietaryOption.allCases) { option in
                     dietaryChip(option)
                 }
@@ -178,27 +168,21 @@ struct HouseholdSetupView: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: option.icon)
-                    .font(.fluffyCaption)
-                Text(option.rawValue)
-                    .font(.fluffySubheadline)
-            }
-            .foregroundStyle(isSelected ? .white : Color.fluffyPrimary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                isSelected ? Color.fluffyAmber : Color.fluffyCard,
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(
-                        isSelected ? Color.clear : Color.fluffyBorder,
-                        lineWidth: 1
+            VStack(spacing: 3) {
+                Text(option.rawValue.uppercased())
+                    .font(.custom(FluffyFace.regular, size: 14))
+                    .fluffyTracking(0.06, at: 14)
+                    .foregroundStyle(
+                        isSelected ? Color.fluffyAccent : Color.fluffySecondary
                     )
-            )
+                FluffyRule(
+                    weight: 2,
+                    color: isSelected ? .fluffyAccent : .clear
+                )
+            }
+            .fixedSize()
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Persistence

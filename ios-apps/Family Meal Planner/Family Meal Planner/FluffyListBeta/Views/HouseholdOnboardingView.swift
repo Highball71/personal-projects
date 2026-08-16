@@ -2,9 +2,10 @@
 //  HouseholdOnboardingView.swift
 //  FluffyList
 //
-//  After sign-in, if the user has no household, show this screen
-//  to create one or join an existing one by code.
-//  Heirloom design tokens throughout.
+//  After sign-in, if the user has no household: "The Press" step 2.
+//  "Who's cooking with you?" — name a household on a solid ink rule
+//  and create it, or join one below the "OR JOIN ONE" divider with a
+//  six-cell invite code. Service calls unchanged.
 //
 
 import SwiftUI
@@ -12,180 +13,209 @@ import SwiftUI
 struct HouseholdOnboardingView: View {
     @EnvironmentObject private var householdService: HouseholdService
 
-    @State private var mode: OnboardingMode = .choose
     @State private var householdName = ""
     @State private var displayName = ""
     @State private var joinCode = ""
+    @FocusState private var codeFieldFocused: Bool
 
-    enum OnboardingMode {
-        case choose, create, join
+    private var canCreate: Bool {
+        !householdName.isEmpty && !displayName.isEmpty && !householdService.isLoading
+    }
+
+    private var canJoin: Bool {
+        joinCode.count == 6 && !displayName.isEmpty && !householdService.isLoading
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                switch mode {
-                case .choose:
-                    chooseView
-                case .create:
-                    createView
-                case .join:
-                    joinView
-                }
-            }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.fluffyBackground)
-            .navigationTitle("Get Started")
-            .navigationBarTitleDisplayMode(.large)
-            .animation(.easeInOut(duration: 0.25), value: mode)
-        }
-    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                FluffyMasthead(title: "", dateline: "STEP 2 OF 2")
+                    .padding(.horizontal, 22)
 
-    // MARK: - Choose Mode
+                Text("Who's cooking\nwith you?")
+                    .font(.fluffyDisplay)
+                    .fluffyTracking(-0.025, at: 38)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .padding(.horizontal, 22)
+                    .padding(.top, 30)
+                    .padding(.bottom, 12)
 
-    private var chooseView: some View {
-        VStack(spacing: 20) {
-            Spacer()
+                Text("A household shares one plan, one recipe box, and one list.")
+                    .font(.custom(FluffyFace.italic, size: 16))
+                    .foregroundStyle(Color.fluffySecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 30)
 
-            Image(systemName: "house.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(Color.fluffyAmber)
-
-            Text("Set up your household")
-                .font(.fluffyDisplaySmall)
-                .foregroundStyle(Color.fluffyPrimary)
-
-            Text("Create a new household or join one\nthat someone has already set up.")
-                .font(.fluffyBody)
-                .foregroundStyle(Color.fluffySecondary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
-
-            FluffyPrimaryButton("Create Household", icon: "plus.circle.fill", section: .recipes) {
-                mode = .create
-            }
-
-            Button {
-                mode = .join
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.badge.plus")
-                    Text("Join with Code")
-                }
-                .font(.fluffyButton)
-                .foregroundStyle(Color.fluffyPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.fluffyBorder, lineWidth: 1)
+                // Name the household — value on a solid ink rule; a
+                // filled field would break the system.
+                inkRuleField(
+                    label: "Name your household",
+                    placeholder: "e.g. The Night Kitchen",
+                    text: $householdName
                 )
-            }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 20)
 
-            Spacer()
-                .frame(height: 20)
-        }
-    }
+                inkRuleField(
+                    label: "Your name",
+                    placeholder: "e.g. David",
+                    text: $displayName
+                )
+                .padding(.horizontal, 22)
+                .padding(.bottom, 30)
 
-    // MARK: - Create Household
-
-    private var createView: some View {
-        VStack(spacing: 16) {
-            Text("Create a Household")
-                .font(.fluffyDisplaySmall)
-                .foregroundStyle(Color.fluffyPrimary)
-
-            TextField("Household name (e.g. The Smith Family)", text: $householdName)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Your name", text: $displayName)
-                .textFieldStyle(.roundedBorder)
-
-            FluffyPrimaryButton("Create", section: .recipes) {
-                Task {
-                    _ = await householdService.createHousehold(
-                        name: householdName,
-                        memberDisplayName: displayName
-                    )
+                FluffyFilledButton(title: "Create household") {
+                    Task {
+                        _ = await householdService.createHousehold(
+                            name: householdName,
+                            memberDisplayName: displayName
+                        )
+                    }
                 }
+                .disabled(!canCreate)
+                .opacity(canCreate ? 1 : 0.5)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 30)
+
+                // Rule-with-centred-label divider
+                orDivider
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 30)
+
+                // Invite code — six equal cells, each a 2px bottom
+                // rule only, no boxes.
+                codeCells
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 15)
+
+                Text("Ask the household creator for the six-character code.")
+                    .font(.custom(FluffyFace.italic, size: 14))
+                    .foregroundStyle(Color.fluffySecondary)
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
+
+                FluffyTextLink(title: "Join household") {
+                    Task {
+                        _ = await householdService.joinHousehold(
+                            code: joinCode,
+                            memberDisplayName: displayName
+                        )
+                    }
+                }
+                .disabled(!canJoin)
+                .opacity(canJoin ? 1 : 0.5)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 15)
+
+                if householdService.isLoading {
+                    Text("Working\u{2026}")
+                        .font(.fluffyCallout)
+                        .foregroundStyle(Color.fluffySecondary)
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 10)
+                }
+
+                if let error = householdService.errorMessage {
+                    Text(error)
+                        .font(.custom(FluffyFace.regular, size: 13))
+                        .foregroundStyle(Color.fluffyError)
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 10)
+                }
+
+                Spacer(minLength: 40)
             }
-            .disabled(householdName.isEmpty || displayName.isEmpty || householdService.isLoading)
-            .opacity(householdName.isEmpty || displayName.isEmpty ? 0.5 : 1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color.fluffyBackground)
+        .animation(.easeInOut(duration: 0.25), value: householdService.isLoading)
+    }
 
-            if householdService.isLoading {
-                ProgressView()
+    // MARK: - Ink-Rule Field
+
+    /// Uppercase label over a value set on a 2px SOLID INK rule —
+    /// stronger than the form fields elsewhere, per the spec.
+    private func inkRuleField(
+        label: String,
+        placeholder: String,
+        text: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            FluffySectionHead(title: label)
+            VStack(spacing: 7) {
+                ZStack(alignment: .leading) {
+                    if text.wrappedValue.isEmpty {
+                        Text(placeholder)
+                            .font(.custom(FluffyFace.regular, size: 22))
+                            .foregroundStyle(Color.fluffyTertiary)
+                    }
+                    TextField("", text: text)
+                        .font(.custom(FluffyFace.semibold, size: 22))
+                        .foregroundStyle(Color.fluffyPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                FluffyRule(weight: 2, color: .fluffyPrimary)
             }
-
-            errorView
-
-            Button("Back") { mode = .choose }
-                .font(.fluffyCallout)
-                .foregroundStyle(Color.fluffySecondary)
-
-            Spacer()
         }
     }
 
-    // MARK: - Join Household
+    // MARK: - OR Divider
 
-    private var joinView: some View {
-        VStack(spacing: 16) {
-            Text("Join a Household")
-                .font(.fluffyDisplaySmall)
-                .foregroundStyle(Color.fluffyPrimary)
-
-            Text("Ask the household creator for the\n6-character join code.")
-                .font(.fluffyCallout)
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            FluffyRule()
+            Text("OR JOIN ONE")
+                .font(.fluffySectionHead)
+                .fluffyTracking(0.16, at: 11)
                 .foregroundStyle(Color.fluffySecondary)
-                .multilineTextAlignment(.center)
+                .fixedSize()
+            FluffyRule()
+        }
+    }
 
-            TextField("Join code", text: $joinCode)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
+    // MARK: - Code Cells
+
+    /// Six square, equal-width cells, characters at 26pt SemiBold
+    /// centred, each cell a 2px bottom rule only. A hidden text field
+    /// underneath collects the input.
+    private var codeCells: some View {
+        ZStack {
+            TextField("", text: $joinCode)
+                .focused($codeFieldFocused)
+                .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
-                .font(.system(.title2, design: .monospaced, weight: .bold))
-                .multilineTextAlignment(.center)
+                .keyboardType(.asciiCapable)
+                .opacity(0.01)
+                .onChange(of: joinCode) { _, newValue in
+                    let cleaned = String(newValue.prefix(6))
+                    if cleaned != newValue { joinCode = cleaned }
+                }
 
-            TextField("Your name", text: $displayName)
-                .textFieldStyle(.roundedBorder)
-
-            FluffyPrimaryButton("Join", section: .recipes) {
-                Task {
-                    _ = await householdService.joinHousehold(
-                        code: joinCode,
-                        memberDisplayName: displayName
-                    )
+            HStack(spacing: 12) {
+                ForEach(0..<6, id: \.self) { index in
+                    VStack(spacing: 6) {
+                        Text(character(at: index))
+                            .font(.custom(FluffyFace.semibold, size: 26))
+                            .foregroundStyle(Color.fluffyPrimary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                        FluffyRule(
+                            weight: 2,
+                            color: index < joinCode.count ? .fluffyPrimary : .fluffyFieldRule
+                        )
+                    }
                 }
             }
-            .disabled(joinCode.count != 6 || displayName.isEmpty || householdService.isLoading)
-            .opacity(joinCode.count != 6 || displayName.isEmpty ? 0.5 : 1)
-
-            if householdService.isLoading {
-                ProgressView()
-            }
-
-            errorView
-
-            Button("Back") { mode = .choose }
-                .font(.fluffyCallout)
-                .foregroundStyle(Color.fluffySecondary)
-
-            Spacer()
+            .contentShape(Rectangle())
+            .onTapGesture { codeFieldFocused = true }
         }
+        .frame(height: 48)
     }
 
-    // MARK: - Error
-
-    @ViewBuilder
-    private var errorView: some View {
-        if let error = householdService.errorMessage {
-            Text(error)
-                .font(.fluffyCaption)
-                .foregroundStyle(Color.fluffyError)
-                .padding(.horizontal)
-        }
+    private func character(at index: Int) -> String {
+        guard index < joinCode.count else { return " " }
+        let i = joinCode.index(joinCode.startIndex, offsetBy: index)
+        return String(joinCode[i]).uppercased()
     }
 }
