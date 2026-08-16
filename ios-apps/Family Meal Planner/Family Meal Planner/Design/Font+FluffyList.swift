@@ -2,78 +2,102 @@
 //  Font+FluffyList.swift
 //  FluffyList
 //
-//  Heirloom typography scale.
-//  Display titles: Playfair Display Bold
-//  Body / UI text: Inter Regular & Semi Bold
+//  "The Press" typography scale.
+//  Source Serif 4 for everything — headings AND body. No sans-serif
+//  anywhere, including UI chrome.
 //
-//  SETUP: Add the font files to the Xcode project and register
-//  them in Info.plist under "Fonts provided by application":
-//    - PlayfairDisplay-Bold.ttf
-//    - Inter-Regular.ttf
-//    - Inter-SemiBold.ttf
+//  Bundled faces (PostScript names, as registered in Info.plist):
+//    - SourceSerif4-Regular
+//    - SourceSerif4-Semibold   (note lowercase 'b' in the PS name)
+//    - SourceSerif4-Bold
+//    - SourceSerif4-It         (italic)
+//
+//  Tracking: SwiftUI .tracking() takes points, the spec uses em.
+//  Use the em-tracking helpers at the bottom (points = em × size).
 //
 
 import SwiftUI
+
+// MARK: - Face names
+
+enum FluffyFace {
+    static let regular  = "SourceSerif4-Regular"
+    static let semibold = "SourceSerif4-Semibold"
+    static let bold     = "SourceSerif4-Bold"
+    static let italic   = "SourceSerif4-It"
+}
 
 // MARK: - Typography Scale
 
 extension Font {
 
-    // -- Display (Playfair Display Bold) --
+    // -- Display (Source Serif 4 Bold) --
 
-    /// Large display title — Playfair Display Bold 34pt
-    /// Used for the app name on splash / sign-in.
-    static let fluffyDisplayLarge  = Font.custom("PlayfairDisplay-Bold", size: 34)
+    /// Welcome headline only — Bold 52pt, −0.035em, line-height 0.98
+    static let fluffyDisplayLarge  = Font.custom(FluffyFace.bold, size: 52)
 
-    /// Standard display title — Playfair Display Bold 28pt
-    /// Used for screen-level headings (e.g. "Recipes", "Meal Plan").
-    static let fluffyDisplay       = Font.custom("PlayfairDisplay-Bold", size: 28)
+    /// Screen titles ("This Week", "Recipes") — Bold 38pt, −0.025em
+    static let fluffyDisplay       = Font.custom(FluffyFace.bold, size: 38)
 
-    /// Small display — Playfair Display Bold 22pt
-    /// Used for section headers within a screen.
-    static let fluffyDisplaySmall  = Font.custom("PlayfairDisplay-Bold", size: 22)
+    /// Hero recipe title, empty-state headline — Bold 30pt, −0.02em
+    static let fluffyDisplaySmall  = Font.custom(FluffyFace.bold, size: 30)
 
-    // -- Headings (Inter Semi Bold) --
+    /// Recipe detail title — Bold 36pt, −0.03em, line-height 1.02
+    static let fluffyTitle         = Font.custom(FluffyFace.bold, size: 36)
 
-    /// Title — Inter Semi Bold 20pt
-    static let fluffyTitle         = Font.custom("Inter-SemiBold", size: 20)
+    // -- Headings (Source Serif 4 SemiBold) --
 
-    /// Headline — Inter Semi Bold 17pt
-    static let fluffyHeadline      = Font.custom("Inter-SemiBold", size: 17)
+    /// Row titles (meal, recipe name) — SemiBold 19pt, −0.01em
+    static let fluffyHeadline      = Font.custom(FluffyFace.semibold, size: 19)
 
-    /// Subheadline — Inter Semi Bold 15pt
-    static let fluffySubheadline   = Font.custom("Inter-SemiBold", size: 15)
+    /// Secondary row titles — SemiBold 15pt
+    static let fluffySubheadline   = Font.custom(FluffyFace.semibold, size: 15)
 
-    // -- Body (Inter Regular) --
+    // -- Body (Source Serif 4 Regular / Italic) --
 
-    /// Body — Inter Regular 16pt
-    static let fluffyBody          = Font.custom("Inter-Regular", size: 16)
+    /// List items, method steps, ingredients — Regular 17pt
+    static let fluffyBody          = Font.custom(FluffyFace.regular, size: 17)
 
-    /// Callout — Inter Regular 15pt
-    static let fluffyCallout       = Font.custom("Inter-Regular", size: 15)
+    /// Editorial asides, sub-copy, empty states — Italic 15pt
+    static let fluffyCallout       = Font.custom(FluffyFace.italic, size: 15)
 
-    /// Footnote — Inter Regular 13pt
-    static let fluffyFootnote      = Font.custom("Inter-Regular", size: 13)
+    /// Larger editorial paragraph (recipe description) — Italic 17pt
+    static let fluffyCalloutLarge  = Font.custom(FluffyFace.italic, size: 17)
 
-    /// Caption — Inter Regular 12pt
-    static let fluffyCaption       = Font.custom("Inter-Regular", size: 12)
+    /// Quantities, right-aligned metadata — Regular 13pt
+    static let fluffyFootnote      = Font.custom(FluffyFace.regular, size: 13)
+
+    /// Row metadata ("PASTA · 20 MIN") — Regular 12pt, +0.10em, uppercase
+    static let fluffyCaption       = Font.custom(FluffyFace.regular, size: 12)
+
+    /// Masthead label ("FLUFFYLIST" / dateline) — Regular 10pt, +0.16em, uppercase
+    static let fluffyMastheadLabel = Font.custom(FluffyFace.regular, size: 10)
+
+    /// Section head ("INGREDIENTS", "PRODUCE") — Regular 11pt, +0.16em, uppercase
+    static let fluffySectionHead   = Font.custom(FluffyFace.regular, size: 11)
 
     // -- Utility --
 
-    /// Button label — Inter Semi Bold 16pt
-    static let fluffyButton        = Font.custom("Inter-SemiBold", size: 16)
+    /// Buttons and text links — SemiBold 16pt
+    static let fluffyButton        = Font.custom(FluffyFace.semibold, size: 16)
 
-    /// Tab bar label — Inter Semi Bold 10pt
-    static let fluffyTabLabel      = Font.custom("Inter-SemiBold", size: 10)
+    /// Tab bar — Regular 10pt, +0.12em, uppercase
+    static let fluffyTabLabel      = Font.custom(FluffyFace.regular, size: 10)
 }
 
-// MARK: - Dynamic Type Support
-//
-// If you want fonts to scale with the user's Dynamic Type setting,
-// use `relativeTo:` — e.g.:
-//
-//   Font.custom("Inter-Regular", size: 16, relativeTo: .body)
-//
-// The static constants above use fixed sizes for pixel-perfect
-// Figma parity. Swap to relativeTo when you're ready for
-// accessibility scaling.
+// MARK: - Em Tracking
+
+extension View {
+    /// Apply tracking specified in em for a given point size.
+    /// SwiftUI's .tracking() takes points; points = em × size.
+    func fluffyTracking(_ em: CGFloat, at size: CGFloat) -> some View {
+        tracking(em * size)
+    }
+}
+
+extension Text {
+    /// Text-returning variant so it can chain with other Text modifiers.
+    func fluffyTracking(_ em: CGFloat, at size: CGFloat) -> Text {
+        tracking(em * size)
+    }
+}

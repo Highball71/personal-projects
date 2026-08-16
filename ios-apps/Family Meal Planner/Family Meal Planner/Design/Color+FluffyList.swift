@@ -2,8 +2,9 @@
 //  Color+FluffyList.swift
 //  FluffyList
 //
-//  Heirloom design palette — warm near-white background with
-//  three section accent colors (Amber, Teal, Slate Blue).
+//  "The Press" palette — editorial broadsheet treatment.
+//  Paper ground, ink text, persimmon as the single tappable colour,
+//  deep spruce as the rare second spot colour.
 //  All colours are defined here so changes stay in one place.
 //
 
@@ -15,69 +16,95 @@ extension Color {
 
     // -- Surfaces --
 
-    /// App background — warm near-white (#FAFAF7)
-    static let fluffyBackground  = Color(hex: "FAFAF7")
+    /// Paper ground — every screen (#F3F2F2)
+    static let fluffyBackground  = Color(hex: "F3F2F2")
 
-    /// Card / sheet surface — clean white to float above background
-    static let fluffyCard        = Color(hex: "FFFFFF")
+    /// No longer a distinct surface; cards are gone. Same paper.
+    static let fluffyCard        = Color(hex: "F3F2F2")
 
-    /// Navigation and tab bar surface
-    static let fluffyNavBar      = Color(hex: "F4F4F0")
+    /// Chrome is the same paper.
+    static let fluffyNavBar      = Color(hex: "F3F2F2")
+
+    /// Ink ground — Store Mode background (#201E1D)
+    static let fluffyInkGround   = Color(hex: "201E1D")
 
     // -- Text --
 
-    /// Primary text — near-black (#1C1C1A)
-    static let fluffyPrimary     = Color(hex: "1C1C1A")
+    /// Ink — all body and display text (#201E1D)
+    static let fluffyPrimary     = Color(hex: "201E1D")
 
-    /// Secondary text — warm medium gray
-    static let fluffySecondary   = Color(hex: "6B6B68")
+    /// Metadata, kickers (#605D5D)
+    static let fluffySecondary   = Color(hex: "605D5D")
 
-    /// Tertiary / placeholder text — lighter gray
-    static let fluffyTertiary    = Color(hex: "9E9E9A")
+    /// Checked / disabled text (#9B9797)
+    static let fluffyTertiary    = Color(hex: "9B9797")
 
     // -- Borders & dividers --
 
-    /// Subtle border for cards and inputs
-    static let fluffyBorder      = Color(hex: "E2E2DD")
+    /// Unchecked checkbox stroke (#BAB6B6)
+    static let fluffyBorder      = Color(hex: "BAB6B6")
 
-    /// Lighter divider / separator
-    static let fluffyDivider     = Color(hex: "EDEDEA")
+    /// Hairline rules between rows — rgba(32,30,29,0.16)
+    static let fluffyDivider     = Color(hex: "201E1D").opacity(0.16)
+
+    /// Stronger rule for underlined fields — rgba(32,30,29,0.35)
+    static let fluffyFieldRule   = Color(hex: "201E1D").opacity(0.35)
 }
 
-// MARK: - Section Accents
+// MARK: - Spot Colours (ink 1 / ink 2 / ink 3)
 
 extension Color {
 
-    // Each app section has a primary accent and a soft-tinted background.
+    /// Ink 1 — Persimmon. The only tappable colour. (#D93A14)
+    static let fluffyAccent      = Color(hex: "D93A14")
 
-    /// Recipes — Amber (#F59B00)
-    static let fluffyAmber           = Color(hex: "F59B00")
-    /// Recipes — light amber tint for section backgrounds
-    static let fluffyAmberLight      = Color(hex: "FFF5E0")
+    /// Ink 1 deep — pressed / hover state (#9E2A0E)
+    static let fluffyAccentDeep  = Color(hex: "9E2A0E")
 
-    /// Meal Plan — Teal (#0F6E6E)
-    static let fluffyTeal            = Color(hex: "0F6E6E")
-    /// Meal Plan — light teal tint for section backgrounds
-    static let fluffyTealLight       = Color(hex: "E4F4F4")
+    /// Ink 1 pale — Store Mode checkbox fill, tinted marks (#FFC9B8)
+    static let fluffyAccentPale  = Color(hex: "FFC9B8")
 
-    /// Grocery — Slate Blue (#2E5DA8)
-    static let fluffySlateBlue       = Color(hex: "2E5DA8")
-    /// Grocery — light blue tint for section backgrounds
-    static let fluffySlateBlueLight  = Color(hex: "E6EDF7")
+    /// Ink 2 — Deep spruce. The rare second spot colour. (#14663E)
+    static let fluffyInk2        = Color(hex: "14663E")
 
-    // Convenience aliases so existing views keep compiling.
-    // "fluffyAccent" now maps to amber (the old accent colour).
-    static let fluffyAccent          = fluffyAmber
+    /// Ink 2 deep — category heads on dark, dense ink-2 text (#0C4429)
+    static let fluffyInk2Deep    = Color(hex: "0C4429")
+
+    /// Ink 3 — Press yellow. Reserved; used sparingly. (#EDBB00)
+    static let fluffyInk3        = Color(hex: "EDBB00")
+
+    // -- Retired per-section accents --
+    // Sections are no longer colour-coded. These aliases keep any
+    // straggling call sites compiling; all collapse to persimmon.
+    static let fluffyAmber           = fluffyAccent
+    static let fluffyAmberLight      = fluffyAccentPale
+    static let fluffyTeal            = fluffyAccent
+    static let fluffyTealLight       = fluffyAccentPale
+    static let fluffySlateBlue       = fluffyAccent
+    static let fluffySlateBlueLight  = fluffyAccentPale
 }
 
 // MARK: - Semantic Helpers
 
 extension Color {
-    /// Destructive / error red
-    static let fluffyError       = Color(hex: "D1333A")
+    /// Error — reuse ink 1 deep rather than a new red
+    static let fluffyError       = Color(hex: "9E2A0E")
 
-    /// Success green
-    static let fluffySuccess     = Color(hex: "2E8B57")
+    /// Success — reuse ink 2
+    static let fluffySuccess     = Color(hex: "14663E")
+}
+
+// MARK: - Store Mode (ink ground) palette
+
+extension Color {
+    /// Paper text on the ink ground (#F3F2F2)
+    static let fluffyPaperOnInk      = Color(hex: "F3F2F2")
+
+    /// Dimmed / checked text on the ink ground
+    static let fluffyPaperDimOnInk   = Color(hex: "F3F2F2").opacity(0.4)
+
+    /// Hairline rules on the ink ground
+    static let fluffyRuleOnInk       = Color(hex: "F3F2F2").opacity(0.18)
 }
 
 // MARK: - Hex Initialiser

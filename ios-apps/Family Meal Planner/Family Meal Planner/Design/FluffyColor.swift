@@ -2,35 +2,25 @@
 //  FluffyColor.swift
 //  FluffyList
 //
-//  Section-aware color provider. Maps each app section to its
-//  accent color pair so views can be themed by context.
+//  "The Press": sections are no longer colour-coded. The enum keeps
+//  its cases and icon role (the tab bar still needs them); the colour
+//  role collapses to persimmon + ink-1 pale everywhere.
 //
 
 import SwiftUI
 
-/// The three main app sections, each with its own accent colour pair.
+/// The main app sections. Colour-coding is retired under The Press —
+/// every section's accent is persimmon (ink 1).
 enum FluffySection: String, CaseIterable {
     case recipes
     case mealPlan
     case grocery
 
-    /// Bold accent colour for this section.
-    var accent: Color {
-        switch self {
-        case .recipes:  .fluffyAmber
-        case .mealPlan: .fluffyTeal
-        case .grocery:  .fluffySlateBlue
-        }
-    }
+    /// Single app accent — persimmon (ink 1) for every section.
+    var accent: Color { .fluffyAccent }
 
-    /// Soft tinted background for this section.
-    var accentLight: Color {
-        switch self {
-        case .recipes:  .fluffyAmberLight
-        case .mealPlan: .fluffyTealLight
-        case .grocery:  .fluffySlateBlueLight
-        }
-    }
+    /// Single soft tint — ink 1 pale for every section.
+    var accentLight: Color { .fluffyAccentPale }
 
     /// SF Symbol name for the section's tab icon.
     var iconName: String {
