@@ -192,6 +192,10 @@ struct MealPlanRow: Codable, Identifiable, Equatable {
     let id: UUID
     let householdID: UUID
     let recipeID: UUID?
+    /// The household member this meal belongs to.
+    /// NULL/nil = the whole household (every pre-013 row).
+    /// Phase 1 ships dark: decoded here but no UI reads it yet.
+    let memberID: UUID?
     /// ISO date string "YYYY-MM-DD" — Postgres returns date columns
     /// in this format, which isn't a valid ISO 8601 timestamp so we
     /// keep it as String and convert in Swift when needed.
@@ -201,6 +205,7 @@ struct MealPlanRow: Codable, Identifiable, Equatable {
         case id, date
         case householdID = "household_id"
         case recipeID = "recipe_id"
+        case memberID = "member_id"
     }
 
     init(from decoder: Decoder) throws {
@@ -208,6 +213,7 @@ struct MealPlanRow: Codable, Identifiable, Equatable {
         id = try c.decode(UUID.self, forKey: .id)
         householdID = try c.decode(UUID.self, forKey: .householdID)
         recipeID = try? c.decode(UUID.self, forKey: .recipeID)
+        memberID = try? c.decode(UUID.self, forKey: .memberID)
         date = (try? c.decode(String.self, forKey: .date)) ?? ""
     }
 }
@@ -215,6 +221,10 @@ struct MealPlanRow: Codable, Identifiable, Equatable {
 struct MealPlanInsert: Codable {
     let householdID: UUID
     let recipeID: UUID
+    /// nil = household meal (today's only caller). Optional with a
+    /// default so existing call sites are unchanged; nil is omitted
+    /// from the encoded JSON and the column defaults to NULL.
+    var memberID: UUID? = nil
     /// ISO date string "YYYY-MM-DD"
     let date: String
 
@@ -222,6 +232,7 @@ struct MealPlanInsert: Codable {
         case date
         case householdID = "household_id"
         case recipeID = "recipe_id"
+        case memberID = "member_id"
     }
 }
 

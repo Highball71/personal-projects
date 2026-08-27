@@ -1,7 +1,9 @@
 # FEATURE — Per-Person Meals (design only, not yet built)
 
 Drafted 2026-08-27 (chat session) from tester feedback triage (Kristin).
-Status: **DESIGN. Do not implement without David's go.**
+Status: **APPROVED 2026-08-27 (all four decisions below). Phase 1
+(migration 013 + model decode, shipped dark) implemented 2026-08-27;
+Phases 2–3 not yet built.**
 Companion to the dietary-preferences promise onboarding makes but doesn't keep
 (POLISH list in HANDOFF).
 
@@ -132,10 +134,14 @@ for v1; it would break the head-cook-plans-for-everyone flow.
    rendering.
 Each phase is independently shippable; 3 is the risky one.
 
-## Open decisions for David
+## Open decisions for David — ALL DECIDED 2026-08-27
 
-1. Option 1 (nullable user_id) vs Option 2 (people table)? — doc assumes 1.
-2. Do member meals contribute groceries identically? (Assumed yes.)
-3. Does "one meal per day" hold per person, or can a person have two? —
-   doc assumes one per (day, member).
-4. v1 dietary matching = ingredient-keyword only — acceptable?
+1. **DECIDED: Option 1** (nullable `user_id`). Profile members are
+   `user_id IS NULL` rows; Option 2 (separate table) rejected.
+2. **DECIDED: Yes** — member meals contribute groceries identically to
+   household meals (same `addMealWithGroceries` path).
+3. **DECIDED: One meal per day per person.** The household slot and each
+   member's slot are separate slots on the same day, but no person (and
+   not the household) gets two meals on one day. No multi-meal-per-person.
+4. **DECIDED: Yes** — keyword-only dietary matching is fine for v1.
+   Flag, never block; be honest about misses.

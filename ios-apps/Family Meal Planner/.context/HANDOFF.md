@@ -2,7 +2,7 @@
 
 **Read this first.** Concise current state. Detailed trail lives in `.context/STUDIO_LOG/` and `SESSION_LOG.md`.
 
-Last updated: 2026-08-27 (tester-feedback triage session, authored off-Mac)
+Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
@@ -12,7 +12,8 @@ Last updated: 2026-08-27 (tester-feedback triage session, authored off-Mac)
 
 **Tester feedback arrived** (Kristin, via Copy Me That habits) and was triaged 2026-08-27:
 - **"Copy last week" — IMPLEMENTED this session, authored off-Mac, NEEDS BUILD + DEVICE PASS.** One commit touching `MealPlanService.swift` + `SupabaseMealPlanView.swift`. Rules David decided: days already planned are **kept** (never overwritten); past days skipped **silently**. All copies go through `addMealWithGroceries` so grocery contributions carry over. Verification checklist in ACTIVE_TASK.md.
-- **Per-person meals — DESIGN ONLY**, written to `FEATURE_PER_PERSON_MEALS.md`. Do not build without David's answers to its four open decisions (biggest: nullable `household_members.user_id` for account-less kids). Folds in the dietary-preferences promise.
+- **Per-person meals — APPROVED, Phase 1 CODE DONE (2026-08-27).** David answered all four open decisions (Option 1 nullable user_id; groceries identical; one meal per (day, member); keyword dietary matching for v1) — stamped into `FEATURE_PER_PERSON_MEALS.md`. Phase 1 implemented: `supabase/migrations/013_member_meals.sql` (nullable user_id, dietary_preferences[], meal_plans.member_id, composite FK **ON DELETE NO ACTION** + member-delete cleanup trigger — deliberately NOT SET NULL, see doc) plus `MealPlanRow`/`MealPlanInsert` decode changes. Ships dark; sim build + all 125 tests pass.
+- **⚠️ Migration 013 is NOT YET APPLIED to `papuusfhtojthtnbsdvs`.** The Supabase MCP + CLI on this machine are authenticated to a different account (only sees "Placatto"). David: re-auth the Supabase connector (or `supabase login` as the FluffyList account), then apply `013_member_meals.sql`. Until then the app is fully compatible with the un-migrated DB (member_id decode is tolerant; insert omits nil).
 - Still untriaged from Kristin's list: pantry-scan recipe suggestions, community recipe section.
 
 **NEXT BUILD NUMBER: 111.** (110 is uploaded and live on TestFlight.)
@@ -43,3 +44,4 @@ Last updated: 2026-08-27 (tester-feedback triage session, authored off-Mac)
 - Bundle `com.highball71.fluffylist.beta`, team `A5DP57PZ7N`, device "Dad's iPhone" registered.
 - `PROXY_KEY` is the one real secret — gitignored `Secrets.xcconfig`, never commit it.
 - Housekeeping (not urgent): repo structure tangled (Fast No Slow files mixed in); keep `.context` current each session.
+- **This machine's `Secrets.xcconfig` holds the template PLACEHOLDER key** (created 2026-08-27 so compile-only builds work; gitignored). AI features will fail at runtime here until the real `PROXY_KEY` is filled in.
