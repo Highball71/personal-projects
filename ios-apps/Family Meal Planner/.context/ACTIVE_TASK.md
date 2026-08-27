@@ -1,29 +1,30 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** "The Press" visual overhaul — implemented on branch `press-overhaul`, awaiting compile + device verification.
+**Session Focus:** Tester-feedback wave 1 — "Copy last week" implemented (needs Mac verification); per-person meals designed.
 
 ---
 
-## Completed This Session (August 16, 2026)
+## Completed This Session (August 27, 2026 — chat session, off-Mac)
 
-Implemented per `design_handoff_press_overhaul/README.md` (the zip bundle; HTML prototype "1a — The Press"). Presentation layer only; all services, view models, @AppStorage keys, and navigation unchanged.
+0. **Verified repo state before acting** (probe, not prose): press-overhaul was already merged and build 110 already on TestFlight — the session brief's "item 1" was stale. HANDOFF corrected; next build is **111**.
+1. **Copy last week** — commit on top of `main` (`9fd8e64`):
+   - `MealPlanService`: `copyPreviousWeek(weekStart:recipeService:groceryService:)` + `fetchWeekRows` helper + `CopyWeekResult` tally. Reads both weeks fresh from DB; collapses legacy multi-row slots (first row, view convention); copies via `addMealWithGroceries` only onto confirmed-empty slots, so its clear-first step is a no-op and contributions carry over.
+   - **Rules (David, 2026-08-27): skip filled days (keep existing); skip past days silently** (pre-filtered so the write path's past-date guard never raises).
+   - View: "Copy last week" `FluffyTextLink` in the week footer (shown only when an open, non-past day exists) and in the empty-week link stack. Assigning overlay text parameterized ("Copying last week..."). Press-voice toasts ("Copied three dinners from last week." / "…kept the days you'd planned." / "Last week was empty.").
+2. **Per-person meals design** → `FEATURE_PER_PERSON_MEALS.md`. Nullable `member_id` on meal_plans (NULL = household), composite-FK tenant safety + member-delete trigger, no RLS policy changes, per-member `dietary_preferences` keeping the onboarding promise, Press UI (chip row, kicker day rows), 3-phase rollout, 4 open decisions awaiting David.
 
-1. **Tokens**: `Color+FluffyList.swift` → paper/ink/persimmon palette (ink 2 spruce, ink 3 reserved); retired amber/teal/slate accents kept as compile aliases → persimmon. `Font+FluffyList.swift` → Source Serif 4 everywhere + em-tracking helpers.
-2. **Fonts**: Source Serif 4 Regular/Semibold/Bold/It TTFs bundled (Adobe 4.005 release, OFL) + registered in Info.plist. **Actual PostScript names differ from the design README**: `SourceSerif4-Semibold` (lowercase b), `SourceSerif4-It` (not -Italic). Old Playfair/Inter files retained (RULES: no deletions) — remove font files + registration in a later cleanup once confirmed dead.
-3. **Components** (`FluffyFont.swift`): FluffyMasthead, FluffyRule, FluffySectionHead, FluffyMetadataLine, FluffyTextLink, FluffyFilledButton, FluffyCheckbox, halftone modifier; legacy shims for old component names.
-4. **Screens**: Grocery + Store Mode (ink ground, pale-persimmon heads), Meals (ruled day rows, state line, CTA text link), Settings (label/value rules), Recipe detail (kicker, ruled ingredients, METHOD numerals, sticky "Add to the week"), Recipes (search rule, underlined word chips, halftone hero, ruled lists — grid removed), Add/edit recipe (header rule, toolbar Save, ink-outlined scan box, label-over-rule fields), Welcome/SignIn ("Dinner, decided.", numbered value rows), HouseholdSetup + HouseholdOnboarding (ink-rule fields, six-cell code, OR JOIN ONE divider).
-5. **Chrome**: Tab bar via UITabBarAppearance (paper, 1px ink top rule, serif 10pt uppercase, active persimmon / inactive #7D7979). FluffyErrorBanner → PROBLEM band. Toasts/overlays squared.
+## Verification checklist (on a Mac, before archiving 111)
 
-## Deliberate deviations from the design README (flag if wrong)
-- **Save also kept as a filled button at the end of the Add Recipe form** (in addition to the header Save) — long form, avoids scroll-back. Delete `saveButton` from formContent if unwanted.
-- **Icons are SF Symbols throughout** (spec permits substitution); Phosphor SVGs not bundled.
-- **Store Mode toggle + Clear checked stay in the (inline, paper-tinted) nav bar** — spec doesn't place them.
-- **Grocery empty-state "Plan a night →"** required passing `selectedTab` binding into `SupabaseGroceryListView` (same pattern as Meals).
-- **Detail-screen kicker** uses FAVOURITE/category (no cook-count data exists).
+1. `git am` the session patch from the `personal-projects` root (or pull if already pushed), build for device.
+2. Copy-last-week happy path: plan a few meals "last week" (temporarily allow past assign or seed rows in Supabase), tap Copy on the current week → meals land shifted +7, grocery list gains their ingredients.
+3. Skip-filled: pre-plan one current-week day, copy → that day untouched, toast says "kept the day(s) you'd planned."
+4. Mid-week: run on a week where Mon–Wed are past → those skip silently, no error banner.
+5. Empty source: fresh week pair → "Last week was empty." toast, nothing written.
+6. Contribution symmetry: remove a copied meal → its grocery contributions unwind exactly like a hand-assigned one.
+7. Empty-week screen shows the third link; footer link hidden when every remaining day is planned or past.
 
-## Verification checklist (on a Mac, before merge)
-1. `git fetch && git checkout press-overhaul` (or apply the patch bundle), build for device.
-2. Confirm the four Source Serif faces render (wrong PS name = silent system-font fallback).
-3. Dynamic Type pass at largest supported size — grocery rows, ingredient rows (Source Serif sets wider than Inter).
-4. Store Mode cross-fade, checkbox animation, code-entry cells with hardware + software keyboard.
-5. Tab bar appearance on scroll edge (iOS 26 behavior).
+## Next up
+
+- David answers the 4 open decisions in `FEATURE_PER_PERSON_MEALS.md`.
+- Archive/upload build 111 after verification (home iMac has the ASC key).
+- Still parked: pantry-scan suggestions, community recipes, Engineer Mode (behind App Store blockers), join-by-code second-Apple-ID test, old Supabase project pause/delete.
