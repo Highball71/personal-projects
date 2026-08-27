@@ -17,6 +17,22 @@ import Foundation
 import os
 import Supabase
 
+/// Summary of a copy-last-week run — per-day tally for the caller's
+/// toast. Produced by `MealPlanService.copyPreviousWeek`.
+struct CopyWeekResult: Equatable {
+    var copied = 0
+    /// Target days that already held a meal — kept, never overwritten.
+    var skippedFilled = 0
+    /// Target days already in the past — skipped silently.
+    var skippedPast = 0
+    /// Source rows whose recipe couldn't be found locally.
+    var skippedNoRecipe = 0
+    /// Copies that reached the write path but failed.
+    var failed = 0
+    /// True when the previous week had no meals to copy at all.
+    var sourceEmpty = false
+}
+
 @MainActor
 final class MealPlanService: ObservableObject {
     /// Plans for the currently-loaded week, keyed by ISO date string.
@@ -373,6 +389,142 @@ final class MealPlanService: ObservableObject {
         }
 
         return true
+    }
+
+    // MARK: - Copy Last Week
+
+    /// Copy the previous week's meals onto the week starting at
+    /// `weekStart`, shifting each by +7 days.
+    ///
+    /// Rules (decided 2026-08-27):
+    ///   - Target days that already hold a meal are SKIPPED — existing
+    ///     plans are never overwritten.
+    ///   - Target days already in the past are skipped silently. The
+    ///     assign path refuses past dates with an error; we pre-filter
+    ///     so a routine copy never surfaces one.
+    ///   - Each copy goes through `addMealWithGroceries` — the single
+    ///     write path — so grocery contributions carry over exactly as
+    ///     if the meal had been assigned by hand. Because it is only
+    ///     called on slots confirmed empty, its clear-first step is a
+    ///     no-op and nothing existing is ever deleted.
+    ///
+    /// Reads both weeks fresh from the DB (never the local cache).
+    /// Returns nil when a read fails (`errorMessage` is set); otherwise
+    /// a `CopyWeekResult` tally. The caller should refetch the week.
+    func copyPreviousWeek(
+        weekStart: Date,
+        recipeService: RecipeService,
+        groceryService: GroceryService
+    ) async -> CopyWeekResult? {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else {
+            Logger.supabase.error("copyPreviousWeek: no household ID")
+            errorMessage = "No household selected."
+            return nil
+        }
+
+        let cal = Calendar.current
+        guard let prevStart = cal.date(byAdding: .day, value: -7, to: weekStart) else {
+            return nil
+        }
+
+        // 1. Read both weeks straight from the DB.
+        guard let sourceRows = await fetchWeekRows(householdID: householdID, weekStart: prevStart),
+              let targetRows = await fetchWeekRows(householdID: householdID, weekStart: weekStart)
+        else {
+            errorMessage = "Couldn't read last week's plan. Please try again."
+            return nil
+        }
+
+        // Beta slot rule: one meal per day. Collapse legacy multi-row
+        // slots to their first row (same convention as the week view)
+        // and ignore orphan rows (recipe_id NULLed by a recipe delete).
+        var sourceByDate: [String: MealPlanRow] = [:]
+        for row in sourceRows where row.recipeID != nil {
+            if sourceByDate[row.date] == nil { sourceByDate[row.date] = row }
+        }
+
+        var result = CopyWeekResult()
+        if sourceByDate.isEmpty {
+            result.sourceEmpty = true
+            Logger.supabase.info("copyPreviousWeek: previous week is empty — nothing to copy")
+            return result
+        }
+
+        let filledTargetDates = Set(targetRows.filter { $0.recipeID != nil }.map(\.date))
+        let today = cal.startOfDay(for: Date())
+
+        // Recipes are needed for the addMealWithGroceries call below.
+        if recipeService.recipes.isEmpty {
+            _ = await recipeService.fetchRecipes()
+        }
+
+        // 2. Walk the seven day-offsets so all Date construction matches
+        //    the week view's `weekDates` (no re-parsing of ISO strings,
+        //    no UTC/local drift).
+        for offset in 0..<7 {
+            guard let sourceDate = cal.date(byAdding: .day, value: offset, to: prevStart),
+                  let targetDate = cal.date(byAdding: .day, value: offset, to: weekStart)
+            else { continue }
+
+            guard let sourceRow = sourceByDate[Self.isoDate(from: sourceDate)],
+                  let recipeID = sourceRow.recipeID
+            else { continue } // nothing planned that day last week
+
+            let targetISO = Self.isoDate(from: targetDate)
+
+            if cal.startOfDay(for: targetDate) < today {
+                result.skippedPast += 1
+                Logger.supabase.info("copyPreviousWeek: skip \(targetISO) — in the past")
+                continue
+            }
+            if filledTargetDates.contains(targetISO) {
+                result.skippedFilled += 1
+                Logger.supabase.info("copyPreviousWeek: skip \(targetISO) — already planned")
+                continue
+            }
+            guard let recipe = recipeService.recipes.first(where: { $0.id == recipeID }) else {
+                result.skippedNoRecipe += 1
+                Logger.supabase.warning("copyPreviousWeek: skip \(targetISO) — recipe \(recipeID.uuidString) not found locally")
+                continue
+            }
+
+            let newID = await addMealWithGroceries(
+                recipe: recipe,
+                on: targetDate,
+                recipeService: recipeService,
+                groceryService: groceryService
+            )
+            if newID != nil {
+                result.copied += 1
+            } else {
+                result.failed += 1
+            }
+        }
+
+        Logger.supabase.info("copyPreviousWeek: copied=\(result.copied) skippedFilled=\(result.skippedFilled) skippedPast=\(result.skippedPast) skippedNoRecipe=\(result.skippedNoRecipe) failed=\(result.failed)")
+        return result
+    }
+
+    /// Read all meal_plans rows for the 7 days starting at `weekStart`,
+    /// straight from the DB — no cache, and unlike `fetchPlans` this
+    /// never mutates `plansByDate`. Returns nil on error.
+    private func fetchWeekRows(householdID: UUID, weekStart: Date) async -> [MealPlanRow]? {
+        guard let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) else {
+            return nil
+        }
+        do {
+            return try await supabase
+                .from("meal_plans")
+                .select()
+                .eq("household_id", value: householdID.uuidString)
+                .gte("date", value: Self.isoDate(from: weekStart))
+                .lt("date", value: Self.isoDate(from: weekEnd))
+                .execute()
+                .value
+        } catch {
+            Logger.supabase.error("fetchWeekRows: failed — \(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// Read all current meal_plans rows for a single (household, date)

@@ -25,6 +25,9 @@ struct SupabaseMealPlanView: View {
     /// for the meal currently assigned to this date.
     @State private var slotActionDate: Date?
     @State private var isAssigning = false
+    /// Line shown in the assigning overlay — the copy-week action
+    /// reuses the overlay with its own wording.
+    @State private var assigningText = "Adding to meal plan..."
     @State private var toastMessage: String?
     @State private var showingAddRecipe = false
     /// True when the last week fetch failed — drives the retry banner
@@ -255,6 +258,9 @@ struct SupabaseMealPlanView: View {
                         FluffyTextLink(title: "Add a custom meal") {
                             showingAddRecipe = true
                         }
+                        FluffyTextLink(title: "Copy last week") {
+                            Task { await copyLastWeek() }
+                        }
                     }
                     .padding(.bottom, 40)
                 }
@@ -356,10 +362,17 @@ struct SupabaseMealPlanView: View {
                     .padding(.top, 26)
                     .padding(.bottom, 20)
 
-                FluffyTextLink(title: "Build the grocery list") {
-                    Task {
-                        await groceryService.fetchItems()
-                        selectedTab = .groceries
+                VStack(alignment: .leading, spacing: 20) {
+                    if hasOpenFutureDay {
+                        FluffyTextLink(title: "Copy last week") {
+                            Task { await copyLastWeek() }
+                        }
+                    }
+                    FluffyTextLink(title: "Build the grocery list") {
+                        Task {
+                            await groceryService.fetchItems()
+                            selectedTab = .groceries
+                        }
                     }
                 }
                 .padding(.horizontal, 22)
@@ -503,7 +516,7 @@ struct SupabaseMealPlanView: View {
                     .ignoresSafeArea()
                 VStack(spacing: 12) {
                     ProgressView().scaleEffect(1.3)
-                    Text("Adding to meal plan...")
+                    Text(assigningText)
                         .font(.fluffyHeadline)
                         .foregroundStyle(Color.fluffyPrimary)
                 }
@@ -584,6 +597,63 @@ struct SupabaseMealPlanView: View {
     }
 
     // MARK: - Actions
+
+    /// True when at least one day this week is unplanned and not in
+    /// the past — i.e. copy-last-week could actually land something.
+    private var hasOpenFutureDay: Bool {
+        let today = Calendar.current.startOfDay(for: Date())
+        return weekDates.contains { date in
+            plans(for: date).isEmpty &&
+            Calendar.current.startOfDay(for: date) >= today
+        }
+    }
+
+    /// Copy the previous week's meals forward. Days already planned
+    /// are kept and past days are skipped silently (decided
+    /// 2026-08-27) — see MealPlanService.copyPreviousWeek.
+    private func copyLastWeek() async {
+        assigningText = "Copying last week..."
+        isAssigning = true
+        defer {
+            isAssigning = false
+            assigningText = "Adding to meal plan..."
+        }
+
+        guard let result = await mealPlanService.copyPreviousWeek(
+            weekStart: weekStart,
+            recipeService: recipeService,
+            groceryService: groceryService
+        ) else {
+            actionErrorMessage = "Couldn't copy last week. Please try again."
+            return
+        }
+
+        await reloadWeek()
+
+        if result.failed > 0 {
+            actionErrorMessage = "Copied \(result.copied) meal\(result.copied == 1 ? "" : "s"), but \(result.failed) didn't make it. Please try again."
+            return
+        }
+
+        withAnimation { toastMessage = copyToastText(result) }
+    }
+
+    /// Press-voice summary line for the copy toast.
+    private func copyToastText(_ result: CopyWeekResult) -> String {
+        if result.sourceEmpty { return "Last week was empty." }
+        let copied = result.copied
+        if copied == 0 {
+            if result.skippedFilled > 0 { return "Those days are already planned." }
+            if result.skippedPast > 0 { return "Those days have passed." }
+            return "Nothing to copy."
+        }
+        let dinners = copied == 1 ? "dinner" : "dinners"
+        if result.skippedFilled > 0 {
+            let kept = result.skippedFilled == 1 ? "day you'd planned" : "days you'd planned"
+            return "Copied \(word(copied)) \(dinners); kept the \(kept)."
+        }
+        return "Copied \(word(copied)) \(dinners) from last week."
+    }
 
     /// Fetch the current week and record whether it succeeded, so a
     /// failed load shows the retry banner instead of an empty week.
