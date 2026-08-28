@@ -56,3 +56,13 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - Info.plist now forces light-only appearance (Press has no dark palette).
 - Mac-1929: Secrets.xcconfig has real Supabase values, placeholder PROXY_KEY → archive from home iMac only.
 - Old Supabase project `dbunenacikpeeplnltrz` is **paused**.
+
+---
+
+## 2026-08-28 update (grocery-unwind fix)
+
+- **The grocery-unwind bug is FIXED** (the "Known bug shipping in 110" above). `clearDayWithGroceries` now snapshots `grocery_contributions` (`GroceryService.fetchContributions(forMealPlans:)`) BEFORE deleting the `meal_plans` rows, verifies the delete as before, then settles grocery quantities from the snapshot (`settleContributions(_:)`) for exactly the rows the server confirmed deleted — the RLS-safety delete-first verification is preserved, and the ON DELETE CASCADE can no longer erase the evidence before the unwind runs. If the snapshot itself fails, the delete is aborted with an error (better to leave the meal than strand un-settleable groceries). `removeContributions` (the `removeMeal` path) now shares the same settle core. No DB/migration changes.
+- **Removal-path audit:** `removeMeal` was already unwind-first (correct); the dead `clearSlot(on:)` — zero callers, deleted meal_plans with no grocery unwind at all — was removed.
+- **Regression tests:** new `GroceryUnwindTests.swift` runs the real services against an in-memory fake PostgREST backend (URLProtocol on URLSession.shared; emulates the cascade; blocks all real network). The main test was verified to FAIL against the pre-fix code and passes now. **Suite: 128 tests, 0 failures** (125 + 3 new).
+- Update to the 8/27 line "Next build 111 should ship it together with the grocery-unwind fix": the fix is now in. **111 still needs archiving from the home iMac** (real PROXY_KEY + ASC key). Build number untouched here.
+- Sim quirk on Mac-1929: iPhone 17 sim twice refused to launch the test host ("Application failed preflight checks") — stale app install; fixed with `xcrun simctl uninstall com.highball71.fluffylist.beta`.

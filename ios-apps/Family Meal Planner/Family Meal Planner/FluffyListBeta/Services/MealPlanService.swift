@@ -272,10 +272,20 @@ final class MealPlanService: ObservableObject {
     // MARK: - Clear Day
 
     /// Remove all meals for (household, date) and undo their grocery
-    /// contributions. Order matters: delete first, then only undo
-    /// contributions for the rows the server actually removed. That
-    /// way an RLS-silent failure can't strip groceries from meals that
-    /// are still in the plan.
+    /// contributions.
+    ///
+    /// Ordering is subtle because two constraints pull in opposite
+    /// directions:
+    ///   - RLS safety: only settle groceries for rows the server
+    ///     actually deleted, so a silent RLS failure can't strip
+    ///     groceries from meals still in the plan.
+    ///   - The DB cascade: grocery_contributions.meal_plan_id is
+    ///     ON DELETE CASCADE (migration 005), so the contribution rows
+    ///     vanish the instant the meal_plans rows are deleted —
+    ///     querying them after the delete finds nothing.
+    /// Resolution: SNAPSHOT the contribution rows first, then delete
+    /// and verify, then settle grocery quantities from the snapshot,
+    /// filtered to the rows the server confirmed deleted.
     func clearDayWithGroceries(on date: Date, groceryService: GroceryService) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
 
@@ -287,7 +297,20 @@ final class MealPlanService: ObservableObject {
 
         guard !beforeRows.isEmpty else { return true }
 
-        // 2. Delete with .select() so we get back the rows the server
+        // 2. Snapshot the grocery contributions BEFORE deleting the
+        //    meal plans — after the delete the cascade has already
+        //    destroyed them. If the snapshot fails, abort while the
+        //    meals are still intact; deleting anyway would strand the
+        //    grocery items with no way to ever settle them.
+        guard let contributionSnapshot = await groceryService.fetchContributions(
+            forMealPlans: beforeRows.map(\.id)
+        ) else {
+            Logger.supabase.error("clearDayWithGroceries: aborting — couldn't snapshot grocery contributions")
+            errorMessage = "Couldn't remove this meal. Please try again."
+            return false
+        }
+
+        // 3. Delete with .select() so we get back the rows the server
         //    actually removed.
         let deletedIDs: [UUID]
         do {
@@ -307,9 +330,18 @@ final class MealPlanService: ObservableObject {
             return false
         }
 
-        // 3. Verify the slot is empty.
+        // 4. Verify the slot is empty.
         let afterRows = await fetchSlotRows(householdID: householdID, iso: iso)
         Logger.supabase.info("clearDayWithGroceries: date=\(iso) — \(afterRows.count) row(s) after delete")
+
+        // 5. Settle grocery quantities from the snapshot — but only
+        //    for meal plans the server confirmed deleted, preserving
+        //    the RLS-safety rule even on a partial delete. The
+        //    contribution rows themselves are already gone (cascade);
+        //    the snapshot carries the amounts to subtract.
+        let deletedSet = Set(deletedIDs)
+        let toSettle = contributionSnapshot.filter { deletedSet.contains($0.mealPlanID) }
+        _ = await groceryService.settleContributions(toSettle)
 
         if !afterRows.isEmpty {
             let leftover = afterRows.map { $0.id.uuidString }.joined(separator: ", ")
@@ -318,78 +350,14 @@ final class MealPlanService: ObservableObject {
             return false
         }
 
-        // 4. Now that the meal_plans rows are truly gone, undo their
-        //    grocery contributions.
-        for id in deletedIDs {
-            _ = await groceryService.removeContributions(forMealPlan: id)
-        }
-
         return true
     }
 
-    /// Delete all meal plan rows for (household, date) directly in the
-    /// database. Verifies the result by counting rows before and after
-    /// and re-reading the slot. Does NOT mutate `plansByDate` — the
-    /// caller is expected to refetch so the UI sees authoritative state.
-    func clearSlot(on date: Date) async -> Bool {
-        guard let householdID = SupabaseManager.shared.currentHouseholdID else {
-            Logger.supabase.error("clearSlot: no household ID")
-            return false
-        }
-
-        let iso = Self.isoDate(from: date)
-
-        // 1. Count rows currently in the slot.
-        let beforeRows = await fetchSlotRows(householdID: householdID, iso: iso)
-        Logger.supabase.info("clearSlot: date=\(iso) — \(beforeRows.count) row(s) before delete")
-
-        if beforeRows.isEmpty {
-            // Nothing to do, but surface the no-op clearly in logs.
-            Logger.supabase.info("clearSlot: date=\(iso) — slot already empty")
-            return true
-        }
-
-        // 2. Issue the delete and capture which rows the server reports
-        //    as deleted. This catches the silent-no-op case (e.g. an
-        //    RLS policy that grants SELECT but not DELETE) — without
-        //    .select() the API call would succeed even when zero rows
-        //    were actually removed.
-        let deletedIDs: [UUID]
-        do {
-            let deleted: [MealPlanRow] = try await supabase
-                .from("meal_plans")
-                .delete()
-                .eq("household_id", value: householdID.uuidString)
-                .eq("date", value: iso)
-                .select()
-                .execute()
-                .value
-
-            deletedIDs = deleted.map(\.id)
-            Logger.supabase.info("clearSlot: server reported \(deletedIDs.count) row(s) deleted")
-        } catch {
-            Logger.supabase.error("clearSlot: delete failed — \(error.localizedDescription)")
-            errorMessage = error.localizedDescription
-            return false
-        }
-
-        // 3. Re-read the slot to confirm it is actually empty.
-        let afterRows = await fetchSlotRows(householdID: householdID, iso: iso)
-        Logger.supabase.info("clearSlot: date=\(iso) — \(afterRows.count) row(s) after delete")
-
-        if !afterRows.isEmpty {
-            let leftover = afterRows.map { $0.id.uuidString }.joined(separator: ", ")
-            Logger.supabase.error("clearSlot: \(afterRows.count) row(s) still present after delete (likely RLS blocked the DELETE). leftover=[\(leftover)]")
-            errorMessage = "Couldn't remove this meal. Please try again or check your account permissions."
-            return false
-        }
-
-        if deletedIDs.count != beforeRows.count {
-            Logger.supabase.warning("clearSlot: deleted \(deletedIDs.count) of \(beforeRows.count) row(s) — slot is empty but counts disagree")
-        }
-
-        return true
-    }
+    // NOTE: a `clearSlot(on:)` helper used to live here. It deleted
+    // meal_plans rows without ever touching grocery contributions —
+    // any caller would strand grocery items exactly like the bug this
+    // section fixes. It had no callers left, so it was removed rather
+    // than fixed. Use clearDayWithGroceries instead.
 
     // MARK: - Copy Last Week
 
@@ -528,8 +496,8 @@ final class MealPlanService: ObservableObject {
     }
 
     /// Read all current meal_plans rows for a single (household, date)
-    /// directly from the DB. Used by clearSlot for before/after
-    /// verification — bypasses any local cache.
+    /// directly from the DB. Used by clearDayWithGroceries for
+    /// before/after verification — bypasses any local cache.
     private func fetchSlotRows(householdID: UUID, iso: String) async -> [MealPlanRow] {
         do {
             return try await supabase

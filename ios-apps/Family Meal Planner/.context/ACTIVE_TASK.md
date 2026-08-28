@@ -1,19 +1,21 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** (2026-08-27 evening — chat + device) Migration 013 applied to production; copy-last-week device-verified; pre-existing grocery-unwind bug found and diagnosed. Next session: fix the unwind, then archive 111.
+**Session Focus:** (2026-08-28 — Claude Code on Mac-1929) Grocery-unwind bug FIXED with regression tests. Next: archive/upload build 111 from the home iMac.
 
-## State after tonight
+## State after this session
 
-- **Migration 013 APPLIED** to `papuusfhtojthtnbsdvs` via dashboard SQL Editor (connector/CLI still auth'd to the wrong Supabase account — reconnect in claude.ai settings before expecting MCP DB access). Column-verified: `meal_plans.member_id` present; `household_members.user_id` nullable = YES; `dietary_preferences` present. FK/trigger spot-checks (cross-household insert rejected; member delete nulls meals) deferred — low risk, run before Phase 3.
-- **Copy-last-week DEVICE-VERIFIED** on Dad's iPhone: link hidden when no open future day PASS; link appears after freeing a day PASS; partial copy (1 dinner into Friday, filled days kept, past days silently skipped) PASS; re-tap no duplicates PASS. Checklist items 6/7 as previously written were untestable — the Press week view has **no week navigation** (current week only); empty-source toast remains unverified on device, acceptable.
-- **NEW BUG (pre-existing, ships in 110): removing a meal strands its grocery items.** Root cause: `clearDayWithGroceries` (the week view's only removal path) deletes `meal_plans` rows FIRST, then calls `removeContributions(forMealPlan:)` — but `grocery_contributions.meal_plan_id` is ON DELETE CASCADE (migration 005), so the contribution rows are already gone; the unwind finds zero and reports success. The delete-first ordering was a deliberate RLS-safety choice; the cascade silently defeats it. **Fix plan:** snapshot the contribution rows for the affected meal ids BEFORE the delete, verify the delete, then settle grocery quantities from the snapshot (keeps the RLS-safety intent). Add a regression test. Note `removeMeal(_:)` uses unwind-first ordering and works, but is not the path the view uses.
-- **Dark mode fixed globally:** `UIUserInterfaceStyle = Light` in Info.plist (commit 20b4316). Press has no dark palette; recipe sheet was black-on-black on a Dark Mode phone. The lone per-view `.preferredColorScheme(.light)` in SupabaseAddRecipeView is now redundant.
-- **Secrets template completed:** `Secrets.xcconfig.template` now includes `SUPABASE_URL` / `SUPABASE_ANON_KEY` placeholders (with the xcconfig `//`-comment escape). This machine (Mac-1929) has real Supabase values; **PROXY_KEY here is still the placeholder → archives must come from the home iMac.**
-- **Two households exist in prod:** David's (13 recipes) and a second (~"Neuro and the Divergent...", 1 recipe, real meal on 2026-08-20) — likely the tester's own household. Chat-session test seeds there were removed same night. David's household carries seeded meals on 2026-08-20..22 (his own recipes; harmless history).
-- **Old Supabase V1 project `dbunenacikpeeplnltrz` PAUSED** 2026-08-27 (slot freed, data recoverable).
+- **Grocery-unwind bug FIXED.** The week view's removal path (`clearDayWithGroceries`) deleted `meal_plans` rows first, then queried `grocery_contributions` — but the ON DELETE CASCADE (migration 005) had already destroyed those rows, so the unwind found nothing and grocery items were stranded. Fix keeps the RLS-safety intent instead of just reordering:
+  1. `GroceryService.fetchContributions(forMealPlans:)` — SNAPSHOTS the contribution rows before the delete; if the snapshot fails, the delete is aborted (meals stay intact rather than stranding groceries forever).
+  2. Delete + verify unchanged (server-confirmed rows, slot re-read).
+  3. `GroceryService.settleContributions(_:)` — settles grocery quantities from the snapshot, filtered to the rows the server confirmed deleted. `removeContributions(forMealPlan:)` (the `removeMeal` path) was refactored onto the same settle core and still works.
+  - Audit of other removal paths: `removeMeal` was already unwind-first (fine); dead `clearSlot(on:)` (no callers, deleted meal_plans with NO grocery unwind at all) was removed. No other `meal_plans` delete sites exist.
+  - **No DB/migration changes** — the cascade stays; the app adapts.
+- **Regression tests added** (`Family Meal PlannerTests/GroceryUnwindTests.swift`): an in-memory fake PostgREST backend (URLProtocol on URLSession.shared — the session the Supabase SDK uses; no test traffic can reach prod) that emulates the ON DELETE CASCADE. Three tests: week-view removal settles items (verified FAILING pre-fix: flour stuck at 4 cups, butter stranded), removeMeal path still settles, snapshot failure aborts the delete. **Full suite: 128 tests, 0 failures** (was 125 + 3 new) on iPhone 17 sim.
+  - Sim note: two runs hit "Application failed preflight checks" launching the test host — a stale app install on the iPhone 17 sim; `simctl uninstall com.highball71.fluffylist.beta` fixed it. Not a code issue.
+- **Build number NOT bumped, nothing archived** — per plan, 111 gets archived from the home iMac (real PROXY_KEY + ASC key live there).
 
 ## Next up
 
-1. **Claude Code session: grocery-unwind fix** per the plan above + regression test. Then **archive/upload build 111 from the home iMac** (real PROXY_KEY + ASC key live there) — 111 ships copy-last-week + light-mode + the unwind fix together.
+1. **Archive/upload build 111 from the home iMac** — ships copy-last-week + light-mode + the grocery-unwind fix together. Test suite is green; device pass of the unwind fix (remove a meal, watch the grocery list settle) is a good pre-archive sanity check.
 2. Per-person meals **Phase 2** (People screen, profile members, per-member dietary prefs, AppStorage migration) when David says go.
-3. Parked: join-by-code second-Apple-ID test; Engineer Mode; pantry-scan suggestions; community recipes; toast icon string-match cosmetic.
+3. Parked: join-by-code second-Apple-ID test; Engineer Mode; pantry-scan suggestions; community recipes; toast icon string-match cosmetic; migration 013 FK/trigger spot-checks before Phase 3.

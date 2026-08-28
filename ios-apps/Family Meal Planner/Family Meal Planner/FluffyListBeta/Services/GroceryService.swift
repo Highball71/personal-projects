@@ -218,21 +218,69 @@ final class GroceryService: ObservableObject {
     ///
     /// Safe to call on a meal plan that has no contributions (no-op).
     /// Does not touch items added via the manual path (no contributions).
+    ///
+    /// IMPORTANT: this only works while the meal_plans row still
+    /// exists — grocery_contributions.meal_plan_id is ON DELETE
+    /// CASCADE (migration 005), so once the meal plan is deleted the
+    /// contribution rows are gone and this finds nothing. Callers
+    /// that delete the meal plan first must snapshot the rows with
+    /// `fetchContributions(forMealPlans:)` and settle from the
+    /// snapshot via `settleContributions(_:)` instead.
     func removeContributions(forMealPlan mealPlanID: UUID) async -> Bool {
         Logger.supabase.info("removeContributions: meal plan \(mealPlanID.uuidString)")
 
+        guard let contributions = await fetchContributions(forMealPlans: [mealPlanID]) else {
+            return false
+        }
+        return await settleContributions(contributions)
+    }
+
+    /// Read the contribution rows for a set of meal plans.
+    ///
+    /// Used to SNAPSHOT contributions before a meal_plans delete: the
+    /// DB cascade removes these rows the moment the meal plan goes,
+    /// so this is the last chance to learn what each meal contributed
+    /// to the grocery list. Returns nil on error — callers about to
+    /// delete meal plans should abort rather than strand grocery
+    /// items that can never be settled afterwards.
+    func fetchContributions(forMealPlans mealPlanIDs: [UUID]) async -> [GroceryContributionRow]? {
+        guard !mealPlanIDs.isEmpty else { return [] }
+
         do {
-            // Fetch contributions for this meal plan.
             let contributions: [GroceryContributionRow] = try await supabase
                 .from("grocery_contributions")
                 .select()
-                .eq("meal_plan_id", value: mealPlanID.uuidString)
+                .`in`("meal_plan_id", values: mealPlanIDs.map(\.uuidString))
                 .execute()
                 .value
 
-            Logger.supabase.info("removeContributions: found \(contributions.count) contribution(s)")
-            guard !contributions.isEmpty else { return true }
+            Logger.supabase.info("fetchContributions: found \(contributions.count) contribution(s) for \(mealPlanIDs.count) meal plan(s)")
+            return contributions
+        } catch {
+            Logger.supabase.error("fetchContributions: failed — \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
 
+    /// Settle grocery item quantities for the given contribution rows.
+    /// For each contribution:
+    ///   - Subtract the contribution's quantity from the grocery item.
+    ///   - If the result is effectively zero, delete the grocery item
+    ///     entirely (which cascades any remaining contribution row).
+    ///   - Otherwise, update the grocery item's quantity and delete
+    ///     the contribution row.
+    ///
+    /// Works from rows the caller already holds, so it settles
+    /// correctly even when the contribution rows themselves no longer
+    /// exist in the DB (cascaded away by a meal_plans delete) — the
+    /// contribution-row deletes just match nothing in that case.
+    ///
+    /// Safe to call with an empty array (no-op).
+    func settleContributions(_ contributions: [GroceryContributionRow]) async -> Bool {
+        guard !contributions.isEmpty else { return true }
+
+        do {
             for contrib in contributions {
                 // Read the current grocery item quantity.
                 let rows: [SupabaseGroceryItem] = try await supabase
@@ -250,7 +298,7 @@ final class GroceryService: ObservableObject {
                         .delete()
                         .eq("id", value: contrib.id.uuidString)
                         .execute()
-                    Logger.supabase.info("removeContributions: grocery item already gone, cleaned up contribution")
+                    Logger.supabase.info("settleContributions: grocery item already gone, cleaned up contribution")
                     continue
                 }
 
@@ -264,7 +312,7 @@ final class GroceryService: ObservableObject {
                         .delete()
                         .eq("id", value: item.id.uuidString)
                         .execute()
-                    Logger.supabase.info("removeContributions: deleted \"\(item.name)\" (would be \(newQty))")
+                    Logger.supabase.info("settleContributions: deleted \"\(item.name)\" (would be \(newQty))")
                     // Cascade deletes the contribution row too.
                 } else {
                     try await supabase
@@ -279,14 +327,14 @@ final class GroceryService: ObservableObject {
                         .eq("id", value: contrib.id.uuidString)
                         .execute()
 
-                    Logger.supabase.info("removeContributions: reduced \"\(item.name)\" by \(contrib.quantity) → \(newQty)")
+                    Logger.supabase.info("settleContributions: reduced \"\(item.name)\" by \(contrib.quantity) → \(newQty)")
                 }
             }
 
             await fetchItems()
             return true
         } catch {
-            Logger.supabase.error("removeContributions: failed — \(error.localizedDescription)")
+            Logger.supabase.error("settleContributions: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return false
         }
