@@ -45,3 +45,14 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - `PROXY_KEY` is the one real secret — gitignored `Secrets.xcconfig`, never commit it.
 - Housekeeping (not urgent): repo structure tangled (Fast No Slow files mixed in); keep `.context` current each session.
 - **This machine's `Secrets.xcconfig` holds the template PLACEHOLDER key** (created 2026-08-27 so compile-only builds work; gitignored). AI features will fail at runtime here until the real `PROXY_KEY` is filled in.
+
+---
+
+## 2026-08-27 evening update (supersedes stale bullets above)
+
+- Migration 013 **applied to production** and column-verified (dashboard SQL Editor). The earlier BLOCKED item is resolved. The claude.ai Supabase connector is still signed into the Placatto-only account.
+- Copy-last-week **device-verified**; details in ACTIVE_TASK. Next build 111 should ship it together with the grocery-unwind fix.
+- **Known bug shipping in 110:** meal removal strands grocery items — the ON DELETE CASCADE on grocery_contributions defeats clearDayWithGroceries' post-delete unwind. Diagnosis + fix plan in ACTIVE_TASK.
+- Info.plist now forces light-only appearance (Press has no dark palette).
+- Mac-1929: Secrets.xcconfig has real Supabase values, placeholder PROXY_KEY → archive from home iMac only.
+- Old Supabase project `dbunenacikpeeplnltrz` is **paused**.
