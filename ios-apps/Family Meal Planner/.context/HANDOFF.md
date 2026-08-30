@@ -66,3 +66,10 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - **Regression tests:** new `GroceryUnwindTests.swift` runs the real services against an in-memory fake PostgREST backend (URLProtocol on URLSession.shared; emulates the cascade; blocks all real network). The main test was verified to FAIL against the pre-fix code and passes now. **Suite: 128 tests, 0 failures** (125 + 3 new).
 - Update to the 8/27 line "Next build 111 should ship it together with the grocery-unwind fix": the fix is now in. **111 still needs archiving from the home iMac** (real PROXY_KEY + ASC key). Build number untouched here.
 - Sim quirk on Mac-1929: iPhone 17 sim twice refused to launch the test host ("Application failed preflight checks") — stale app install; fixed with `xcrun simctl uninstall com.highball71.fluffylist.beta`.
+
+---
+
+## 2026-08-30 update
+
+- Build 111 archived and uploaded to App Store Connect from the home iMac (10:34 AM). Ships copy-last-week + light-only appearance + grocery-unwind fix.
+- Next: confirm 111 appears in TestFlight, then Phase 2 per-person meals when David says go.
