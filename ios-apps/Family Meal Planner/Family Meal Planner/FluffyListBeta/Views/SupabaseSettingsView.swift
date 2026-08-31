@@ -22,6 +22,10 @@ struct SupabaseSettingsView: View {
     @AppStorage("autoAddGroceries") private var autoAddGroceries = true
     @AppStorage("groupGroceriesByAisle") private var groupByAisle = true
     @AppStorage("mealPlanStartDay") private var startDay: String = "Sunday"
+    /// Seasonal Suggestions v1: the household's US region, stored as a
+    /// USRegion raw value. "" = not set = the feature is fully dormant
+    /// (no section, no badges, no nagging anywhere).
+    @AppStorage("seasonalRegion") private var seasonalRegionRaw: String = ""
 
     var body: some View {
         NavigationStack {
@@ -74,6 +78,7 @@ struct SupabaseSettingsView: View {
                             detail: "When a recipe is planned",
                             isOn: $autoAddGroceries
                         )
+                        seasonalRegionRow
                     }
 
                     settingsGroup("Shopping") {
@@ -256,6 +261,37 @@ struct SupabaseSettingsView: View {
                 Picker("", selection: selection) {
                     ForEach(options, id: \.self) { option in
                         Text(option).tag(option)
+                    }
+                }
+                .tint(Color.fluffyAccent)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 6)
+        }
+    }
+
+    // MARK: - Seasonal Region Row (Seasonal Suggestions v1)
+
+    /// One row: pick the household's US region so the recipe picker
+    /// can flag what's in season. "Not set" (the default) keeps the
+    /// whole feature dormant.
+    private var seasonalRegionRow: some View {
+        VStack(spacing: 0) {
+            rule
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Seasonal region")
+                        .font(.custom(FluffyFace.regular, size: 17))
+                        .foregroundStyle(Color.fluffyPrimary)
+                    Text("Flags recipes in season near you")
+                        .font(.custom(FluffyFace.italic, size: 13))
+                        .foregroundStyle(Color.fluffySecondary)
+                }
+                Spacer()
+                Picker("", selection: $seasonalRegionRaw) {
+                    Text("Not set").tag("")
+                    ForEach(USRegion.allCases) { region in
+                        Text(region.displayName).tag(region.rawValue)
                     }
                 }
                 .tint(Color.fluffyAccent)
