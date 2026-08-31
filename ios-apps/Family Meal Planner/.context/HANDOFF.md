@@ -152,3 +152,9 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - **Composition with Phase 3 respected:** the seasonal section rows are the same shared row as All Recipes — assignment chips still drive the pick, and a seasonal row still shows the selected person's dietary hint (both hints can appear together).
 - **New tests:** `SeasonalCalendarTests` (bundle load; all 8×12 cells present + non-empty; keyword hygiene incl. no peak/available dup within a cell; out-of-range month) and `SeasonalMatchTests` (weights, ranking, zero-hit exclusion, cap, dormancy ×2, word-boundary + plural matching, name matching without double counting, match-line copy). Fixtures reuse TestFixtures.recipeRow; a hand-built one-cell SeasonalCalendar keeps them independent of the real month.
 - **Not done / later:** AI seasonal pairing is v1.5 per decision 4. Seasonal device pass happens after merge (post-112). Hemisphere-flip and non-US regions remain out of scope.
+
+### 2026-08-31 night — 112 uploaded; seasonal-v1 merged to main
+- **Build 112 archived + uploaded from the MacBook** (real PROXY_KEY now in its Secrets.xcconfig; upload via Apple ID in Organizer). "Archive only from Home iMac" is RETIRED — MacBook and Home iMac can both archive.
+- `seasonal-v1` merged into main after the 112 upload, per plan. Main now = per-person meals + seasonal suggestions v1 (unreleased). Next build number is 113.
+- Calendar JSON got an honest read: cells spot-checked against real harvest timing, all sound; one quibble — muscadine is late-Aug/Sep, listed available in Southeast July.
+- **Next:** fig icon polishing pass → drop 1024 PNG into asset catalog → device pass of seasonal (set region, check "In season now") → archive 113 → announcement email. Icon and seasonal launch TOGETHER as 113.
