@@ -860,8 +860,35 @@ struct RecipePickerSheet: View {
     /// nil = EVERYONE (the household slot) — the default.
     @State private var selectedMemberID: UUID?
 
+    /// Seasonal Suggestions v1: the household's region setting.
+    /// "" (unset) keeps everything below empty — the sheet renders
+    /// exactly as it did before the feature existed.
+    @AppStorage("seasonalRegion") private var seasonalRegionRaw = ""
+
     private var selectedMember: HouseholdMemberRow? {
         selectedMemberID.flatMap { id in members.first { $0.id == id } }
+    }
+
+    /// Recipes promoted into the "In season now" section (best score
+    /// first, capped at 8).
+    private var seasonalPicks: [SeasonalMatch.Pick] {
+        SeasonalMatch.inSeasonNow(
+            recipes: recipes,
+            ingredientsByRecipeID: ingredientsByRecipeID,
+            region: USRegion(rawValue: seasonalRegionRaw),
+            month: Calendar.current.component(.month, from: Date())
+        )
+    }
+
+    /// Every qualifying recipe id (uncapped) — the leaf badge in the
+    /// All Recipes list.
+    private var seasonalIDs: Set<UUID> {
+        SeasonalMatch.seasonalRecipeIDs(
+            recipes: recipes,
+            ingredientsByRecipeID: ingredientsByRecipeID,
+            region: USRegion(rawValue: seasonalRegionRaw),
+            month: Calendar.current.component(.month, from: Date())
+        )
     }
 
     var body: some View {
@@ -881,6 +908,8 @@ struct RecipePickerSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
+                    let picks = seasonalPicks
+                    let leafIDs = seasonalIDs
                     List {
                         if !members.isEmpty {
                             Section("Who is this meal for?") {
@@ -889,6 +918,20 @@ struct RecipePickerSheet: View {
                                     selection: $selectedMemberID
                                 )
                                 .padding(.vertical, 4)
+                            }
+                        }
+
+                        // Seasonal Suggestions v1: what's in season in
+                        // the household's region right now, best match
+                        // first. Absent entirely when the region is
+                        // unset — the sheet then looks exactly as
+                        // before. All Recipes below stays complete;
+                        // nothing is ever hidden.
+                        if !picks.isEmpty {
+                            Section("In season now") {
+                                ForEach(picks, id: \.recipe.id) { pick in
+                                    recipeRow(pick.recipe, seasonalScore: pick.score, showsLeaf: true)
+                                }
                             }
                         }
 
@@ -920,37 +963,11 @@ struct RecipePickerSheet: View {
 
                         Section("All Recipes") {
                             ForEach(recipes) { recipe in
-                                Button {
-                                    onPick(recipe, selectedMemberID)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(recipe.name)
-                                                .font(.fluffyHeadline)
-                                                .foregroundStyle(Color.fluffyPrimary)
-                                            Text(recipe.category.capitalized)
-                                                .font(.fluffyCaption)
-                                                .foregroundStyle(Color.fluffySecondary)
-                                            // Keyword-only dietary hint for
-                                            // the selected person — a gentle
-                                            // flag, never a block.
-                                            if let member = selectedMember,
-                                               let conflict = DietaryMatch.conflict(
-                                                   for: member,
-                                                   recipe: recipe,
-                                                   ingredientNames: ingredientsByRecipeID[recipe.id]
-                                               ) {
-                                                FluffyMetadataLine(
-                                                    text: DietaryMatch.hintText(for: conflict),
-                                                    color: .fluffyAccent
-                                                )
-                                            }
-                                        }
-                                        Spacer()
-                                    }
-                                    .contentShape(Rectangle())
-                                }
-                                .tint(Color.fluffyPrimary)
+                                recipeRow(
+                                    recipe,
+                                    seasonalScore: nil,
+                                    showsLeaf: leafIDs.contains(recipe.id)
+                                )
                             }
                         }
                     }
@@ -966,6 +983,62 @@ struct RecipePickerSheet: View {
             }
         }
         .onAppear { selectedMemberID = initialMemberID }
+    }
+
+    /// One tappable recipe row, shared by "In season now" and "All
+    /// Recipes". The seasonal leaf and match line COMPOSE with the
+    /// dietary hint — a seasonal recipe can still carry "MIGHT NOT BE
+    /// NUT-FREE" for the selected person.
+    private func recipeRow(
+        _ recipe: RecipeRow,
+        seasonalScore: SeasonalMatch.Score?,
+        showsLeaf: Bool
+    ) -> some View {
+        Button {
+            onPick(recipe, selectedMemberID)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(recipe.name)
+                            .font(.fluffyHeadline)
+                            .foregroundStyle(Color.fluffyPrimary)
+                        if showsLeaf {
+                            Image(systemName: "leaf.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.fluffyInk2)
+                        }
+                    }
+                    Text(recipe.category.capitalized)
+                        .font(.fluffyCaption)
+                        .foregroundStyle(Color.fluffySecondary)
+                    // "IN SEASON · TOMATO, BASIL" — only in the
+                    // seasonal section, where the match is the point.
+                    if let seasonalScore {
+                        FluffyMetadataLine(
+                            text: SeasonalMatch.matchText(for: seasonalScore),
+                            color: .fluffyInk2
+                        )
+                    }
+                    // Keyword-only dietary hint for the selected
+                    // person — a gentle flag, never a block.
+                    if let member = selectedMember,
+                       let conflict = DietaryMatch.conflict(
+                           for: member,
+                           recipe: recipe,
+                           ingredientNames: ingredientsByRecipeID[recipe.id]
+                       ) {
+                        FluffyMetadataLine(
+                            text: DietaryMatch.hintText(for: conflict),
+                            color: .fluffyAccent
+                        )
+                    }
+                }
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .tint(Color.fluffyPrimary)
     }
 }
 

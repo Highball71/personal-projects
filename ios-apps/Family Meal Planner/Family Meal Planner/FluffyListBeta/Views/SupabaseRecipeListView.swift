@@ -37,6 +37,20 @@ struct SupabaseRecipeListView: View {
     private static let fetchErrorText =
         "Couldn't load your recipes. Check your connection and tap Retry."
 
+    /// Seasonal Suggestions v1: region setting; "" = dormant.
+    @AppStorage("seasonalRegion") private var seasonalRegionRaw = ""
+
+    /// IDs of recipes in season right now — the small leaf badge on
+    /// list rows. Empty (no badges anywhere) when the region is unset.
+    private var seasonalIDs: Set<UUID> {
+        SeasonalMatch.seasonalRecipeIDs(
+            recipes: recipeService.recipes,
+            ingredientsByRecipeID: recipeService.ingredientsByRecipeID,
+            region: USRegion(rawValue: seasonalRegionRaw),
+            month: Calendar.current.component(.month, from: Date())
+        )
+    }
+
     // MARK: - Filtering
 
     /// Recipes filtered by favorites toggle, browse tag, then search text.
@@ -260,6 +274,9 @@ struct SupabaseRecipeListView: View {
 
     private var browseContent: some View {
         ScrollView {
+            // Computed once per body pass, not per row — scoring every
+            // recipe from inside each row would be quadratic.
+            let leafIDs = seasonalIDs
             VStack(alignment: .leading, spacing: 0) {
                 masthead
                     .padding(.bottom, 20)
@@ -291,7 +308,7 @@ struct SupabaseRecipeListView: View {
                         .padding(.horizontal, 22)
                         .padding(.bottom, 10)
 
-                    ruledRecipeList(recentlyAdded)
+                    ruledRecipeList(recentlyAdded, leafIDs: leafIDs)
                         .padding(.bottom, 30)
                 }
 
@@ -301,7 +318,7 @@ struct SupabaseRecipeListView: View {
                         .padding(.horizontal, 22)
                         .padding(.bottom, 10)
 
-                    ruledRecipeList(gridRecipes)
+                    ruledRecipeList(gridRecipes, leafIDs: leafIDs)
                         .padding(.bottom, 40)
                 }
             }
@@ -408,7 +425,7 @@ struct SupabaseRecipeListView: View {
 
     /// Vertical ruled list: 58\u{00D7}58 halftone thumbnail, title over
     /// uppercase metadata, a persimmon chevron at the trailing edge.
-    private func ruledRecipeList(_ recipes: [RecipeRow]) -> some View {
+    private func ruledRecipeList(_ recipes: [RecipeRow], leafIDs: Set<UUID> = []) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(recipes) { recipe in
                 VStack(spacing: 0) {
@@ -416,7 +433,7 @@ struct SupabaseRecipeListView: View {
                     NavigationLink {
                         SupabaseRecipeDetailView(recipe: recipe)
                     } label: {
-                        listRow(recipe)
+                        listRow(recipe, showsLeaf: leafIDs.contains(recipe.id))
                     }
                     .buttonStyle(.plain)
                     .contextMenu { recipeContextMenu(recipe) }
@@ -426,7 +443,7 @@ struct SupabaseRecipeListView: View {
         }
     }
 
-    private func listRow(_ recipe: RecipeRow) -> some View {
+    private func listRow(_ recipe: RecipeRow, showsLeaf: Bool = false) -> some View {
         HStack(spacing: 14) {
             RecipeCardImage(recipe: recipe, height: 58)
                 .frame(width: 58, height: 58)
@@ -441,6 +458,14 @@ struct SupabaseRecipeListView: View {
                         .lineLimit(1)
                     if recipe.isFavorite {
                         Image(systemName: "heart.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.fluffyInk2)
+                    }
+                    // Seasonal Suggestions v1: in season in the
+                    // household's region this month. Never shown when
+                    // the region is unset.
+                    if showsLeaf {
+                        Image(systemName: "leaf.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(Color.fluffyInk2)
                     }
@@ -724,6 +749,19 @@ struct DayPickerSheet: View {
     /// nil = EVERYONE (the household slot) — the default.
     @State private var selectedMemberID: UUID?
 
+    /// Seasonal Suggestions v1: leaf on the recipe being planned when
+    /// it's in season in the household's region. "" = dormant.
+    @AppStorage("seasonalRegion") private var seasonalRegionRaw = ""
+
+    private var recipeIsSeasonal: Bool {
+        !SeasonalMatch.seasonalRecipeIDs(
+            recipes: [recipe],
+            ingredientsByRecipeID: ingredientNames.map { [recipe.id: $0] } ?? [:],
+            region: USRegion(rawValue: seasonalRegionRaw),
+            month: Calendar.current.component(.month, from: Date())
+        ).isEmpty
+    }
+
     private let weekStart: Date = DateHelper.startOfWeek(containing: Date())
 
     private var weekDates: [Date] {
@@ -740,9 +778,16 @@ struct DayPickerSheet: View {
         NavigationStack {
             List {
                 Section {
-                    Text(recipe.name)
-                        .font(.fluffyHeadline)
-                        .foregroundStyle(Color.fluffyPrimary)
+                    HStack(spacing: 6) {
+                        Text(recipe.name)
+                            .font(.fluffyHeadline)
+                            .foregroundStyle(Color.fluffyPrimary)
+                        if recipeIsSeasonal {
+                            Image(systemName: "leaf.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.fluffyInk2)
+                        }
+                    }
                 } header: {
                     Text("Plan this recipe")
                 }
