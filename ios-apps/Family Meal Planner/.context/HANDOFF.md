@@ -127,3 +127,8 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - **Next step: device pass of per-person meals** (checklist in ACTIVE_TASK). Can run from any machine whose `Secrets.xcconfig` has real SUPABASE_URL + SUPABASE_ANON_KEY (MacBook has them; office iMac — probe first, and check personal-projects is at ~/Developer). A placeholder PROXY_KEY only disables AI features; it does NOT block the device pass.
 - **Archive 112 must happen on Home iMac** (only machine with real PROXY_KEY + ASC key). Do not archive until the device pass passes.
 - Fresh session on any machine: `git pull --ff-only`, then open with the identity check (scutil --get ComputerName + pwd + branch + commit).
+
+### 2026-08-31 evening — device pass PASSED (MacBook, wireless via hotspot)
+- Per-person meals verified on Dad's iPhone against production: profile member CRUD (migration 014 proven live), assignment chips, dietary hints (warn-only confirmed), member-meal grocery contribution + unwind on remove, member delete → meal survives as household meal.
+- Road to build 112 is OPEN. Archive from Home iMac (real PROXY_KEY + ASC key).
+- Wireless debug note: hospital/public Wi-Fi blocks device discovery (client isolation); workaround = Mac joins iPhone's Personal Hotspot.
