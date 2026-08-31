@@ -121,3 +121,9 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
   - Legacy multi-row household slots and orphaned rows render EVERY row (nothing planned is invisible); they collapse on the next assign, as before.
 - **Test infra:** fake PostgREST store now supports the `is.null` filter and emulates the 013 BEFORE DELETE trigger (household_members delete → meal_plans.member_id NULLed). New shared `TestFixtures.swift`. UUID columns come back uppercase from SDK inserts vs lowercase seeds — tests compare lowercased.
 - **Untested against prod** (fake backend only): the composite-FK insert path with real member ids, and RLS behavior on member_id writes (no policy changes were needed per the feature doc, but no live write with member_id has happened yet). First device pass should add a member meal against `papuusfhtojthtnbsdvs`.
+
+### 2026-08-31 — plane landed on Home iMac; resume from ANY machine
+- All work is on origin/main at 42404dc (Phase 3). Nothing unpushed. Local `.claude/settings.local.json` shows modified on Home iMac — Claude Code's local permissions, harmless; if a future `git pull` complains about it, run `git checkout -- .claude/settings.local.json` first.
+- **Next step: device pass of per-person meals** (checklist in ACTIVE_TASK). Can run from any machine whose `Secrets.xcconfig` has real SUPABASE_URL + SUPABASE_ANON_KEY (MacBook has them; office iMac — probe first, and check personal-projects is at ~/Developer). A placeholder PROXY_KEY only disables AI features; it does NOT block the device pass.
+- **Archive 112 must happen on Home iMac** (only machine with real PROXY_KEY + ASC key). Do not archive until the device pass passes.
+- Fresh session on any machine: `git pull --ff-only`, then open with the identity check (scutil --get ComputerName + pwd + branch + commit).
