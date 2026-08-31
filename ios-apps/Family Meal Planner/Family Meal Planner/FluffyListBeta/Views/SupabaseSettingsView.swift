@@ -14,9 +14,9 @@ struct SupabaseSettingsView: View {
     @EnvironmentObject private var householdService: HouseholdService
     @EnvironmentObject private var authService: AuthService
 
-    // Persisted preferences
+    // Persisted preferences. (Dietary preferences are no longer a
+    // device setting — they live per person; see PeopleView.)
     @AppStorage("householdSize") private var householdSize: Int = 2
-    @AppStorage("dietaryPreferences") private var dietaryPrefsRaw: String = ""
     @AppStorage("groceryStoreMode") private var storeMode = false
     @AppStorage("defaultServings") private var defaultServings: Int = 4
     @AppStorage("autoAddGroceries") private var autoAddGroceries = true
@@ -49,6 +49,7 @@ struct SupabaseSettingsView: View {
                                 value: "\(householdService.members.count) member\(householdService.members.count == 1 ? "" : "s")"
                             )
                         }
+                        peopleRow
                         joinCodeRow
                         stepperRow(
                             label: "Household size",
@@ -261,6 +262,33 @@ struct SupabaseSettingsView: View {
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 6)
+        }
+    }
+
+    // MARK: - People Row (per-person meals Phase 2)
+
+    /// Pushes the People screen: members, profile members, and
+    /// per-person dietary preferences.
+    private var peopleRow: some View {
+        VStack(spacing: 0) {
+            rule
+            NavigationLink {
+                PeopleView()
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("People")
+                        .font(.custom(FluffyFace.regular, size: 17))
+                        .foregroundStyle(Color.fluffyPrimary)
+                    Spacer()
+                    Text("Names & dietary preferences \u{2192}")
+                        .font(.custom(FluffyFace.regular, size: 14))
+                        .foregroundStyle(Color.fluffyAccent)
+                }
+                .padding(.horizontal, 22)
+                .padding(.vertical, 15)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 

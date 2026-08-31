@@ -41,13 +41,20 @@ struct HouseholdInsert: Codable {
 
 // MARK: - Household Members
 
-struct HouseholdMemberRow: Codable, Identifiable {
+struct HouseholdMemberRow: Codable, Identifiable, Equatable {
     let id: UUID
     let householdID: UUID
-    let userID: UUID
+    /// The Apple-ID account behind this member. NULL/nil = a "profile
+    /// member" (migration 013) — someone you plan meals for who never
+    /// signs in, like a kid. Profile members can't authenticate as
+    /// anyone: RLS matches auth.uid() = user_id and NULL never matches.
+    let userID: UUID?
     let displayName: String
     let isHeadCook: Bool
     let joinedAt: Date?
+    /// Raw DietaryOption strings ("Vegetarian", "Nut-Free", …) so the
+    /// Swift enum round-trips. Empty = no preferences.
+    let dietaryPreferences: [String]
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -56,20 +63,41 @@ struct HouseholdMemberRow: Codable, Identifiable {
         case displayName = "display_name"
         case isHeadCook = "is_head_cook"
         case joinedAt = "joined_at"
+        case dietaryPreferences = "dietary_preferences"
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdID = try c.decode(UUID.self, forKey: .householdID)
+        // Tolerant like the other Rows: absent or NULL both mean nil.
+        userID = try? c.decode(UUID.self, forKey: .userID)
+        displayName = (try? c.decode(String.self, forKey: .displayName)) ?? ""
+        isHeadCook = (try? c.decode(Bool.self, forKey: .isHeadCook)) ?? false
+        joinedAt = try? c.decode(Date.self, forKey: .joinedAt)
+        dietaryPreferences = (try? c.decode([String].self, forKey: .dietaryPreferences)) ?? []
+    }
+
+    /// True for members without an account (user_id NULL) — the only
+    /// members the app may rename/delete besides the signed-in user.
+    var isProfileMember: Bool { userID == nil }
 }
 
 struct HouseholdMemberInsert: Codable {
     let householdID: UUID
-    let userID: UUID
+    /// nil = profile member. Synthesized Codable omits nil, so the
+    /// column falls back to its NULL default.
+    let userID: UUID?
     let displayName: String
     let isHeadCook: Bool
+    var dietaryPreferences: [String] = []
 
     enum CodingKeys: String, CodingKey {
         case householdID = "household_id"
         case userID = "user_id"
         case displayName = "display_name"
         case isHeadCook = "is_head_cook"
+        case dietaryPreferences = "dietary_preferences"
     }
 }
 

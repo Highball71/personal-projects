@@ -73,3 +73,33 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 - Build 111 archived and uploaded to App Store Connect from the home iMac (10:34 AM). Ships copy-last-week + light-only appearance + grocery-unwind fix.
 - Next: confirm 111 appears in TestFlight, then Phase 2 per-person meals when David says go.
+
+---
+
+## 2026-08-31 update (per-person meals Phase 2, home iMac)
+
+- **Phase 2 CODE DONE** (People screen, profile members, per-member dietary prefs, AppStorage migration). App code only — no migrations written or applied; build number untouched. **Suite: 137 tests, 0 failures** (128 + 9 new `MemberCRUDTests`); sim build + launch verified on iPhone 17. Details in ACTIVE_TASK.
+- **⚠️ One deployment gap found — household_members RLS.** The policies in the repo (001 + 011) only permit INSERT/UPDATE/DELETE where `auth.uid() = user_id`, and NULL never matches, so **profile-member create/edit/delete will be RLS-blocked against prod** unless policies were added outside the repo when 013 was applied. Couldn't verify: this session's Supabase connector only sees the Placatto account. The app fails honestly (verified writes via `.select()` surface "couldn't be added/updated/removed" instead of silent success), and the dietary-prefs migration only touches the user's own row (covered by the existing "update own membership" policy), so nothing else breaks. **David: in the dashboard SQL editor on `papuusfhtojthtnbsdvs`, check then (if missing) run:**
+  ```sql
+  -- check what's there
+  select policyname, cmd from pg_policies where tablename = 'household_members';
+
+  -- profile-member policies (rows with user_id IS NULL, scoped to your own household)
+  create policy "Members can add profile members" on public.household_members
+    for insert to authenticated
+    with check (user_id is null and public.is_household_member(household_id));
+  create policy "Members can update profile members" on public.household_members
+    for update to authenticated
+    using (user_id is null and public.is_household_member(household_id))
+    with check (user_id is null and public.is_household_member(household_id));
+  create policy "Members can remove profile members" on public.household_members
+    for delete to authenticated
+    using (user_id is null and public.is_household_member(household_id));
+  ```
+  The `user_id is null` guard in WITH CHECK also stops anyone smuggling an account membership through these policies. Worth capturing as `014_profile_member_policies.sql` in the repo afterward (011-style drift capture) — not done this session per the no-migrations instruction.
+- **Smallest-reasonable-choice decisions** (feature doc was ambiguous / impossible-as-written):
+  - Onboarding dietary chips **still write the local AppStorage key** — the doc said they should write the member row instead, but that step runs before any account exists. The promise is kept transitively: `migrateLocalDietaryPreferencesIfNeeded()` (called from `loadCurrentHousehold`, which every entry path hits) promotes the key to the signed-in user's member row when that row's array is empty, then clears the key. Server wins over a stale local copy; failures keep the key and retry next launch.
+  - **Editing model follows RLS reality:** you can edit yourself and profile members; other account members' rows are read-only in the UI (only they can edit, from their device). Delete exists only for profile members (confirmation dialog; the 013 trigger detaches their meals). Account members leave via their own device, as before.
+  - PersonDetailView/AddPersonView are pushed screens with mastheads; the Settings "People" row lives in the Household group. Settings' device-level dietary declaration was removed (it was already unread).
+- Refactors along the way: `DietaryOption` promoted to `Models/DietaryOption.swift` (**raw values are DB data now — never rename cases**); chips extracted to `Design/FluffyDietaryChips.swift` reusing `FluffyFlowLayout`; `HouseholdMemberRow.userID` is now `UUID?` with `isProfileMember`; fake PostgREST store supports PATCH representation + `seed()`.
+- **Phase 2 boundary respected:** no slot-semantics rework, no assignment chips, no day-row changes, MealPlanService untouched. App icon + FEATURE_SEASONAL untouched (parked).

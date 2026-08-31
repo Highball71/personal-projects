@@ -49,6 +49,14 @@ final class FakePostgRESTStore: @unchecked Sendable {
         return tables[table] ?? []
     }
 
+    /// Seed rows directly, bypassing the request path — for test
+    /// fixtures the app itself can't create (e.g. an account member
+    /// row, which in production only sign-up flows insert).
+    func seed(table: String, rows newRows: [[String: Any]]) {
+        lock.lock(); defer { lock.unlock() }
+        tables[table, default: []].append(contentsOf: newRows)
+    }
+
     // MARK: Request handling
 
     func handle(_ request: URLRequest, body: Data?) -> (status: Int, body: Data) {
@@ -106,11 +114,15 @@ final class FakePostgRESTStore: @unchecked Sendable {
             guard let body, let patch = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else {
                 return (400, Data("{}".utf8))
             }
+            var updated: [[String: Any]] = []
             for index in all.indices where Self.matches(all[index], filters) {
                 for (key, value) in patch { all[index][key] = value }
+                updated.append(all[index])
             }
             tables[table] = all
-            return (204, Data())
+            // Like real PostgREST: return the updated rows when the
+            // caller asked for a representation (select=...).
+            return wantsRepresentation ? (200, Self.encode(updated)) : (204, Data())
 
         case "DELETE":
             let deleted = all.filter { Self.matches($0, filters) }

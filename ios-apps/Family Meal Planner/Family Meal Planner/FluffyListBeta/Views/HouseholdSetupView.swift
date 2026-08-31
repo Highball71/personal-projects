@@ -6,7 +6,9 @@
 //  Press" dress: masthead with a step dateline, underlined-word
 //  dietary chips, and a solid ink-1 Continue. Preferences are stored
 //  locally in UserDefaults so they survive before a Supabase account
-//  exists.
+//  exists; once the user has a member row, HouseholdService's
+//  dietary-prefs migration promotes them to that row's
+//  dietary_preferences column and clears the local key (Phase 2).
 //
 
 import SwiftUI
@@ -149,40 +151,8 @@ struct HouseholdSetupView: View {
 
             // Underlined-word chips — not capsules. Multi-select:
             // chosen words take ink 1 and a 2px underline.
-            FlowLayout(spacing: 18) {
-                ForEach(DietaryOption.allCases) { option in
-                    dietaryChip(option)
-                }
-            }
+            FluffyDietaryChips(selection: $selectedPrefs)
         }
-    }
-
-    private func dietaryChip(_ option: DietaryOption) -> some View {
-        let isSelected = selectedPrefs.contains(option)
-        return Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                if isSelected {
-                    selectedPrefs.remove(option)
-                } else {
-                    selectedPrefs.insert(option)
-                }
-            }
-        } label: {
-            VStack(spacing: 3) {
-                Text(option.rawValue.uppercased())
-                    .font(.custom(FluffyFace.regular, size: 14))
-                    .fluffyTracking(0.06, at: 14)
-                    .foregroundStyle(
-                        isSelected ? Color.fluffyAccent : Color.fluffySecondary
-                    )
-                FluffyRule(
-                    weight: 2,
-                    color: isSelected ? .fluffyAccent : .clear
-                )
-            }
-            .fixedSize()
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Persistence
@@ -190,10 +160,7 @@ struct HouseholdSetupView: View {
     private func loadPreferences() {
         guard !didLoadPrefs else { return }
         didLoadPrefs = true
-        let saved = dietaryPrefsRaw
-            .split(separator: ",")
-            .compactMap { DietaryOption(rawValue: String($0)) }
-        selectedPrefs = Set(saved)
+        selectedPrefs = DietaryOption.set(fromCommaSeparated: dietaryPrefsRaw)
     }
 
     private func savePreferences() {
@@ -204,83 +171,7 @@ struct HouseholdSetupView: View {
     }
 }
 
-// MARK: - Dietary Options
-
-private enum DietaryOption: String, CaseIterable, Identifiable, Hashable {
-    case vegetarian  = "Vegetarian"
-    case vegan       = "Vegan"
-    case glutenFree  = "Gluten-Free"
-    case dairyFree   = "Dairy-Free"
-    case nutFree     = "Nut-Free"
-    case lowCarb     = "Low-Carb"
-    case pescatarian = "Pescatarian"
-    case halal       = "Halal"
-    case kosher      = "Kosher"
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .vegetarian:  "leaf"
-        case .vegan:       "leaf.fill"
-        case .glutenFree:  "slash.circle"
-        case .dairyFree:   "drop.triangle"
-        case .nutFree:     "exclamationmark.triangle"
-        case .lowCarb:     "scalemass"
-        case .pescatarian: "fish"
-        case .halal:       "checkmark.seal"
-        case .kosher:      "star.circle"
-        }
-    }
-}
-
-// MARK: - Flow Layout
-
-/// A wrapping horizontal layout — chips flow to the next line
-/// when the row fills up. Lightweight replacement for iOS 16 Layout.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var height: CGFloat = 0
-        for (i, row) in rows.enumerated() {
-            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            height += rowHeight
-            if i < rows.count - 1 { height += spacing }
-        }
-        return CGSize(width: proposal.width ?? 0, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var y = bounds.minY
-        for row in rows {
-            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            var x = bounds.minX
-            for subview in row {
-                let size = subview.sizeThatFits(.unspecified)
-                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-            y += rowHeight + spacing
-        }
-    }
-
-    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubviews.Element]] {
-        let maxWidth = proposal.width ?? .infinity
-        var rows: [[LayoutSubviews.Element]] = [[]]
-        var currentWidth: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentWidth + size.width > maxWidth && !rows[rows.count - 1].isEmpty {
-                rows.append([])
-                currentWidth = 0
-            }
-            rows[rows.count - 1].append(subview)
-            currentWidth += size.width + spacing
-        }
-        return rows
-    }
-}
+// DietaryOption moved to Models/DietaryOption.swift and the chip row
+// to Design/FluffyDietaryChips.swift (shared with the People screen
+// since per-person meals Phase 2); the flow layout was replaced by the
+// shared FluffyFlowLayout in SupabaseRecipeListView.

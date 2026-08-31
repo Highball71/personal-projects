@@ -73,7 +73,7 @@ final class HouseholdService: ObservableObject {
                 displayName: memberDisplayName,
                 isHeadCook: true
             )
-            print("🟡 [HouseholdService] INSERT household_members payload: household_id=\(memberPayload.householdID), user_id=\(memberPayload.userID), display_name=\(memberPayload.displayName), is_head_cook=\(memberPayload.isHeadCook)")
+            print("🟡 [HouseholdService] INSERT household_members payload: household_id=\(memberPayload.householdID), user_id=\(memberPayload.userID?.uuidString ?? "NULL"), display_name=\(memberPayload.displayName), is_head_cook=\(memberPayload.isHeadCook)")
 
             try await supabase
                 .from("household_members")
@@ -197,6 +197,11 @@ final class HouseholdService: ObservableObject {
 
             household = rows.first
             await loadMembers()
+            // Phase 2: promote any device-local dietary prefs onto the
+            // signed-in user's member row. Runs here because every path
+            // into the app (launch, create, join) lands on
+            // SupabaseContentView, whose .task calls this method.
+            await migrateLocalDietaryPreferencesIfNeeded()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -223,7 +228,7 @@ final class HouseholdService: ObservableObject {
 
             print("🟢 [HouseholdService] loadMembers: got \(loaded.count) row(s)")
             for m in loaded {
-                print("   • member: user_id=\(m.userID), display_name=\(m.displayName), is_head_cook=\(m.isHeadCook)")
+                print("   • member: user_id=\(m.userID?.uuidString ?? "NULL (profile)"), display_name=\(m.displayName), is_head_cook=\(m.isHeadCook)")
             }
             members = loaded
             membersLoaded = true
@@ -233,6 +238,194 @@ final class HouseholdService: ObservableObject {
             errorMessage = "Failed to load members: \(error.localizedDescription)"
             membersLoaded = true
             isLoadingMembers = false
+        }
+    }
+
+    // MARK: - Profile Members (per-person meals, Phase 2)
+
+    /// Create a "profile member" — a household member without an
+    /// account (user_id NULL, migration 013). Kids, guests: people you
+    /// plan meals for who never sign in. Any member can create one.
+    func createProfileMember(name: String, dietaryPreferences: [String]) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "Give this person a name."
+            return false
+        }
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else {
+            errorMessage = "No household selected."
+            return false
+        }
+
+        errorMessage = nil
+        do {
+            let payload = HouseholdMemberInsert(
+                householdID: householdID,
+                userID: nil,
+                displayName: trimmed,
+                isHeadCook: false,
+                dietaryPreferences: dietaryPreferences
+            )
+            // .select() so RLS silently inserting nothing can't be
+            // mistaken for success.
+            let rows: [HouseholdMemberRow] = try await supabase
+                .from("household_members")
+                .insert(payload)
+                .select()
+                .execute()
+                .value
+
+            guard rows.first != nil else {
+                errorMessage = "\(trimmed) couldn't be added."
+                return false
+            }
+            await loadMembers()
+            return true
+        } catch {
+            print("🔴 [HouseholdService] createProfileMember ERROR: \(error)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Update a member's name and dietary preferences. RLS permits
+    /// this only for the signed-in user's own row and (with the
+    /// profile-member policies) for profile members — the UI offers
+    /// editing only in those cases.
+    func updateMember(
+        _ memberID: UUID,
+        displayName: String,
+        dietaryPreferences: [String]
+    ) async -> Bool {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "A person needs a name."
+            return false
+        }
+
+        errorMessage = nil
+        struct MemberUpdate: Encodable {
+            let displayName: String
+            let dietaryPreferences: [String]
+
+            enum CodingKeys: String, CodingKey {
+                case displayName = "display_name"
+                case dietaryPreferences = "dietary_preferences"
+            }
+        }
+
+        do {
+            // .select() to verify the row was actually updated — under
+            // RLS an unpermitted UPDATE succeeds with zero rows.
+            let updated: [HouseholdMemberRow] = try await supabase
+                .from("household_members")
+                .update(MemberUpdate(displayName: trimmed, dietaryPreferences: dietaryPreferences))
+                .eq("id", value: memberID.uuidString)
+                .select()
+                .execute()
+                .value
+
+            guard !updated.isEmpty else {
+                errorMessage = "This person couldn't be updated."
+                return false
+            }
+            await loadMembers()
+            return true
+        } catch {
+            print("🔴 [HouseholdService] updateMember ERROR: \(error)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Remove a profile member from the household. Account members are
+    /// never deletable here — RLS only lets a user delete their own
+    /// membership, so they leave from their own device. The DB's
+    /// BEFORE DELETE trigger (migration 013) detaches any meals
+    /// assigned to the member instead of orphaning them.
+    func deleteProfileMember(_ memberID: UUID) async -> Bool {
+        guard let member = members.first(where: { $0.id == memberID }) else {
+            errorMessage = "This person is no longer in the household."
+            return false
+        }
+        guard member.isProfileMember else {
+            errorMessage = "\(member.displayName) has an account and can only leave from their own device."
+            return false
+        }
+
+        errorMessage = nil
+        do {
+            // .select() to verify the delete — an RLS-blocked DELETE
+            // "succeeds" having removed zero rows.
+            let deleted: [HouseholdMemberRow] = try await supabase
+                .from("household_members")
+                .delete()
+                .eq("id", value: memberID.uuidString)
+                .select()
+                .execute()
+                .value
+
+            guard !deleted.isEmpty else {
+                errorMessage = "\(member.displayName) couldn't be removed."
+                await loadMembers()
+                return false
+            }
+            await loadMembers()
+            return true
+        } catch {
+            print("🔴 [HouseholdService] deleteProfileMember ERROR: \(error)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    // MARK: - Dietary Prefs Migration (Phase 2)
+
+    /// The pre-Phase-2 device-local dietary preferences key. Onboarding
+    /// still writes it (there is no account yet at that step); this
+    /// migration promotes it to the member row and clears it.
+    static let legacyDietaryPrefsKey = "dietaryPreferences"
+
+    /// One-time promotion of @AppStorage("dietaryPreferences") to the
+    /// signed-in user's member row (dietary_preferences, migration 013).
+    /// Rules: only when the local key is non-empty; if the member row
+    /// already has preferences, the server wins and the local copy is
+    /// discarded; on network failure the key is kept so a later launch
+    /// retries. Nothing reads the key after Phase 2.
+    func migrateLocalDietaryPreferencesIfNeeded() async {
+        let defaults = UserDefaults.standard
+        let raw = defaults.string(forKey: Self.legacyDietaryPrefsKey) ?? ""
+        guard !raw.isEmpty else { return }
+
+        guard let userID = SupabaseManager.shared.currentUserID,
+              let mine = members.first(where: { $0.userID == userID }) else {
+            // Not signed in or member row not loaded — retry next launch.
+            return
+        }
+
+        guard mine.dietaryPreferences.isEmpty else {
+            // The row was already populated (another device, or an
+            // earlier migration) — the server wins.
+            defaults.removeObject(forKey: Self.legacyDietaryPrefsKey)
+            return
+        }
+
+        let prefs = DietaryOption.rawValues(
+            from: DietaryOption.set(fromCommaSeparated: raw)
+        )
+        guard !prefs.isEmpty else {
+            // The key held nothing parseable — just clear it.
+            defaults.removeObject(forKey: Self.legacyDietaryPrefsKey)
+            return
+        }
+
+        if await updateMember(mine.id, displayName: mine.displayName, dietaryPreferences: prefs) {
+            defaults.removeObject(forKey: Self.legacyDietaryPrefsKey)
+            print("🟢 [HouseholdService] migrated device-local dietary prefs to member row: \(prefs)")
+        } else {
+            // Keep the key; a later launch retries. Don't surface the
+            // error — the user didn't ask for this write.
+            errorMessage = nil
         }
     }
 
