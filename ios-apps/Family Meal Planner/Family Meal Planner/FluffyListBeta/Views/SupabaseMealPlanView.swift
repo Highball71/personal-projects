@@ -4,26 +4,52 @@
 //
 //  "The Press" week view: masthead ("This Week"), an italic line of
 //  state, one ruled row per day (day/date column in ink, meal name
-//  over uppercase metadata), one meal per day (Beta rule),
-//  tap-to-control action sheet (Replace / Remove / Cancel) on filled
-//  slots, and the "Build the grocery list" text-link CTA.
+//  over uppercase metadata), one household meal plus up to one meal
+//  per member per day (per-person meals, Phase 3) — member meals as
+//  indented lines with a small-caps name kicker — tap-to-control
+//  action sheet (Replace / Remove / Cancel) on each meal, and the
+//  "Build the grocery list" text-link CTA.
 //
 
 import os
 import SwiftUI
 
+/// What the recipe picker is being opened for: a day, and who the
+/// meal should default to (nil = EVERYONE / the household slot).
+struct MealPickerContext: Identifiable {
+    let id = UUID()
+    let date: Date
+    let memberID: UUID?
+}
+
+/// The meal a tapped day-row line controls: drives the
+/// Replace / Remove action sheet.
+struct MealActionTarget: Identifiable {
+    let id = UUID()
+    let date: Date
+    let plan: MealPlanRow
+    /// Resolved assignment — nil for household meals AND for orphaned
+    /// rows whose member no longer exists (they render as household).
+    let memberID: UUID?
+    let memberName: String?
+    /// Meals on this date, so the sheet can offer "Clear the whole
+    /// day" when there's more than one.
+    let dayMealCount: Int
+}
+
 struct SupabaseMealPlanView: View {
     @EnvironmentObject private var mealPlanService: MealPlanService
     @EnvironmentObject private var recipeService: RecipeService
     @EnvironmentObject private var groceryService: GroceryService
+    @EnvironmentObject private var householdService: HouseholdService
 
     @Binding var selectedTab: AppTab
 
     @State private var weekStart: Date = DateHelper.startOfWeek(containing: Date())
-    @State private var pickerDate: Date?
+    @State private var pickerContext: MealPickerContext?
     /// When set, shows the Replace / Remove / Cancel action sheet
-    /// for the meal currently assigned to this date.
-    @State private var slotActionDate: Date?
+    /// for one specific meal on a date.
+    @State private var mealAction: MealActionTarget?
     @State private var isAssigning = false
     /// Line shown in the assigning overlay — the copy-week action
     /// reuses the overlay with its own wording.
@@ -145,36 +171,44 @@ struct SupabaseMealPlanView: View {
                 await reloadWeek()
                 await recipeService.fetchRecipes()
             }
-            .sheet(item: $pickerDate) { date in
+            .sheet(item: $pickerContext) { context in
                 RecipePickerSheet(
                     recipes: recipeService.recipes,
-                    onPick: { recipe in
-                        pickerDate = nil
-                        Task { await addMeal(recipe, to: date) }
+                    members: householdService.members,
+                    initialMemberID: context.memberID,
+                    ingredientsByRecipeID: recipeService.ingredientsByRecipeID,
+                    onPick: { recipe, memberID in
+                        pickerContext = nil
+                        Task { await addMeal(recipe, to: context.date, for: memberID) }
                     },
-                    onCancel: { pickerDate = nil }
+                    onCancel: { pickerContext = nil }
                 )
             }
             .sheet(isPresented: $showingAddRecipe) {
                 SupabaseAddRecipeView()
             }
             .confirmationDialog(
-                slotActionTitle,
-                isPresented: slotActionBinding,
+                mealActionTitle,
+                isPresented: mealActionBinding,
                 titleVisibility: .visible,
-                presenting: slotActionDate
-            ) { date in
+                presenting: mealAction
+            ) { target in
                 Button("Replace Meal") {
-                    slotActionDate = nil
-                    pickerDate = date
+                    mealAction = nil
+                    pickerContext = MealPickerContext(date: target.date, memberID: target.memberID)
                 }
                 Button("Remove Meal", role: .destructive) {
-                    let target = date
-                    slotActionDate = nil
-                    Task { await removeSlot(date: target) }
+                    mealAction = nil
+                    Task { await removeMeal(target) }
+                }
+                if target.dayMealCount > 1 {
+                    Button("Clear the Whole Day", role: .destructive) {
+                        mealAction = nil
+                        Task { await removeSlot(date: target.date) }
+                    }
                 }
                 Button("Cancel", role: .cancel) {
-                    slotActionDate = nil
+                    mealAction = nil
                 }
             }
             .overlay { assigningOverlay }
@@ -386,12 +420,12 @@ struct SupabaseMealPlanView: View {
 
     @ViewBuilder
     private func dayRow(_ date: Date) -> some View {
-        let meals = plans(for: date)
+        let dayPlan = DayPlan.build(from: plans(for: date), members: householdService.members)
 
-        if meals.isEmpty {
+        if dayPlan.isEmpty {
             emptyDayRow(date)
         } else {
-            filledDayRow(date, meals: meals)
+            filledDayRow(date, dayPlan: dayPlan)
         }
     }
 
@@ -406,7 +440,7 @@ struct SupabaseMealPlanView: View {
             if isPast {
                 withAnimation { toastMessage = "You can only plan meals for today or future days." }
             } else {
-                pickerDate = date
+                pickerContext = MealPickerContext(date: date, memberID: nil)
             }
         } label: {
             HStack(alignment: .center, spacing: 14) {
@@ -432,32 +466,101 @@ struct SupabaseMealPlanView: View {
         .buttonStyle(.plain)
     }
 
-    /// Day row with a meal — one meal per slot (Beta rule). The whole
-    /// row is tappable and opens the Replace / Remove / Cancel action
-    /// sheet. If legacy data has multiple rows for this date, only the
-    /// first is displayed; Replace or Remove will collapse the slot
-    /// back to a single row (or zero) via clearDayWithGroceries.
-    private func filledDayRow(_ date: Date, meals: [MealPlanRow]) -> some View {
+    /// Day row with at least one meal. The household meal is the
+    /// primary line; member meals render as indented lines beneath it
+    /// with a small-caps name kicker. Each line is its own tap target
+    /// opening the Replace / Remove action sheet for exactly that
+    /// meal. Legacy multi-row household slots render every row (they
+    /// collapse on the next assign); meals orphaned by a member delete
+    /// arrive here with member_id NULL (013 trigger) and render as
+    /// household meals.
+    private func filledDayRow(_ date: Date, dayPlan: DayPlan) -> some View {
         let today = Calendar.current.isDateInToday(date)
         let isPast = Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
-        let plan = meals.first
 
-        return Button {
-            // Past slots are read-only; nothing to control.
+        return HStack(alignment: .top, spacing: 14) {
+            dateColumn(date: date, today: today)
+
+            VStack(alignment: .leading, spacing: 12) {
+                // Household slot: the primary line. When only member
+                // meals exist, hold its place with a tappable
+                // "Nothing for everyone" so the household meal can
+                // still be added (future days only).
+                if dayPlan.householdMeals.isEmpty {
+                    if !isPast {
+                        emptyHouseholdLine(date)
+                    }
+                } else {
+                    ForEach(dayPlan.householdMeals) { plan in
+                        mealLine(plan, member: nil, date: date, isPast: isPast,
+                                 dayMealCount: dayPlan.mealCount)
+                    }
+                }
+
+                ForEach(dayPlan.memberMeals, id: \.plan.id) { memberMeal in
+                    mealLine(memberMeal.plan, member: memberMeal.member,
+                             date: date, isPast: isPast,
+                             dayMealCount: dayPlan.mealCount)
+                        .padding(.leading, 14)
+                }
+            }
+
+            Spacer()
+
+            // Add another meal (a person's, or replace via chips).
+            // Hidden on past days — they're read-only.
+            if !isPast {
+                Button {
+                    pickerContext = MealPickerContext(
+                        date: date,
+                        memberID: defaultPickerMember(for: dayPlan)
+                    )
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(Color.fluffyAccent)
+                        .padding(.top, 2)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 14)
+    }
+
+    /// One tappable meal line: optional small-caps member kicker, the
+    /// recipe title, and (household meals only) the category/time
+    /// metadata line.
+    private func mealLine(
+        _ plan: MealPlanRow,
+        member: HouseholdMemberRow?,
+        date: Date,
+        isPast: Bool,
+        dayMealCount: Int
+    ) -> some View {
+        Button {
             guard !isPast else { return }
-            slotActionDate = date
+            mealAction = MealActionTarget(
+                date: date,
+                plan: plan,
+                memberID: member?.id,
+                memberName: member?.displayName,
+                dayMealCount: dayMealCount
+            )
         } label: {
-            HStack(alignment: .center, spacing: 14) {
-                dateColumn(date: date, today: today)
-
-                if let plan, let recipe = recipeService.recipes.first(where: { $0.id == plan.recipeID }) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(recipe.name)
-                            .font(.fluffyHeadline)
-                            .fluffyTracking(-0.01, at: 19)
-                            .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffyPrimary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 3) {
+                if let member {
+                    FluffyMetadataLine(text: member.displayName)
+                }
+                if let recipe = recipeService.recipes.first(where: { $0.id == plan.recipeID }) {
+                    Text(recipe.name)
+                        .font(.fluffyHeadline)
+                        .fluffyTracking(-0.01, at: 19)
+                        .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffyPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    if member == nil {
                         let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
                         FluffyMetadataLine(text: total > 0
                              ? "\(recipe.category) \u{00B7} \(total) min"
@@ -467,23 +570,45 @@ struct SupabaseMealPlanView: View {
                     // Plan row exists but its recipe isn't loaded
                     // (or was deleted). Show a hint so the user can
                     // still tap to Replace / Remove.
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Tap to update")
-                            .font(.fluffyHeadline)
-                            .fluffyTracking(-0.01, at: 19)
-                            .foregroundStyle(Color.fluffySecondary)
-                        FluffyMetadataLine(text: "MEAL NEEDS ATTENTION")
-                    }
+                    Text("Tap to update")
+                        .font(.fluffyHeadline)
+                        .fluffyTracking(-0.01, at: 19)
+                        .foregroundStyle(Color.fluffySecondary)
+                    FluffyMetadataLine(text: "MEAL NEEDS ATTENTION")
                 }
-
-                Spacer()
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(isPast)
+    }
+
+    /// The household slot's placeholder when a day holds only member
+    /// meals — tappable to add the whole-family meal.
+    private func emptyHouseholdLine(_ date: Date) -> some View {
+        Button {
+            pickerContext = MealPickerContext(date: date, memberID: nil)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Nothing for everyone")
+                    .font(.fluffyHeadline)
+                    .fluffyTracking(-0.01, at: 19)
+                    .foregroundStyle(Color.fluffyTertiary)
+                FluffyMetadataLine(text: "TAP TO ADD")
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Default assignment when the day row's "+" opens the picker:
+    /// EVERYONE while the household slot is open; otherwise the first
+    /// member without a meal that day (so the plus naturally walks
+    /// through the family); EVERYONE again when the day is saturated.
+    private func defaultPickerMember(for dayPlan: DayPlan) -> UUID? {
+        guard !dayPlan.householdMeals.isEmpty else { return nil }
+        let planned = Set(dayPlan.memberMeals.map(\.member.id))
+        return householdService.members.first { !planned.contains($0.id) }?.id
     }
 
     // MARK: - Date Column
@@ -579,31 +704,37 @@ struct SupabaseMealPlanView: View {
             .filter { $0.recipeID != nil }
     }
 
-    /// Title shown above the Replace / Remove action sheet.
-    private var slotActionTitle: String {
-        guard let date = slotActionDate,
-              let plan = plans(for: date).first,
-              let recipe = recipeService.recipes.first(where: { $0.id == plan.recipeID })
+    /// Title shown above the Replace / Remove action sheet —
+    /// "Pasta Primavera" or "Pasta Primavera — for Maya".
+    private var mealActionTitle: String {
+        guard let target = mealAction,
+              let recipe = recipeService.recipes.first(where: { $0.id == target.plan.recipeID })
         else { return "This Meal" }
+        if let name = target.memberName {
+            return "\(recipe.name) \u{2014} for \(name)"
+        }
         return recipe.name
     }
 
-    /// Bool binding driving the confirmationDialog from `slotActionDate`.
-    private var slotActionBinding: Binding<Bool> {
+    /// Bool binding driving the confirmationDialog from `mealAction`.
+    private var mealActionBinding: Binding<Bool> {
         Binding(
-            get: { slotActionDate != nil },
-            set: { if !$0 { slotActionDate = nil } }
+            get: { mealAction != nil },
+            set: { if !$0 { mealAction = nil } }
         )
     }
 
     // MARK: - Actions
 
-    /// True when at least one day this week is unplanned and not in
-    /// the past — i.e. copy-last-week could actually land something.
+    /// True when at least one future day has an open slot — household
+    /// or member — i.e. copy-last-week could actually land something.
+    /// (Whether last week can fill a given open slot isn't knowable
+    /// here; the copy itself applies the exact per-slot skip rules.)
     private var hasOpenFutureDay: Bool {
         let today = Calendar.current.startOfDay(for: Date())
+        let slotCapacity = 1 + householdService.members.count
         return weekDates.contains { date in
-            plans(for: date).isEmpty &&
+            plans(for: date).count < slotCapacity &&
             Calendar.current.startOfDay(for: date) >= today
         }
     }
@@ -662,13 +793,14 @@ struct SupabaseMealPlanView: View {
         fetchFailed = !ok
     }
 
-    private func addMeal(_ recipe: RecipeRow, to date: Date) async {
+    private func addMeal(_ recipe: RecipeRow, to date: Date, for memberID: UUID? = nil) async {
         isAssigning = true
         defer { isAssigning = false }
 
         let result = await mealPlanService.addMealWithGroceries(
             recipe: recipe,
             on: date,
+            memberID: memberID,
             recipeService: recipeService,
             groceryService: groceryService
         )
@@ -678,11 +810,28 @@ struct SupabaseMealPlanView: View {
             return
         }
         await reloadWeek()
-        withAnimation { toastMessage = "Added to \(fullDayName(for: date))" }
+        let day = fullDayName(for: date)
+        let memberName = memberID.flatMap { id in
+            householdService.members.first { $0.id == id }?.displayName
+        }
+        withAnimation {
+            toastMessage = memberName.map { "Added for \($0) \u{2014} \(day)" }
+                ?? "Added to \(day)"
+        }
     }
 
-    /// Remove the meal assigned to a slot. Uses clearDayWithGroceries
-    /// so legacy multi-row slots also collapse cleanly.
+    /// Remove one specific meal (unwind-first, per-row).
+    private func removeMeal(_ target: MealActionTarget) async {
+        Logger.supabase.info("MealPlan removeMeal: plan=\(target.plan.id.uuidString)")
+        let removed = await mealPlanService.removeMeal(target.plan.id, groceryService: groceryService)
+        if !removed {
+            actionErrorMessage = "Couldn't remove that meal. Please try again."
+        }
+        await reloadWeek()
+    }
+
+    /// Remove ALL meals on a date — the "Clear the Whole Day" action.
+    /// clearDayWithGroceries settles groceries for every removed meal.
     private func removeSlot(date: Date) async {
         Logger.supabase.info("MealPlan removeSlot: date=\(MealPlanService.isoDate(from: date))")
         let cleared = await mealPlanService.clearDayWithGroceries(on: date, groceryService: groceryService)
@@ -697,8 +846,23 @@ struct SupabaseMealPlanView: View {
 
 struct RecipePickerSheet: View {
     let recipes: [RecipeRow]
-    let onPick: (RecipeRow) -> Void
+    /// Household members for the assignment chips. Empty hides the row
+    /// (the pick is a household meal, exactly the pre-Phase-3 flow).
+    var members: [HouseholdMemberRow] = []
+    /// Preselected assignment — set when the picker opens from a
+    /// specific meal line ("Replace" on Maya's meal preselects MAYA).
+    var initialMemberID: UUID? = nil
+    /// Lowercased ingredient names per recipe, for the dietary hint.
+    var ingredientsByRecipeID: [UUID: [String]] = [:]
+    let onPick: (RecipeRow, UUID?) -> Void
     let onCancel: () -> Void
+
+    /// nil = EVERYONE (the household slot) — the default.
+    @State private var selectedMemberID: UUID?
+
+    private var selectedMember: HouseholdMemberRow? {
+        selectedMemberID.flatMap { id in members.first { $0.id == id } }
+    }
 
     var body: some View {
         NavigationStack {
@@ -718,11 +882,21 @@ struct RecipePickerSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
+                        if !members.isEmpty {
+                            Section("Who is this meal for?") {
+                                FluffyAssignmentChips(
+                                    members: members,
+                                    selection: $selectedMemberID
+                                )
+                                .padding(.vertical, 4)
+                            }
+                        }
+
                         Section {
                             Button {
                                 if let pick = recipes.randomElement() {
                                     Logger.supabase.info("Surprise Me: picked \"\(pick.name)\" id=\(pick.id.uuidString)")
-                                    onPick(pick)
+                                    onPick(pick, selectedMemberID)
                                 }
                             } label: {
                                 HStack(spacing: 10) {
@@ -747,7 +921,7 @@ struct RecipePickerSheet: View {
                         Section("All Recipes") {
                             ForEach(recipes) { recipe in
                                 Button {
-                                    onPick(recipe)
+                                    onPick(recipe, selectedMemberID)
                                 } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
@@ -757,6 +931,20 @@ struct RecipePickerSheet: View {
                                             Text(recipe.category.capitalized)
                                                 .font(.fluffyCaption)
                                                 .foregroundStyle(Color.fluffySecondary)
+                                            // Keyword-only dietary hint for
+                                            // the selected person — a gentle
+                                            // flag, never a block.
+                                            if let member = selectedMember,
+                                               let conflict = DietaryMatch.conflict(
+                                                   for: member,
+                                                   recipe: recipe,
+                                                   ingredientNames: ingredientsByRecipeID[recipe.id]
+                                               ) {
+                                                FluffyMetadataLine(
+                                                    text: DietaryMatch.hintText(for: conflict),
+                                                    color: .fluffyAccent
+                                                )
+                                            }
                                         }
                                         Spacer()
                                     }
@@ -777,6 +965,7 @@ struct RecipePickerSheet: View {
                 }
             }
         }
+        .onAppear { selectedMemberID = initialMemberID }
     }
 }
 

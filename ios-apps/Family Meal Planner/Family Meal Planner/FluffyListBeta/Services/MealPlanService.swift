@@ -5,11 +5,15 @@
 //  CRUD for meal_plans via Supabase.
 //  Household-scoped via RLS.
 //
-//  Slot rule (Beta): one meal per (household, date). The DB still
+//  Slot rule (per-person meals, Phase 3): the slot key is
+//  (household, date, member_id). member_id NULL is the household slot
+//  — the whole-family meal, today's only kind before Phase 3 — and
+//  each member gets at most one slot per day, so a day can hold one
+//  household meal plus up to one meal per member. The DB still
 //  permits multiple rows per slot — the rule is enforced in the app
-//  by the assign path, which clears the slot before inserting.
-//  Legacy multi-row slots are tolerated on read and collapsed on the
-//  next assign or remove.
+//  by the assign path, which clears exactly its own slot before
+//  inserting. Legacy multi-row slots are tolerated on read and
+//  collapsed on the next assign or remove.
 //
 
 import Combine
@@ -31,6 +35,22 @@ struct CopyWeekResult: Equatable {
     var failed = 0
     /// True when the previous week had no meals to copy at all.
     var sourceEmpty = false
+}
+
+/// Which meal_plans rows on a date an operation targets.
+/// The slot key is (date, member_id): NULL member_id is the household
+/// slot, each member id is that person's slot, and `.wholeDay` is
+/// every slot at once (the day-level "Remove" action).
+enum MealSlotScope: Equatable {
+    case wholeDay
+    case household
+    case member(UUID)
+
+    /// The scope that owns a meal assigned to `memberID`
+    /// (nil = the household slot).
+    static func slot(for memberID: UUID?) -> MealSlotScope {
+        memberID.map { .member($0) } ?? .household
+    }
 }
 
 @MainActor
@@ -106,9 +126,10 @@ final class MealPlanService: ObservableObject {
 
     // MARK: - Add Meal
 
-    /// Insert a new meal plan row for (household, date).
-    /// Multiple rows per date are allowed.
-    func addMeal(recipeID: UUID, on date: Date) async -> UUID? {
+    /// Insert a new meal plan row for (household, date, member).
+    /// memberID nil = a household meal. Multiple rows per date are
+    /// allowed (one per slot).
+    func addMeal(recipeID: UUID, on date: Date, memberID: UUID? = nil) async -> UUID? {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.error("addMeal: no household ID")
             errorMessage = "No household selected."
@@ -116,11 +137,12 @@ final class MealPlanService: ObservableObject {
         }
 
         let iso = Self.isoDate(from: date)
-        Logger.supabase.info("addMeal: recipe=\(recipeID.uuidString) date=\(iso)")
+        Logger.supabase.info("addMeal: recipe=\(recipeID.uuidString) date=\(iso) member=\(memberID?.uuidString ?? "household")")
 
         let insert = MealPlanInsert(
             householdID: householdID,
             recipeID: recipeID,
+            memberID: memberID,
             date: iso
         )
 
@@ -149,13 +171,18 @@ final class MealPlanService: ObservableObject {
 
     // MARK: - Assign Meal + Groceries (orchestration)
 
-    /// Assign a recipe to a slot (household, date), enforcing the
-    /// one-meal-per-slot rule:
-    ///   1. Clear the slot — delete any existing meal_plans rows for
-    ///      this date and undo their grocery contributions
+    /// Assign a recipe to a slot (household, date, member), enforcing
+    /// the one-meal-per-slot rule:
+    ///   1. Clear THIS slot only — delete any existing meal_plans rows
+    ///      for (date, member) and undo their grocery contributions.
+    ///      A household assign never touches member meals, and a
+    ///      member assign never touches the household meal or other
+    ///      members' meals.
     ///   2. Insert the new meal plan row
     ///   3. Fetch the recipe's ingredients
     ///   4. Insert them as grocery items with contribution tracking
+    ///      (member meals contribute groceries identically — decided
+    ///      2026-08-27)
     ///
     /// This is the single write path for meal assignment from any UI
     /// surface (meal plan view, recipe list, recipe detail). Calling
@@ -166,6 +193,7 @@ final class MealPlanService: ObservableObject {
     func addMealWithGroceries(
         recipe: RecipeRow,
         on date: Date,
+        memberID: UUID? = nil,
         recipeService: RecipeService,
         groceryService: GroceryService
     ) async -> UUID? {
@@ -176,22 +204,27 @@ final class MealPlanService: ObservableObject {
             return nil
         }
 
-        // 1. Clear the slot first so this date holds at most one meal
-        //    after we insert. Safe on an already-empty slot.
+        // 1. Clear this slot first so (date, member) holds at most one
+        //    meal after we insert. Safe on an already-empty slot, and
+        //    scoped: the rest of the day's meals are untouched.
         //
         //    CRITICAL: if the clear fails (silent RLS rejection, network
         //    error, etc.) we MUST NOT proceed with the insert. Doing so
         //    would leave the slot stacked (old + new) and double the
         //    grocery contributions. errorMessage is already set by
-        //    clearDayWithGroceries on failure.
-        let cleared = await clearDayWithGroceries(on: date, groceryService: groceryService)
+        //    clearMealsWithGroceries on failure.
+        let cleared = await clearMealsWithGroceries(
+            on: date,
+            scope: .slot(for: memberID),
+            groceryService: groceryService
+        )
         guard cleared else {
             Logger.supabase.error("addMealWithGroceries: aborting insert — slot clear failed for date=\(Self.isoDate(from: date))")
             return nil
         }
 
         // 2. Insert meal plan row
-        guard let newPlanID = await addMeal(recipeID: recipe.id, on: date) else {
+        guard let newPlanID = await addMeal(recipeID: recipe.id, on: date, memberID: memberID) else {
             return nil
         }
 
@@ -269,10 +302,30 @@ final class MealPlanService: ObservableObject {
         }
     }
 
-    // MARK: - Clear Day
+    // MARK: - Clear Day / Slot
 
-    /// Remove all meals for (household, date) and undo their grocery
-    /// contributions.
+    /// Remove ALL meals for (household, date) — every slot, household
+    /// and member alike — and undo their grocery contributions. The
+    /// day-level "nuke the day" action. The snapshot-before-delete
+    /// unwind settles contributions for every removed meal, however
+    /// many the day held.
+    func clearDayWithGroceries(on date: Date, groceryService: GroceryService) async -> Bool {
+        await clearMealsWithGroceries(on: date, scope: .wholeDay, groceryService: groceryService)
+    }
+
+    /// Member-scoped variant: remove only one slot's meals —
+    /// the household slot (memberID nil) or one member's slot —
+    /// leaving the rest of the day untouched.
+    func clearSlotWithGroceries(
+        on date: Date,
+        memberID: UUID?,
+        groceryService: GroceryService
+    ) async -> Bool {
+        await clearMealsWithGroceries(on: date, scope: .slot(for: memberID), groceryService: groceryService)
+    }
+
+    /// Shared core for day- and slot-scoped removal: delete the
+    /// scope's meal_plans rows and undo their grocery contributions.
     ///
     /// Ordering is subtle because two constraints pull in opposite
     /// directions:
@@ -286,14 +339,18 @@ final class MealPlanService: ObservableObject {
     /// Resolution: SNAPSHOT the contribution rows first, then delete
     /// and verify, then settle grocery quantities from the snapshot,
     /// filtered to the rows the server confirmed deleted.
-    func clearDayWithGroceries(on date: Date, groceryService: GroceryService) async -> Bool {
+    private func clearMealsWithGroceries(
+        on date: Date,
+        scope: MealSlotScope,
+        groceryService: GroceryService
+    ) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
 
         let iso = Self.isoDate(from: date)
 
         // 1. Snapshot current rows for logging context.
-        let beforeRows = await fetchSlotRows(householdID: householdID, iso: iso)
-        Logger.supabase.info("clearDayWithGroceries: date=\(iso) — \(beforeRows.count) row(s) before delete")
+        let beforeRows = await fetchSlotRows(householdID: householdID, iso: iso, scope: scope)
+        Logger.supabase.info("clearMealsWithGroceries: date=\(iso) scope=\(String(describing: scope)) — \(beforeRows.count) row(s) before delete")
 
         guard !beforeRows.isEmpty else { return true }
 
@@ -305,7 +362,7 @@ final class MealPlanService: ObservableObject {
         guard let contributionSnapshot = await groceryService.fetchContributions(
             forMealPlans: beforeRows.map(\.id)
         ) else {
-            Logger.supabase.error("clearDayWithGroceries: aborting — couldn't snapshot grocery contributions")
+            Logger.supabase.error("clearMealsWithGroceries: aborting — couldn't snapshot grocery contributions")
             errorMessage = "Couldn't remove this meal. Please try again."
             return false
         }
@@ -314,25 +371,26 @@ final class MealPlanService: ObservableObject {
         //    actually removed.
         let deletedIDs: [UUID]
         do {
-            let deleted: [MealPlanRow] = try await supabase
+            let query = supabase
                 .from("meal_plans")
                 .delete()
                 .eq("household_id", value: householdID.uuidString)
                 .eq("date", value: iso)
+            let deleted: [MealPlanRow] = try await Self.applyScope(scope, to: query)
                 .select()
                 .execute()
                 .value
             deletedIDs = deleted.map(\.id)
-            Logger.supabase.info("clearDayWithGroceries: server reported \(deletedIDs.count) row(s) deleted")
+            Logger.supabase.info("clearMealsWithGroceries: server reported \(deletedIDs.count) row(s) deleted")
         } catch {
-            Logger.supabase.error("clearDayWithGroceries: delete failed — \(error.localizedDescription)")
+            Logger.supabase.error("clearMealsWithGroceries: delete failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return false
         }
 
-        // 4. Verify the slot is empty.
-        let afterRows = await fetchSlotRows(householdID: householdID, iso: iso)
-        Logger.supabase.info("clearDayWithGroceries: date=\(iso) — \(afterRows.count) row(s) after delete")
+        // 4. Verify the scope is empty.
+        let afterRows = await fetchSlotRows(householdID: householdID, iso: iso, scope: scope)
+        Logger.supabase.info("clearMealsWithGroceries: date=\(iso) — \(afterRows.count) row(s) after delete")
 
         // 5. Settle grocery quantities from the snapshot — but only
         //    for meal plans the server confirmed deleted, preserving
@@ -345,12 +403,30 @@ final class MealPlanService: ObservableObject {
 
         if !afterRows.isEmpty {
             let leftover = afterRows.map { $0.id.uuidString }.joined(separator: ", ")
-            Logger.supabase.error("clearDayWithGroceries: \(afterRows.count) row(s) still present after delete (likely RLS blocked the DELETE). leftover=[\(leftover)]")
+            Logger.supabase.error("clearMealsWithGroceries: \(afterRows.count) row(s) still present after delete (likely RLS blocked the DELETE). leftover=[\(leftover)]")
             errorMessage = "Couldn't remove this meal. Please try again or check your account permissions."
             return false
         }
 
         return true
+    }
+
+    /// Append the scope's member_id filter to a meal_plans query.
+    /// `.wholeDay` adds nothing; `.household` matches member_id IS
+    /// NULL (pre-013 rows and whole-family meals); `.member` matches
+    /// one member's rows.
+    private static func applyScope(
+        _ scope: MealSlotScope,
+        to query: PostgrestFilterBuilder
+    ) -> PostgrestFilterBuilder {
+        switch scope {
+        case .wholeDay:
+            return query
+        case .household:
+            return query.is("member_id", value: nil)
+        case .member(let id):
+            return query.eq("member_id", value: id.uuidString)
+        }
     }
 
     // NOTE: a `clearSlot(on:)` helper used to live here. It deleted
@@ -361,12 +437,27 @@ final class MealPlanService: ObservableObject {
 
     // MARK: - Copy Last Week
 
+    /// A slot's identity within one week: date + owner. Used to
+    /// collapse legacy multi-row slots and to skip filled targets
+    /// per (day, member) — copying Maya's Tuesday meal is skipped only
+    /// when the target Tuesday already has a meal FOR MAYA, not when
+    /// it has a household meal or Sam's meal.
+    static func slotKey(date: String, memberID: UUID?) -> String {
+        "\(date)|\(memberID?.uuidString.lowercased() ?? "household")"
+    }
+
     /// Copy the previous week's meals onto the week starting at
     /// `weekStart`, shifting each by +7 days.
     ///
-    /// Rules (decided 2026-08-27):
-    ///   - Target days that already hold a meal are SKIPPED — existing
-    ///     plans are never overwritten.
+    /// Rules (decided 2026-08-27, extended to per-person slots in
+    /// Phase 3):
+    ///   - Copies preserve each meal's assignment: a member meal is
+    ///     copied for that same member; a household meal stays a
+    ///     household meal.
+    ///   - Target slots that already hold a meal for the SAME target
+    ///     (household, or that member) are SKIPPED — existing plans
+    ///     are never overwritten. Other slots on the same day still
+    ///     copy.
     ///   - Target days already in the past are skipped silently. The
     ///     assign path refuses past dates with an error; we pre-filter
     ///     so a routine copy never surfaces one.
@@ -403,22 +494,39 @@ final class MealPlanService: ObservableObject {
             return nil
         }
 
-        // Beta slot rule: one meal per day. Collapse legacy multi-row
-        // slots to their first row (same convention as the week view)
-        // and ignore orphan rows (recipe_id NULLed by a recipe delete).
-        var sourceByDate: [String: MealPlanRow] = [:]
+        // Slot rule: one meal per (day, member). Collapse legacy
+        // multi-row slots to their first row (same convention as the
+        // week view) and ignore orphan rows (recipe_id NULLed by a
+        // recipe delete). Keyed per slot so a day's household meal and
+        // member meals each survive the collapse.
+        var sourceBySlot: [String: MealPlanRow] = [:]
+        // Slot order within each date: preserve fetch order but keep it
+        // deterministic — household copies before member meals.
+        var slotOrderByDate: [String: [String]] = [:]
         for row in sourceRows where row.recipeID != nil {
-            if sourceByDate[row.date] == nil { sourceByDate[row.date] = row }
+            let key = Self.slotKey(date: row.date, memberID: row.memberID)
+            if sourceBySlot[key] == nil {
+                sourceBySlot[key] = row
+                if row.memberID == nil {
+                    slotOrderByDate[row.date, default: []].insert(key, at: 0)
+                } else {
+                    slotOrderByDate[row.date, default: []].append(key)
+                }
+            }
         }
 
         var result = CopyWeekResult()
-        if sourceByDate.isEmpty {
+        if sourceBySlot.isEmpty {
             result.sourceEmpty = true
             Logger.supabase.info("copyPreviousWeek: previous week is empty — nothing to copy")
             return result
         }
 
-        let filledTargetDates = Set(targetRows.filter { $0.recipeID != nil }.map(\.date))
+        let filledTargetSlots = Set(
+            targetRows
+                .filter { $0.recipeID != nil }
+                .map { Self.slotKey(date: $0.date, memberID: $0.memberID) }
+        )
         let today = cal.startOfDay(for: Date())
 
         // Recipes are needed for the addMealWithGroceries call below.
@@ -428,44 +536,52 @@ final class MealPlanService: ObservableObject {
 
         // 2. Walk the seven day-offsets so all Date construction matches
         //    the week view's `weekDates` (no re-parsing of ISO strings,
-        //    no UTC/local drift).
+        //    no UTC/local drift), then each day's slots.
         for offset in 0..<7 {
             guard let sourceDate = cal.date(byAdding: .day, value: offset, to: prevStart),
                   let targetDate = cal.date(byAdding: .day, value: offset, to: weekStart)
             else { continue }
 
-            guard let sourceRow = sourceByDate[Self.isoDate(from: sourceDate)],
-                  let recipeID = sourceRow.recipeID
-            else { continue } // nothing planned that day last week
+            let sourceSlotKeys = slotOrderByDate[Self.isoDate(from: sourceDate)] ?? []
+            guard !sourceSlotKeys.isEmpty else { continue } // nothing planned that day last week
 
             let targetISO = Self.isoDate(from: targetDate)
+            let dayIsPast = cal.startOfDay(for: targetDate) < today
 
-            if cal.startOfDay(for: targetDate) < today {
-                result.skippedPast += 1
-                Logger.supabase.info("copyPreviousWeek: skip \(targetISO) — in the past")
-                continue
-            }
-            if filledTargetDates.contains(targetISO) {
-                result.skippedFilled += 1
-                Logger.supabase.info("copyPreviousWeek: skip \(targetISO) — already planned")
-                continue
-            }
-            guard let recipe = recipeService.recipes.first(where: { $0.id == recipeID }) else {
-                result.skippedNoRecipe += 1
-                Logger.supabase.warning("copyPreviousWeek: skip \(targetISO) — recipe \(recipeID.uuidString) not found locally")
-                continue
-            }
+            for slotKey in sourceSlotKeys {
+                guard let sourceRow = sourceBySlot[slotKey],
+                      let recipeID = sourceRow.recipeID
+                else { continue }
 
-            let newID = await addMealWithGroceries(
-                recipe: recipe,
-                on: targetDate,
-                recipeService: recipeService,
-                groceryService: groceryService
-            )
-            if newID != nil {
-                result.copied += 1
-            } else {
-                result.failed += 1
+                if dayIsPast {
+                    result.skippedPast += 1
+                    Logger.supabase.info("copyPreviousWeek: skip \(targetISO) — in the past")
+                    continue
+                }
+                let targetSlotKey = Self.slotKey(date: targetISO, memberID: sourceRow.memberID)
+                if filledTargetSlots.contains(targetSlotKey) {
+                    result.skippedFilled += 1
+                    Logger.supabase.info("copyPreviousWeek: skip \(targetSlotKey) — already planned")
+                    continue
+                }
+                guard let recipe = recipeService.recipes.first(where: { $0.id == recipeID }) else {
+                    result.skippedNoRecipe += 1
+                    Logger.supabase.warning("copyPreviousWeek: skip \(targetISO) — recipe \(recipeID.uuidString) not found locally")
+                    continue
+                }
+
+                let newID = await addMealWithGroceries(
+                    recipe: recipe,
+                    on: targetDate,
+                    memberID: sourceRow.memberID,
+                    recipeService: recipeService,
+                    groceryService: groceryService
+                )
+                if newID != nil {
+                    result.copied += 1
+                } else {
+                    result.failed += 1
+                }
             }
         }
 
@@ -495,16 +611,21 @@ final class MealPlanService: ObservableObject {
         }
     }
 
-    /// Read all current meal_plans rows for a single (household, date)
-    /// directly from the DB. Used by clearDayWithGroceries for
-    /// before/after verification — bypasses any local cache.
-    private func fetchSlotRows(householdID: UUID, iso: String) async -> [MealPlanRow] {
+    /// Read the current meal_plans rows for (household, date) within a
+    /// scope, directly from the DB. Used by clearMealsWithGroceries
+    /// for before/after verification — bypasses any local cache.
+    private func fetchSlotRows(
+        householdID: UUID,
+        iso: String,
+        scope: MealSlotScope = .wholeDay
+    ) async -> [MealPlanRow] {
         do {
-            return try await supabase
+            let query = supabase
                 .from("meal_plans")
                 .select()
                 .eq("household_id", value: householdID.uuidString)
                 .eq("date", value: iso)
+            return try await Self.applyScope(scope, to: query)
                 .execute()
                 .value
         } catch {

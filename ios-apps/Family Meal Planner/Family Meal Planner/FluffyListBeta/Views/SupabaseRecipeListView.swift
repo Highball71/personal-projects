@@ -187,9 +187,11 @@ struct SupabaseRecipeListView: View {
             .sheet(item: $recipeToPlan) { recipe in
                 DayPickerSheet(
                     recipe: recipe,
-                    onPick: { date in
+                    members: householdService.members,
+                    ingredientNames: recipeService.ingredientsByRecipeID[recipe.id],
+                    onPick: { date, memberID in
                         recipeToPlan = nil
-                        Task { await addToMealPlan(recipe: recipe, date: date) }
+                        Task { await addToMealPlan(recipe: recipe, date: date, memberID: memberID) }
                     },
                     onCancel: { recipeToPlan = nil }
                 )
@@ -596,12 +598,13 @@ struct SupabaseRecipeListView: View {
 
     // MARK: - Add to Meal Plan
 
-    private func addToMealPlan(recipe: RecipeRow, date: Date) async {
-        Logger.supabase.info("Recipe list: addToMealPlan recipe=\(recipe.id.uuidString) date=\(MealPlanService.isoDate(from: date))")
+    private func addToMealPlan(recipe: RecipeRow, date: Date, memberID: UUID? = nil) async {
+        Logger.supabase.info("Recipe list: addToMealPlan recipe=\(recipe.id.uuidString) date=\(MealPlanService.isoDate(from: date)) member=\(memberID?.uuidString ?? "household")")
 
         let result = await mealPlanService.addMealWithGroceries(
             recipe: recipe,
             on: date,
+            memberID: memberID,
             recipeService: recipeService,
             groceryService: groceryService
         )
@@ -617,7 +620,14 @@ struct SupabaseRecipeListView: View {
 
         let f = DateFormatter()
         f.dateFormat = "EEEE"
-        withAnimation { toastMessage = "Added to \(f.string(from: date))" }
+        let day = f.string(from: date)
+        let memberName = memberID.flatMap { id in
+            householdService.members.first { $0.id == id }?.displayName
+        }
+        withAnimation {
+            toastMessage = memberName.map { "Added for \($0) \u{2014} \(day)" }
+                ?? "Added to \(day)"
+        }
     }
 
     /// Check if the recipe is scheduled before allowing deletion.
@@ -700,11 +710,19 @@ private enum BrowseTag: String, CaseIterable, Identifiable {
 // MARK: - Day Picker Sheet
 
 /// Lightweight sheet that lets the user pick one of the 7 days of the
-/// current week to assign a recipe to.
+/// current week to assign a recipe to — and, with per-person meals,
+/// who it's for (assignment chips; EVERYONE by default).
 struct DayPickerSheet: View {
     let recipe: RecipeRow
-    let onPick: (Date) -> Void
+    /// Household members for the assignment chips. Empty hides the row.
+    var members: [HouseholdMemberRow] = []
+    /// Lowercased ingredient names for the dietary hint under the chips.
+    var ingredientNames: [String]? = nil
+    let onPick: (Date, UUID?) -> Void
     let onCancel: () -> Void
+
+    /// nil = EVERYONE (the household slot) — the default.
+    @State private var selectedMemberID: UUID?
 
     private let weekStart: Date = DateHelper.startOfWeek(containing: Date())
 
@@ -712,6 +730,10 @@ struct DayPickerSheet: View {
         (0..<7).compactMap { offset in
             Calendar.current.date(byAdding: .day, value: offset, to: weekStart)
         }
+    }
+
+    private var selectedMember: HouseholdMemberRow? {
+        selectedMemberID.flatMap { id in members.first { $0.id == id } }
     }
 
     var body: some View {
@@ -725,11 +747,36 @@ struct DayPickerSheet: View {
                     Text("Plan this recipe")
                 }
 
+                if !members.isEmpty {
+                    Section("Who is it for?") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            FluffyAssignmentChips(
+                                members: members,
+                                selection: $selectedMemberID
+                            )
+                            // Keyword-only dietary hint for the selected
+                            // person — a gentle flag, never a block.
+                            if let member = selectedMember,
+                               let conflict = DietaryMatch.conflict(
+                                   for: member,
+                                   recipe: recipe,
+                                   ingredientNames: ingredientNames
+                               ) {
+                                FluffyMetadataLine(
+                                    text: DietaryMatch.hintText(for: conflict),
+                                    color: .fluffyAccent
+                                )
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
                 Section("Choose a Day") {
                     ForEach(weekDates, id: \.self) { date in
                         let isPast = Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
                         Button {
-                            onPick(date)
+                            onPick(date, selectedMemberID)
                         } label: {
                             HStack {
                                 Text(dayName(for: date))

@@ -136,18 +136,34 @@ final class FakePostgRESTStore: @unchecked Sendable {
         }
     }
 
-    /// Emulate migration 005's ON DELETE CASCADE foreign keys:
-    /// grocery_contributions vanish when their meal_plan or
-    /// grocery_item row is deleted.
+    /// Emulate migration 005's ON DELETE CASCADE foreign keys
+    /// (grocery_contributions vanish when their meal_plan or
+    /// grocery_item row is deleted) and migration 013's BEFORE DELETE
+    /// trigger on household_members (deleting a member NULLs
+    /// meal_plans.member_id for their meals — they become household
+    /// meals instead of orphans).
     private func cascadeLocked(from table: String, deletedRows: [[String: Any]]) {
+        let deletedIDs = Set(deletedRows.compactMap { ($0["id"] as? String)?.lowercased() })
+        guard !deletedIDs.isEmpty else { return }
+
+        if table == "household_members" {
+            guard var plans = tables["meal_plans"] else { return }
+            for index in plans.indices {
+                if let ref = (plans[index]["member_id"] as? String)?.lowercased(),
+                   deletedIDs.contains(ref) {
+                    plans[index]["member_id"] = nil
+                }
+            }
+            tables["meal_plans"] = plans
+            return
+        }
+
         let column: String
         switch table {
         case "meal_plans": column = "meal_plan_id"
         case "grocery_items": column = "grocery_item_id"
         default: return
         }
-        let deletedIDs = Set(deletedRows.compactMap { ($0["id"] as? String)?.lowercased() })
-        guard !deletedIDs.isEmpty else { return }
         tables["grocery_contributions"]?.removeAll { contribution in
             guard let ref = (contribution[column] as? String)?.lowercased() else { return false }
             return deletedIDs.contains(ref)
@@ -178,6 +194,13 @@ final class FakePostgRESTStore: @unchecked Sendable {
 
     private static func matches(_ row: [String: Any], _ filters: [Filter]) -> Bool {
         for filter in filters {
+            // NULL check first — "is.null" matches a missing key or an
+            // explicit NSNull, mirroring PostgREST's member_id=is.null.
+            if filter.op == "is", filter.value.lowercased() == "null" {
+                let value = row[filter.column]
+                if value == nil || value is NSNull { continue }
+                return false
+            }
             // Stringify for comparison; lowercase both sides because the
             // SDK sends uppercase UUIDs while the store generates lowercase.
             let rowValue = row[filter.column].map { "\($0)" }?.lowercased() ?? ""

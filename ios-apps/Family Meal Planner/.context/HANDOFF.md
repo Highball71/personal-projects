@@ -103,3 +103,21 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
   - PersonDetailView/AddPersonView are pushed screens with mastheads; the Settings "People" row lives in the Household group. Settings' device-level dietary declaration was removed (it was already unread).
 - Refactors along the way: `DietaryOption` promoted to `Models/DietaryOption.swift` (**raw values are DB data now — never rename cases**); chips extracted to `Design/FluffyDietaryChips.swift` reusing `FluffyFlowLayout`; `HouseholdMemberRow.userID` is now `UUID?` with `isProfileMember`; fake PostgREST store supports PATCH representation + `seed()`.
 - **Phase 2 boundary respected:** no slot-semantics rework, no assignment chips, no day-row changes, MealPlanService untouched. App icon + FEATURE_SEASONAL untouched (parked).
+
+---
+
+## 2026-08-31 later update (per-person meals Phase 3, home iMac, autonomous session)
+
+- **Phase 3 CODE DONE on branch `phase3-slots`, merged to main** (suite green + sim launch verified per the session's safety rule). App code + tests only — no migrations (schema complete after 013/014), build number untouched (111 uploaded). **Suite: 154 tests, 0 failures** (137 + 17 new); sim build + launch verified on iPhone 17.
+- **What changed:** slot key is now (date, member_id) — `MealSlotScope` + `clearSlotWithGroceries` member-scoped clear; `addMealWithGroceries(memberID:)` clears only its own slot; `copyPreviousWeek` copies per-slot with assignment intact; `DayPlan` (day-row grouping) + `DietaryMatch` (keyword hints) models; `FluffyAssignmentChips`; chips + hints in RecipePickerSheet AND DayPickerSheet; week-view day rows show household meal as primary line and member meals as indented kicker lines with per-meal Replace/Remove. Details in ACTIVE_TASK.
+- **Protected behaviors, now with tests:** copy-last-week copies member meals with assignment, skips per (day, member) slot, skips past days silently (CopyWeekTests); clearDayWithGroceries removes ALL of a day's meals and settles groceries for every one — the 110 grocery-strand fix extended to multi-meal days (SlotSemanticsTests); member delete leaves meals as household meals via the 013 trigger, emulated in the fake store, and the UI grouping renders them that way.
+- **Smallest-reasonable-choice decisions** (feature doc silent/ambiguous — revisit freely):
+  - The day row's "+" opens the picker defaulting to EVERYONE while the household slot is open, otherwise to the first member without a meal that day. Assigning to a target that already has a meal that day REPLACES it (identical to Replace Meal — it's the same slot-clear write path); the chips make the target visible before the tap.
+  - Member meal lines show the small-caps name kicker + recipe title only (no category/time metadata) to keep multi-meal rows compact; the household line keeps its metadata. Dynamic Type: lines wrap/lineLimit(2) as before.
+  - A day with only member meals shows a tappable "Nothing for everyone · TAP TO ADD" household placeholder (future days only).
+  - The per-meal action sheet offers "Clear the Whole Day" only when the day holds more than one meal — that's the surviving UI caller of clearDayWithGroceries; single-meal removal goes through removeMeal (unwind-first, per-row).
+  - Dietary hints appear only when a specific person is selected (EVERYONE shows none), phrased honestly as a guess: "MIGHT NOT BE NUT-FREE · ALMOND". Bare "nut" is deliberately not a keyword (nutmeg); keyword lists live in DietaryMatch.
+  - Copy-week tallies count meals (slots), not days; the existing toast copy still reads fine.
+  - Legacy multi-row household slots and orphaned rows render EVERY row (nothing planned is invisible); they collapse on the next assign, as before.
+- **Test infra:** fake PostgREST store now supports the `is.null` filter and emulates the 013 BEFORE DELETE trigger (household_members delete → meal_plans.member_id NULLed). New shared `TestFixtures.swift`. UUID columns come back uppercase from SDK inserts vs lowercase seeds — tests compare lowercased.
+- **Untested against prod** (fake backend only): the composite-FK insert path with real member ids, and RLS behavior on member_id writes (no policy changes were needed per the feature doc, but no live write with member_id has happened yet). First device pass should add a member meal against `papuusfhtojthtnbsdvs`.

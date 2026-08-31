@@ -16,6 +16,7 @@ struct SupabaseRecipeDetailView: View {
     @EnvironmentObject private var recipeService: RecipeService
     @EnvironmentObject private var mealPlanService: MealPlanService
     @EnvironmentObject private var groceryService: GroceryService
+    @EnvironmentObject private var householdService: HouseholdService
 
     let recipe: RecipeRow
 
@@ -145,9 +146,11 @@ struct SupabaseRecipeDetailView: View {
         .sheet(isPresented: $showingDayPicker) {
             DayPickerSheet(
                 recipe: recipe,
-                onPick: { date in
+                members: householdService.members,
+                ingredientNames: ingredients.map { $0.name.lowercased() },
+                onPick: { date, memberID in
                     showingDayPicker = false
-                    Task { await addToMealPlan(date: date) }
+                    Task { await addToMealPlan(date: date, memberID: memberID) }
                 },
                 onCancel: { showingDayPicker = false }
             )
@@ -492,10 +495,11 @@ struct SupabaseRecipeDetailView: View {
         isLoadingIngredients = false
     }
 
-    private func addToMealPlan(date: Date) async {
+    private func addToMealPlan(date: Date, memberID: UUID? = nil) async {
         let result = await mealPlanService.addMealWithGroceries(
             recipe: recipe,
             on: date,
+            memberID: memberID,
             recipeService: recipeService,
             groceryService: groceryService
         )
@@ -511,6 +515,13 @@ struct SupabaseRecipeDetailView: View {
 
         let f = DateFormatter()
         f.dateFormat = "EEEE"
-        withAnimation { toastMessage = "Added to \(f.string(from: date))" }
+        let day = f.string(from: date)
+        let memberName = memberID.flatMap { id in
+            householdService.members.first { $0.id == id }?.displayName
+        }
+        withAnimation {
+            toastMessage = memberName.map { "Added for \($0) \u{2014} \(day)" }
+                ?? "Added to \(day)"
+        }
     }
 }
