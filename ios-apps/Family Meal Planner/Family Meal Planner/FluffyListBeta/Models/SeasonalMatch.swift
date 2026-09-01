@@ -33,6 +33,19 @@ enum SeasonalMatch {
         let availableHits: [String]
 
         var isSeasonal: Bool { points > 0 }
+
+        /// Whether the score is strong enough for the leaf badge.
+        /// Stricter than isSeasonal: pantry staples like onion and
+        /// garlic sit on most months' "available" lists, so a single
+        /// available hit would put a leaf on nearly every recipe and
+        /// the badge would stop meaning anything. One peak hit, or two
+        /// hits of any kind, earns the leaf. The "In season now"
+        /// section keeps using isSeasonal — its ranking already sinks
+        /// weak matches, and promotion-with-low-rank is still useful.
+        var earnsBadge: Bool {
+            !peakHits.isEmpty || peakHits.count + availableHits.count >= 2
+        }
+
         var matchedProduce: [String] { peakHits + availableHits }
     }
 
@@ -148,8 +161,10 @@ enum SeasonalMatch {
             .map { $0 }
     }
 
-    /// IDs of every qualifying recipe (uncapped) — drives the small
-    /// leaf badge on recipe rows elsewhere. Empty when dormant.
+    /// IDs of every badge-worthy recipe (uncapped) — drives the small
+    /// leaf badge on recipe rows elsewhere. Uses the stricter
+    /// earnsBadge rule (one peak hit, or two hits total), not
+    /// isSeasonal. Empty when dormant.
     static func seasonalRecipeIDs(
         recipes: [RecipeRow],
         ingredientsByRecipeID: [UUID: [String]],
@@ -163,7 +178,7 @@ enum SeasonalMatch {
 
         return Set(recipes.filter {
             score(recipe: $0, ingredientNames: ingredientsByRecipeID[$0.id], produce: produce)
-                .isSeasonal
+                .earnsBadge
         }.map(\.id))
     }
 

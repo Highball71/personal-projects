@@ -158,3 +158,9 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - `seasonal-v1` merged into main after the 112 upload, per plan. Main now = per-person meals + seasonal suggestions v1 (unreleased). Next build number is 113.
 - Calendar JSON got an honest read: cells spot-checked against real harvest timing, all sound; one quibble — muscadine is late-Aug/Sep, listed available in Southeast July.
 - **Next:** fig icon polishing pass → drop 1024 PNG into asset catalog → device pass of seasonal (set region, check "In season now") → archive 113 → announcement email. Icon and seasonal launch TOGETHER as 113.
+
+### 2026-09-01 — seasonal badge tightened + muscadine fix (Home iMac, autonomous)
+- **Leaf badge rule tightened** per the device-pass review: `seasonalRecipeIDs` now uses `Score.earnsBadge` (≥1 PEAK hit, OR ≥2 hits total) instead of any-hit `isSeasonal`. Rationale: onion and garlic sit on most months' available lists, so a single available hit put a leaf on nearly every recipe and the badge meant nothing. **The "In season now" shelf is deliberately unchanged** — it still promotes any hit (`isSeasonal`) and its ranking handles weak matches; a new test pins that a single-available-hit recipe stays on the shelf but gets no leaf, while a single peak hit earns one.
+- **Calendar correction:** muscadine removed from Southeast July `available` (real timing is late Aug/Sep; it remains peak in Aug/Sep). Only JSON change; no other cells touched.
+- **Suite: 168 tests, 0 failures** (167 + 1 new `testBadgeNeedsPeakHitOrTwoHits`); sim build verified on iPhone 17. Build number untouched — next is 113.
+- Remaining before 113: finish the seasonal device pass (re-check badges are now selective), then archive 113 with the fig icon.

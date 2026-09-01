@@ -62,7 +62,8 @@ final class SeasonalMatchTests: XCTestCase {
     }
 
     /// Zero hits = shown normally elsewhere, but never promoted into
-    /// the section and never badged.
+    /// the section and never badged. (The badged recipe here has a
+    /// peak hit, which meets the stricter badge rule.)
     func testZeroHitRecipeIsExcludedFromSectionAndBadges() throws {
         let miss = try recipe("Weeknight Lentil Soup")
         let hit = try recipe("Tomato Salad")
@@ -83,6 +84,47 @@ final class SeasonalMatchTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(ids, [hit.id])
+    }
+
+    /// The leaf badge is stricter than the section: onion and garlic
+    /// sit on most months' "available" lists, so a lone available hit
+    /// must NOT earn the leaf (or nearly every recipe would wear one)
+    /// — but a lone PEAK hit does, and so do two hits of any kind.
+    /// The "In season now" section still promotes any hit at all.
+    func testBadgeNeedsPeakHitOrTwoHits() throws {
+        let onionOnly = try recipe("Weeknight Rice Bowl")
+        let peachOnly = try recipe("Peach Crumble")
+        let onionAndKale = try recipe("Braised Greens")
+        let ingredients = [
+            onionOnly.id: ["onion", "rice", "soy sauce"],
+            onionAndKale.id: ["onion", "kale", "olive oil"],
+        ]
+
+        let ids = SeasonalMatch.seasonalRecipeIDs(
+            recipes: [onionOnly, peachOnly, onionAndKale],
+            ingredientsByRecipeID: ingredients,
+            region: .northeast,
+            month: 8,
+            calendar: calendar
+        )
+        XCTAssertFalse(ids.contains(onionOnly.id),
+                       "a single available hit must not earn the leaf")
+        XCTAssertTrue(ids.contains(peachOnly.id),
+                      "a single peak hit earns the leaf")
+        XCTAssertTrue(ids.contains(onionAndKale.id),
+                      "two available hits earn the leaf")
+
+        // The section is untouched by the badge rule: the onion-only
+        // recipe is still promoted (ranked low), never filtered out.
+        let picks = SeasonalMatch.inSeasonNow(
+            recipes: [onionOnly, peachOnly, onionAndKale],
+            ingredientsByRecipeID: ingredients,
+            region: .northeast,
+            month: 8,
+            calendar: calendar
+        )
+        XCTAssertTrue(picks.map(\.recipe.id).contains(onionOnly.id),
+                      "the In season now shelf still promotes any hit")
     }
 
     /// The section is capped at 8 even when more recipes qualify.
