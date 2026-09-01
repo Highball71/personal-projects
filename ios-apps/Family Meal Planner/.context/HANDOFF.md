@@ -176,3 +176,9 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
   - **Hint format:** "+N" sits directly after the name, before the "· keyword" — one FluffyMetadataLine, one line.
 - **Suite: 174 tests, 0 failures** (168 + 2 new in DietaryMatchTests for householdConflict/copy + 4 new WeekSummaryTests incl. the past-days regression and the member-only-day rule); sim build + launch verified on iPhone 17 (fresh install, process alive). Build number untouched — next is 113.
 - **Not covered by tests:** the List conversion itself (visual). The device pass should eyeball: day-row spacing/rules vs the old ScrollView layout, swipe on member rows, dialog on multi-meal days, pull-to-refresh still working inside the List, and the empty-week + loading states (untouched ScrollViews).
+
+### 2026-09-01 — seasonal + polish device pass PASSED; 113 archived
+- Verified on Dad's iPhone: fig icon on home screen; dormant with no region; Mid-Atlantic region persists; "In season now" shelf in Choose a Recipe; thinned leaf badges; household-meal dietary hint names the affected member; open-nights count ignores past days; tap meal → recipe, swipe → Replace/Remove.
+- Known cosmetic (post-113): after swipe-remove, the week view refetches and rows disappear for a beat. Fix = remove row locally with animation, refresh silently.
+- Pre-existing data note: user library has duplicate "Whole30 Egg Roll in a Bowl" recipes (not a code issue).
+- 113 = per-person meals + seasonal suggestions v1 + fig icon. This is the coordinated-rollout build; announcement email follows.
