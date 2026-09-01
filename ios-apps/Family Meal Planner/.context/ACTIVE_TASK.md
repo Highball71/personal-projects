@@ -1,8 +1,11 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** (2026-09-01 — Claude Code on Home iMac, autonomous) **Seasonal badge tightened + one calendar correction**, pre-113 tweaks from the seasonal review. The leaf badge now requires at least one PEAK hit OR at least two hits total (`Score.earnsBadge`, used only by `seasonalRecipeIDs`) — previously any single hit earned a leaf, and since onion/garlic sit on most months' available lists, nearly every recipe was badged. The "In season now" shelf is UNCHANGED (still promotes any hit; ranking handles weak matches). Calendar: muscadine removed from Southeast July available (it's late Aug/Sep). **Suite: 168 tests, 0 failures** (167 + 1 new badge-threshold test); sim build verified on iPhone 17. Build number untouched (next is 113).
+**Session Focus:** (2026-09-01 — Claude Code on Home iMac, autonomous) **Three pre-113 polish items from today's device pass:**
+1. **Household dietary hints:** with EVERYONE selected in either picker, the recipe is checked against every member's preferences; the hint names the first affected member in household order and counts the rest — "MIGHT NOT BE VEGAN FOR MAYA +1 · BUTTER" (`DietaryMatch.householdConflict` + new `hintText` overload; per-member behavior untouched; still warn-only).
+2. **Open-nights bug fixed:** "One night is still open" no longer counts past empty days. New `Models/WeekSummary.swift` (pure, tested): open = today-or-later AND no household meal; a future member-only day still counts as open. `stateLine` + `openNightsLine` both use it; "settled"/"every night is planned" now mean "nothing left that could be filled".
+3. **Week-view interaction rework:** TAP on any meal line (household or member) navigates to `SupabaseRecipeDetailView`; Replace + Remove are swipe-left actions per meal line. The week body became a plain `List` with one row PER MEAL LINE (swipe actions need list rows); the Press look is drawn by the rows themselves (rules, 42pt date column on the first line, cleared column below). "Clear the Whole Day" keeps its dialog placement — the Remove swipe raises the dialog on multi-meal days, removes directly on single-meal days. The "+" affordance is unchanged.
 
-**Prior session (2026-08-31 late evening, MacBook):** Seasonal Suggestions v1 CODE DONE — bundled 8-region × 12-month produce calendar, Settings region picker, keyword scoring, "In season now" section in the recipe picker, leaf badges. Merged to main after the 112 upload.
+**Suite: 174 tests, 0 failures** (168 + 2 household-hint + 4 WeekSummary); sim build + launch verified on iPhone 17. Build number untouched (next is 113). Earlier today: seasonal leaf badge tightened (`Score.earnsBadge` = ≥1 peak or ≥2 hits; shelf unchanged) + muscadine removed from Southeast July.
 
 ## State after this session
 
@@ -18,7 +21,7 @@
 ## Next up
 
 1. ~~Archive/upload build 112~~ DONE 2026-08-31 night (from MacBook); `seasonal-v1` merged to main after.
-2. **Finish the seasonal device pass** (set region, check "In season now", verify badges are now selective, dormancy) — the badge fix from the first pass is in; re-check on device.
-3. **Archive 113** (per-person + seasonal + fig icon) → announcement email.
+2. **Device pass of today's three polish items** (household hints with EVERYONE, open-nights count late in the week, tap-to-detail + swipe Replace/Remove incl. member rows and the multi-meal Remove dialog) + re-check seasonal badges are now selective.
+3. **Archive 113** (per-person + seasonal + fig icon + polish) → announcement email.
 4. Seasonal v1.5 (parked): pass the current period's produce list into the AI suggestion prompt. Decide after seeing real library sizes.
 5. Parked: join-by-code second-Apple-ID test; Engineer Mode; pantry-scan suggestions; community recipes; toast icon string-match cosmetic.

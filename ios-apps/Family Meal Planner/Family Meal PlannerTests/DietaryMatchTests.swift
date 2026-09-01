@@ -83,4 +83,55 @@ final class DietaryMatchTests: XCTestCase {
             for: .init(option: .nutFree, keyword: "almond"))
         XCTAssertEqual(text, "Might not be Nut-Free \u{00B7} almond")
     }
+
+    // MARK: - Household-wide hints (EVERYONE selected)
+
+    /// EVERYONE checks every member: the hint names the FIRST member
+    /// (in household member order) with a clash, and counts the rest
+    /// as "+N" — even when they clash with different preferences.
+    func testHouseholdConflictNamesFirstMemberAndCountsOthers() throws {
+        let sam = try TestFixtures.member(householdID: householdID, name: "Sam")
+        let maya = try TestFixtures.member(
+            householdID: householdID, name: "Maya", prefs: ["Vegan"])
+        let kim = try TestFixtures.member(
+            householdID: householdID, name: "Kim", prefs: ["Dairy-Free"])
+        let recipe = try TestFixtures.recipeRow(householdID: householdID, name: "Alfredo")
+
+        let household = DietaryMatch.householdConflict(
+            members: [sam, maya, kim],
+            recipe: recipe,
+            ingredientNames: ["butter", "cream", "fettuccine"]
+        )
+        XCTAssertEqual(household?.memberName, "Maya",
+                       "first clashing member in household order is named")
+        XCTAssertEqual(household?.conflict.option, .vegan)
+        XCTAssertEqual(household?.conflict.keyword, "butter")
+        XCTAssertEqual(household?.othersCount, 1, "Kim's dairy clash counts as +1")
+
+        let text = DietaryMatch.hintText(for: household!)
+        XCTAssertEqual(text, "Might not be Vegan for Maya +1 \u{00B7} butter")
+    }
+
+    /// A lone clashing member gets no "+N"; nobody clashing (or no
+    /// members at all) means no hint.
+    func testHouseholdConflictSingleMemberAndNoConflictCases() throws {
+        let maya = try TestFixtures.member(
+            householdID: householdID, name: "Maya", prefs: ["Nut-Free"])
+        let sam = try TestFixtures.member(householdID: householdID, name: "Sam")
+        let stew = try TestFixtures.recipeRow(householdID: householdID, name: "Peanut Stew")
+
+        let household = DietaryMatch.householdConflict(
+            members: [sam, maya], recipe: stew, ingredientNames: nil)
+        XCTAssertEqual(household?.othersCount, 0)
+        XCTAssertEqual(
+            DietaryMatch.hintText(for: household!),
+            "Might not be Nut-Free for Maya \u{00B7} peanut")
+
+        let salad = try TestFixtures.recipeRow(householdID: householdID, name: "Garden Salad")
+        XCTAssertNil(DietaryMatch.householdConflict(
+            members: [sam, maya], recipe: salad,
+            ingredientNames: ["lettuce", "tomato"]))
+        XCTAssertNil(DietaryMatch.householdConflict(
+            members: [], recipe: stew, ingredientNames: nil))
+    }
 }

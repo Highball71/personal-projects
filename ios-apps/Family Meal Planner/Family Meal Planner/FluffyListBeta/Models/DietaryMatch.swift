@@ -130,4 +130,48 @@ enum DietaryMatch {
     static func hintText(for conflict: Conflict) -> String {
         "Might not be \(conflict.option.rawValue) \u{00B7} \(conflict.keyword)"
     }
+
+    // MARK: - Household-wide hints (EVERYONE selected)
+
+    /// A clash between a recipe and the whole household: the first
+    /// affected member's conflict, plus how many OTHER members also
+    /// clash — for a one-line "MIGHT NOT BE VEGAN FOR MAYA +1 · BUTTER"
+    /// hint when the picker's EVERYONE chip is selected.
+    struct HouseholdConflict: Equatable {
+        let memberName: String
+        let conflict: Conflict
+        /// Additional members (beyond the named one) with a clash of
+        /// their own — possibly against a different preference.
+        let othersCount: Int
+    }
+
+    /// Check a recipe against EVERY member's preferences. The named
+    /// member is the first with a clash in the given member order (the
+    /// household's stable order), so the hint reads the same day to
+    /// day. nil when nobody clashes — or when there are no members.
+    static func householdConflict(
+        members: [HouseholdMemberRow],
+        recipe: RecipeRow,
+        ingredientNames: [String]?
+    ) -> HouseholdConflict? {
+        let clashes = members.compactMap { member in
+            conflict(for: member, recipe: recipe, ingredientNames: ingredientNames)
+                .map { (member, $0) }
+        }
+        guard let first = clashes.first else { return nil }
+        return HouseholdConflict(
+            memberName: first.0.displayName,
+            conflict: first.1,
+            othersCount: clashes.count - 1
+        )
+    }
+
+    /// The household hint line — "Might not be Vegan for Maya · butter",
+    /// with " +1" after the name when more members clash too. Still a
+    /// hint, never a block.
+    static func hintText(for household: HouseholdConflict) -> String {
+        let others = household.othersCount > 0 ? " +\(household.othersCount)" : ""
+        return "Might not be \(household.conflict.option.rawValue) "
+            + "for \(household.memberName)\(others) \u{00B7} \(household.conflict.keyword)"
+    }
 }

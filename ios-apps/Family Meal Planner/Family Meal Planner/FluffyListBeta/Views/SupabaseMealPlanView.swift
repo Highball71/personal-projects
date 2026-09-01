@@ -6,9 +6,12 @@
 //  state, one ruled row per day (day/date column in ink, meal name
 //  over uppercase metadata), one household meal plus up to one meal
 //  per member per day (per-person meals, Phase 3) — member meals as
-//  indented lines with a small-caps name kicker — tap-to-control
-//  action sheet (Replace / Remove / Cancel) on each meal, and the
-//  "Build the grocery list" text-link CTA.
+//  indented lines with a small-caps name kicker. Tapping a meal opens
+//  its recipe detail; Replace and Remove live on swipe-left (which is
+//  why the week body is a plain List — swipe actions need list rows).
+//  "Clear the Whole Day" stays in a confirmation dialog, reached from
+//  the Remove swipe on multi-meal days. Closes with the "Build the
+//  grocery list" text-link CTA.
 //
 
 import os
@@ -22,8 +25,8 @@ struct MealPickerContext: Identifiable {
     let memberID: UUID?
 }
 
-/// The meal a tapped day-row line controls: drives the
-/// Replace / Remove action sheet.
+/// The meal a Remove swipe controls: drives the confirmation dialog
+/// (Remove Meal / Clear the Whole Day) on multi-meal days.
 struct MealActionTarget: Identifiable {
     let id = UUID()
     let date: Date
@@ -47,9 +50,12 @@ struct SupabaseMealPlanView: View {
 
     @State private var weekStart: Date = DateHelper.startOfWeek(containing: Date())
     @State private var pickerContext: MealPickerContext?
-    /// When set, shows the Replace / Remove / Cancel action sheet
-    /// for one specific meal on a date.
+    /// When set, shows the Remove Meal / Clear the Whole Day dialog
+    /// for one specific meal on a multi-meal day.
     @State private var mealAction: MealActionTarget?
+    /// Recipe id pushed onto the navigation stack when a meal line is
+    /// tapped — drives navigationDestination to the recipe detail.
+    @State private var detailRecipeID: UUID?
     @State private var isAssigning = false
     /// Line shown in the assigning overlay — the copy-week action
     /// reuses the overlay with its own wording.
@@ -193,10 +199,6 @@ struct SupabaseMealPlanView: View {
                 titleVisibility: .visible,
                 presenting: mealAction
             ) { target in
-                Button("Replace Meal") {
-                    mealAction = nil
-                    pickerContext = MealPickerContext(date: target.date, memberID: target.memberID)
-                }
                 Button("Remove Meal", role: .destructive) {
                     mealAction = nil
                     Task { await removeMeal(target) }
@@ -209,6 +211,11 @@ struct SupabaseMealPlanView: View {
                 }
                 Button("Cancel", role: .cancel) {
                     mealAction = nil
+                }
+            }
+            .navigationDestination(item: $detailRecipeID) { recipeID in
+                if let recipe = recipeService.recipes.first(where: { $0.id == recipeID }) {
+                    SupabaseRecipeDetailView(recipe: recipe)
                 }
             }
             .overlay { assigningOverlay }
@@ -229,10 +236,6 @@ struct SupabaseMealPlanView: View {
         return "WEEK OF \(fmt.string(from: weekStart).uppercased())"
     }
 
-    private var plannedCount: Int {
-        weekDates.filter { !plans(for: $0).isEmpty }.count
-    }
-
     private static let countWords = [
         "no", "one", "two", "three", "four", "five", "six", "seven"
     ]
@@ -241,23 +244,17 @@ struct SupabaseMealPlanView: View {
         (0...7).contains(n) ? Self.countWords[n] : "\(n)"
     }
 
-    /// "Five dinners planned, two open." — the italic line of state
-    /// under the masthead.
-    private var stateLine: String {
-        let planned = plannedCount
-        let open = weekDates.count - planned
-        if planned == 0 { return "Nothing planned yet." }
-        if open == 0 { return "Every night is planned." }
-        let dinners = planned == 1 ? "dinner" : "dinners"
-        return "\(word(planned).capitalized) \(dinners) planned, \(word(open)) open."
-    }
-
-    /// Italic sentence after the closing rule naming what's still open.
-    private var openNightsLine: String {
-        let open = weekDates.count - plannedCount
-        if open == 0 { return "The week is settled." }
-        let nights = open == 1 ? "night is" : "nights are"
-        return "\(word(open).capitalized) \(nights) still open."
+    /// The two italic count lines, with the open-night rule (today or
+    /// later AND no household meal) applied — see WeekSummary.
+    private var weekSummary: WeekSummary {
+        WeekSummary.build(
+            weekDates: weekDates,
+            hasMeal: { !plans(for: $0).isEmpty },
+            hasHouseholdMeal: { date in
+                !DayPlan.build(from: plans(for: date), members: householdService.members)
+                    .householdMeals.isEmpty
+            }
+        )
     }
 
     // MARK: - Empty Week State
@@ -367,65 +364,111 @@ struct SupabaseMealPlanView: View {
 
     // MARK: - Week Content
 
+    /// The planned week. A plain List (not a ScrollView) because each
+    /// meal line is its own list row — that's what makes standard
+    /// swipe actions possible. Every Press affordance (rules, padding,
+    /// background) is drawn by the rows themselves; the List chrome is
+    /// stripped bare.
     private var weekContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                masthead
-                    .padding(.bottom, 10)
+        List {
+            Group {
+                VStack(alignment: .leading, spacing: 0) {
+                    masthead
+                        .padding(.bottom, 10)
 
-                Text(stateLine)
-                    .font(.custom(FluffyFace.italic, size: 14))
-                    .foregroundStyle(Color.fluffySecondary)
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 15)
+                    Text(weekSummary.stateLine)
+                        .font(.custom(FluffyFace.italic, size: 14))
+                        .foregroundStyle(Color.fluffySecondary)
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 15)
+                }
 
-                VStack(spacing: 0) {
-                    ForEach(weekDates, id: \.self) { date in
-                        VStack(spacing: 0) {
-                            FluffyRule().padding(.horizontal, 22)
-                            dayRow(date)
-                        }
-                    }
+                ForEach(weekDates, id: \.self) { date in
+                    dayRows(date)
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
                     FluffyRule().padding(.horizontal, 22)
-                }
 
-                Text(openNightsLine)
-                    .font(.custom(FluffyFace.italic, size: 15))
-                    .foregroundStyle(Color.fluffySecondary)
+                    Text(weekSummary.openNightsLine)
+                        .font(.custom(FluffyFace.italic, size: 15))
+                        .foregroundStyle(Color.fluffySecondary)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 26)
+                        .padding(.bottom, 20)
+
+                    VStack(alignment: .leading, spacing: 20) {
+                        if hasOpenFutureDay {
+                            FluffyTextLink(title: "Copy last week") {
+                                Task { await copyLastWeek() }
+                            }
+                        }
+                        FluffyTextLink(title: "Build the grocery list") {
+                            Task {
+                                await groceryService.fetchItems()
+                                selectedTab = .groceries
+                            }
+                        }
+                    }
                     .padding(.horizontal, 22)
-                    .padding(.top, 26)
-                    .padding(.bottom, 20)
-
-                VStack(alignment: .leading, spacing: 20) {
-                    if hasOpenFutureDay {
-                        FluffyTextLink(title: "Copy last week") {
-                            Task { await copyLastWeek() }
-                        }
-                    }
-                    FluffyTextLink(title: "Build the grocery list") {
-                        Task {
-                            await groceryService.fetchItems()
-                            selectedTab = .groceries
-                        }
-                    }
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 40)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.fluffyBackground)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.defaultMinListRowHeight, 1)
     }
 
     // MARK: - Day Row
 
+    /// One line of a day row: a meal (household or member) or the
+    /// "Nothing for everyone" household placeholder (plan == nil).
+    private struct DayLine: Identifiable {
+        let id: String
+        let plan: MealPlanRow?
+        let member: HouseholdMemberRow?
+    }
+
+    /// A day's lines in render order: household meals, then (when the
+    /// household slot is open on a non-past day) the placeholder, then
+    /// member meals in household member order.
+    private func dayLines(dayPlan: DayPlan, isPast: Bool) -> [DayLine] {
+        var lines = dayPlan.householdMeals.map {
+            DayLine(id: $0.id.uuidString, plan: $0, member: nil)
+        }
+        if dayPlan.householdMeals.isEmpty && !isPast {
+            lines.append(DayLine(id: "household-open", plan: nil, member: nil))
+        }
+        lines += dayPlan.memberMeals.map {
+            DayLine(id: $0.plan.id.uuidString, plan: $0.plan, member: $0.member)
+        }
+        return lines
+    }
+
+    /// One or more list rows for a date. An empty day is a single
+    /// tappable row; a planned day emits one row PER MEAL LINE so each
+    /// meal carries its own swipe actions.
     @ViewBuilder
-    private func dayRow(_ date: Date) -> some View {
+    private func dayRows(_ date: Date) -> some View {
         let dayPlan = DayPlan.build(from: plans(for: date), members: householdService.members)
+        let isPast = Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
 
         if dayPlan.isEmpty {
-            emptyDayRow(date)
+            VStack(spacing: 0) {
+                FluffyRule().padding(.horizontal, 22)
+                emptyDayRow(date)
+            }
         } else {
-            filledDayRow(date, dayPlan: dayPlan)
+            let lines = dayLines(dayPlan: dayPlan, isPast: isPast)
+            ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                dayLineRow(line, at: index, of: lines.count,
+                           date: date, dayPlan: dayPlan, isPast: isPast)
+            }
         }
     }
 
@@ -466,88 +509,105 @@ struct SupabaseMealPlanView: View {
         .buttonStyle(.plain)
     }
 
-    /// Day row with at least one meal. The household meal is the
-    /// primary line; member meals render as indented lines beneath it
-    /// with a small-caps name kicker. Each line is its own tap target
-    /// opening the Replace / Remove action sheet for exactly that
-    /// meal. Legacy multi-row household slots render every row (they
-    /// collapse on the next assign); meals orphaned by a member delete
-    /// arrive here with member_id NULL (013 trigger) and render as
-    /// household meals.
-    private func filledDayRow(_ date: Date, dayPlan: DayPlan) -> some View {
+    /// One list row for one line of a planned day. The first line
+    /// carries the day's top rule, the date column, and the "+"
+    /// affordance; later lines keep the 42pt column as clear space so
+    /// meals stay aligned. Meal lines (not the placeholder, not past
+    /// days) carry the Remove / Replace swipe actions. Legacy
+    /// multi-row household slots render every row (they collapse on
+    /// the next assign); meals orphaned by a member delete arrive
+    /// here with member_id NULL (013 trigger) and render as household
+    /// meals.
+    private func dayLineRow(
+        _ line: DayLine,
+        at index: Int,
+        of count: Int,
+        date: Date,
+        dayPlan: DayPlan,
+        isPast: Bool
+    ) -> some View {
         let today = Calendar.current.isDateInToday(date)
-        let isPast = Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
+        let isFirst = index == 0
+        let isLast = index == count - 1
 
-        return HStack(alignment: .top, spacing: 14) {
-            dateColumn(date: date, today: today)
+        return VStack(spacing: 0) {
+            if isFirst { FluffyRule().padding(.horizontal, 22) }
 
-            VStack(alignment: .leading, spacing: 12) {
-                // Household slot: the primary line. When only member
-                // meals exist, hold its place with a tappable
-                // "Nothing for everyone" so the household meal can
-                // still be added (future days only).
-                if dayPlan.householdMeals.isEmpty {
-                    if !isPast {
+            HStack(alignment: .top, spacing: 14) {
+                if isFirst {
+                    dateColumn(date: date, today: today)
+                } else {
+                    Color.clear.frame(width: 42, height: 1)
+                }
+
+                Group {
+                    if let plan = line.plan {
+                        mealLine(plan, member: line.member, date: date, isPast: isPast)
+                    } else {
                         emptyHouseholdLine(date)
                     }
-                } else {
-                    ForEach(dayPlan.householdMeals) { plan in
-                        mealLine(plan, member: nil, date: date, isPast: isPast,
-                                 dayMealCount: dayPlan.mealCount)
-                    }
                 }
+                .padding(.leading, line.member != nil ? 14 : 0)
 
-                ForEach(dayPlan.memberMeals, id: \.plan.id) { memberMeal in
-                    mealLine(memberMeal.plan, member: memberMeal.member,
-                             date: date, isPast: isPast,
-                             dayMealCount: dayPlan.mealCount)
-                        .padding(.leading, 14)
+                Spacer()
+
+                // Add another meal (a person's, or replace via chips).
+                // Hidden on past days — they're read-only.
+                if isFirst && !isPast {
+                    Button {
+                        pickerContext = MealPickerContext(
+                            date: date,
+                            memberID: defaultPickerMember(for: dayPlan)
+                        )
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(Color.fluffyAccent)
+                            .padding(.top, 2)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-
-            Spacer()
-
-            // Add another meal (a person's, or replace via chips).
-            // Hidden on past days — they're read-only.
-            if !isPast {
-                Button {
-                    pickerContext = MealPickerContext(
-                        date: date,
-                        memberID: defaultPickerMember(for: dayPlan)
-                    )
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(Color.fluffyAccent)
-                        .padding(.top, 2)
-                        .contentShape(Rectangle())
+            .padding(.horizontal, 22)
+            .padding(.top, isFirst ? 14 : 6)
+            .padding(.bottom, isLast ? 14 : 6)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.fluffyBackground)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if let plan = line.plan, !isPast {
+                Button("Remove", role: .destructive) {
+                    removeSwipe(plan, member: line.member, date: date,
+                                dayMealCount: dayPlan.mealCount)
                 }
-                .buttonStyle(.plain)
+                Button("Replace") {
+                    pickerContext = MealPickerContext(date: date, memberID: line.member?.id)
+                }
+                .tint(Color.fluffyInk2)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 14)
     }
 
     /// One tappable meal line: optional small-caps member kicker, the
     /// recipe title, and (household meals only) the category/time
-    /// metadata line.
+    /// metadata line. Tap opens the recipe's detail screen — past
+    /// meals included; looking back is harmless and useful.
     private func mealLine(
         _ plan: MealPlanRow,
         member: HouseholdMemberRow?,
         date: Date,
-        isPast: Bool,
-        dayMealCount: Int
+        isPast: Bool
     ) -> some View {
         Button {
-            guard !isPast else { return }
-            mealAction = MealActionTarget(
-                date: date,
-                plan: plan,
-                memberID: member?.id,
-                memberName: member?.displayName,
-                dayMealCount: dayMealCount
-            )
+            if let recipe = recipeService.recipes.first(where: { $0.id == plan.recipeID }) {
+                detailRecipeID = recipe.id
+            } else if !isPast {
+                // Recipe missing (deleted or not loaded): nothing to
+                // show, so the tap goes straight to Replace.
+                pickerContext = MealPickerContext(date: date, memberID: member?.id)
+            }
         } label: {
             VStack(alignment: .leading, spacing: 3) {
                 if let member {
@@ -569,7 +629,7 @@ struct SupabaseMealPlanView: View {
                 } else {
                     // Plan row exists but its recipe isn't loaded
                     // (or was deleted). Show a hint so the user can
-                    // still tap to Replace / Remove.
+                    // still tap to Replace, or swipe to Remove.
                     Text("Tap to update")
                         .font(.fluffyHeadline)
                         .fluffyTracking(-0.01, at: 19)
@@ -580,7 +640,29 @@ struct SupabaseMealPlanView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isPast)
+    }
+
+    /// The Remove swipe: a single-meal day removes straight away
+    /// (standard iOS swipe behavior); a multi-meal day raises the
+    /// dialog so "Clear the Whole Day" keeps its existing placement.
+    private func removeSwipe(
+        _ plan: MealPlanRow,
+        member: HouseholdMemberRow?,
+        date: Date,
+        dayMealCount: Int
+    ) {
+        let target = MealActionTarget(
+            date: date,
+            plan: plan,
+            memberID: member?.id,
+            memberName: member?.displayName,
+            dayMealCount: dayMealCount
+        )
+        if dayMealCount > 1 {
+            mealAction = target
+        } else {
+            Task { await removeMeal(target) }
+        }
     }
 
     /// The household slot's placeholder when a day holds only member
@@ -704,7 +786,7 @@ struct SupabaseMealPlanView: View {
             .filter { $0.recipeID != nil }
     }
 
-    /// Title shown above the Replace / Remove action sheet —
+    /// Title shown above the Remove confirmation dialog —
     /// "Pasta Primavera" or "Pasta Primavera — for Maya".
     private var mealActionTitle: String {
         guard let target = mealAction,
@@ -1020,16 +1102,28 @@ struct RecipePickerSheet: View {
                             color: .fluffyInk2
                         )
                     }
-                    // Keyword-only dietary hint for the selected
-                    // person — a gentle flag, never a block.
-                    if let member = selectedMember,
-                       let conflict = DietaryMatch.conflict(
-                           for: member,
-                           recipe: recipe,
-                           ingredientNames: ingredientsByRecipeID[recipe.id]
-                       ) {
+                    // Keyword-only dietary hint — a gentle flag, never
+                    // a block. A selected person gets their own check;
+                    // EVERYONE checks the whole household and names
+                    // the first affected member ("... FOR MAYA +1").
+                    if let member = selectedMember {
+                        if let conflict = DietaryMatch.conflict(
+                            for: member,
+                            recipe: recipe,
+                            ingredientNames: ingredientsByRecipeID[recipe.id]
+                        ) {
+                            FluffyMetadataLine(
+                                text: DietaryMatch.hintText(for: conflict),
+                                color: .fluffyAccent
+                            )
+                        }
+                    } else if let household = DietaryMatch.householdConflict(
+                        members: members,
+                        recipe: recipe,
+                        ingredientNames: ingredientsByRecipeID[recipe.id]
+                    ) {
                         FluffyMetadataLine(
-                            text: DietaryMatch.hintText(for: conflict),
+                            text: DietaryMatch.hintText(for: household),
                             color: .fluffyAccent
                         )
                     }

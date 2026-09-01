@@ -799,16 +799,29 @@ struct DayPickerSheet: View {
                                 members: members,
                                 selection: $selectedMemberID
                             )
-                            // Keyword-only dietary hint for the selected
-                            // person — a gentle flag, never a block.
-                            if let member = selectedMember,
-                               let conflict = DietaryMatch.conflict(
-                                   for: member,
-                                   recipe: recipe,
-                                   ingredientNames: ingredientNames
-                               ) {
+                            // Keyword-only dietary hint — a gentle
+                            // flag, never a block. A selected person
+                            // gets their own check; EVERYONE checks
+                            // the whole household and names the first
+                            // affected member ("... FOR MAYA +1").
+                            if let member = selectedMember {
+                                if let conflict = DietaryMatch.conflict(
+                                    for: member,
+                                    recipe: recipe,
+                                    ingredientNames: ingredientNames
+                                ) {
+                                    FluffyMetadataLine(
+                                        text: DietaryMatch.hintText(for: conflict),
+                                        color: .fluffyAccent
+                                    )
+                                }
+                            } else if let household = DietaryMatch.householdConflict(
+                                members: members,
+                                recipe: recipe,
+                                ingredientNames: ingredientNames
+                            ) {
                                 FluffyMetadataLine(
-                                    text: DietaryMatch.hintText(for: conflict),
+                                    text: DietaryMatch.hintText(for: household),
                                     color: .fluffyAccent
                                 )
                             }
