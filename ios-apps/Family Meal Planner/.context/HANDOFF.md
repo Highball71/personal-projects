@@ -182,3 +182,4 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 - Known cosmetic (post-113): after swipe-remove, the week view refetches and rows disappear for a beat. Fix = remove row locally with animation, refresh silently.
 - Pre-existing data note: user library has duplicate "Whole30 Egg Roll in a Bowl" recipes (not a code issue).
 - 113 = per-person meals + seasonal suggestions v1 + fig icon. This is the coordinated-rollout build; announcement email follows.
+- 2026-09-02: Join-by-code VERIFIED with a second real Apple ID (Shannon joined the household). Long-parked unknown closed.
