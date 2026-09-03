@@ -63,6 +63,13 @@ final class MealPlanService: ObservableObject {
 
     private var supabase: SupabaseClient { SupabaseManager.shared.client }
 
+    /// Monotonic counter for fetchPlans calls. With week navigation a
+    /// user can request week B while week A's fetch is still in
+    /// flight; when A finally lands it must not overwrite B's rows
+    /// (or flip isLoading/errorMessage under B). MainActor-confined,
+    /// so bumping and comparing it is race-free.
+    private var fetchGeneration = 0
+
     /// Formats a Date as an ISO "YYYY-MM-DD" string for Postgres date columns.
     static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -96,6 +103,8 @@ final class MealPlanService: ObservableObject {
 
         Logger.supabase.info("fetchPlans: loading week \(startISO)..<\(endISO) for household \(householdID.uuidString)")
         isLoading = true
+        fetchGeneration += 1
+        let generation = fetchGeneration
 
         do {
             let rows: [MealPlanRow] = try await supabase
@@ -107,6 +116,10 @@ final class MealPlanService: ObservableObject {
                 .execute()
                 .value
 
+            // A newer fetch started while this one was in flight —
+            // its week is the one on screen; drop this result whole.
+            guard generation == fetchGeneration else { return true }
+
             var map: [String: [MealPlanRow]] = [:]
             for row in rows {
                 map[row.date, default: []].append(row)
@@ -117,6 +130,7 @@ final class MealPlanService: ObservableObject {
             isLoading = false
             return true
         } catch {
+            guard generation == fetchGeneration else { return true }
             Logger.supabase.error("fetchPlans: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             isLoading = false

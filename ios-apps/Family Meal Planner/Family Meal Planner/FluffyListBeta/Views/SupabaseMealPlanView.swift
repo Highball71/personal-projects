@@ -2,7 +2,10 @@
 //  SupabaseMealPlanView.swift
 //  FluffyList
 //
-//  "The Press" week view: masthead ("This Week"), an italic line of
+//  "The Press" week view: masthead ("This Week" — or "Last Week",
+//  "Next Week", ... when navigated; arrows and a horizontal swipe
+//  move between weeks, 4 back to 2 forward, and past weeks render
+//  read-only — see WeekNavigation), an italic line of
 //  state, one ruled row per day (day/date column in ink, meal name
 //  over uppercase metadata), one household meal plus up to one meal
 //  per member per day (per-person meals, Phase 3) — member meals as
@@ -49,6 +52,14 @@ struct SupabaseMealPlanView: View {
     @Binding var selectedTab: AppTab
 
     @State private var weekStart: Date = DateHelper.startOfWeek(containing: Date())
+    /// The in-flight week fetch, kept so navigating again cancels it —
+    /// a slow fetch for a week the user has already left must not land
+    /// on top of the week they're looking at now.
+    @State private var weekLoadTask: Task<Void, Never>?
+    /// True from the moment a week change starts until its fetch
+    /// settles — keeps the loading line up over the frame gap before
+    /// the service flips isLoading.
+    @State private var isChangingWeek = false
     @State private var pickerContext: MealPickerContext?
     /// When set, shows the Remove Meal / Clear the Whole Day dialog
     /// for one specific meal on a multi-meal day.
@@ -70,6 +81,19 @@ struct SupabaseMealPlanView: View {
 
     private static let fetchErrorText =
         "Couldn't load your meal plan. Check your connection and tap Retry."
+
+    /// The quiet inline note on read-only past weeks — it stands in
+    /// for the state line, and for every disabled affordance at once.
+    private static let pastWeekNoteText =
+        "A week gone by \u{2014} kept for the record."
+
+    /// Where the displayed week sits relative to today: bounds for the
+    /// arrows and swipe, past-week read-only gating, masthead title.
+    /// Recomputed each render so the window tracks the real current
+    /// week even if the app stays open across a week boundary.
+    private var weekNav: WeekNavigation {
+        WeekNavigation(displayedWeekStart: weekStart)
+    }
 
     private var weekDates: [Date] {
         (0..<7).compactMap { offset in
@@ -137,11 +161,12 @@ struct SupabaseMealPlanView: View {
                         // A failed load with nothing cached must not render
                         // as an empty week — the banner above explains it.
                         Color.clear
-                    } else if mealPlanService.isLoading && mealPlanService.plansByDate.isEmpty {
+                    } else if (mealPlanService.isLoading || isChangingWeek)
+                                && mealPlanService.plansByDate.isEmpty {
                         // Never visually empty: masthead drawn, italic status line.
                         ScrollView {
                             VStack(alignment: .leading, spacing: 0) {
-                                masthead
+                                weekHeader
                                 Text("Fetching your week\u{2026}")
                                     .font(.fluffyCallout)
                                     .foregroundStyle(Color.fluffySecondary)
@@ -150,13 +175,21 @@ struct SupabaseMealPlanView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                    } else if isWeekEmpty && !recipeService.recipes.isEmpty {
+                    } else if isWeekEmpty && !recipeService.recipes.isEmpty && !weekNav.isPastWeek {
+                        // A past empty week falls through to weekContent:
+                        // "wide open" is planning copy, and its links all
+                        // write — a read-only week shows its PASSED days.
                         emptyWeekView
                     } else {
                         weekContent
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Horizontal swipe = week navigation. A plain .gesture
+                // (not highPriority) so the List's own gestures still
+                // win where they claim the drag: vertical scroll, and
+                // the Remove/Replace swipe on meal rows.
+                .gesture(weekSwipeGesture)
             }
             .animation(.easeInOut(duration: 0.25), value: mealPlanService.isLoading)
             .background(Color.fluffyBackground)
@@ -183,6 +216,10 @@ struct SupabaseMealPlanView: View {
                     members: householdService.members,
                     initialMemberID: context.memberID,
                     ingredientsByRecipeID: recipeService.ingredientsByRecipeID,
+                    // Seasonal shelf and leaves follow the day being
+                    // planned, not today — two weeks ahead can cross a
+                    // month boundary into a different harvest period.
+                    seasonalMonth: Calendar.current.component(.month, from: context.date),
                     onPick: { recipe, memberID in
                         pickerContext = nil
                         Task { await addMeal(recipe, to: context.date, for: memberID) }
@@ -226,7 +263,7 @@ struct SupabaseMealPlanView: View {
     // MARK: - Masthead & Week State
 
     private var masthead: some View {
-        FluffyMasthead(title: "This Week", dateline: mastheadDateline)
+        FluffyMasthead(title: weekNav.title, dateline: mastheadDateline)
             .padding(.horizontal, 22)
     }
 
@@ -234,6 +271,96 @@ struct SupabaseMealPlanView: View {
         let fmt = DateFormatter()
         fmt.dateFormat = "MMM d"
         return "WEEK OF \(fmt.string(from: weekStart).uppercased())"
+    }
+
+    /// Masthead plus the week navigation row — what every state of the
+    /// view opens with, so the arrows are reachable even from a loading
+    /// or empty week.
+    private var weekHeader: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            masthead
+            weekNavRow
+        }
+    }
+
+    /// The arrows (disabled at the 4-back / 2-forward bounds) with the
+    /// "This week" return link between them whenever the displayed
+    /// week is not the current one.
+    private var weekNavRow: some View {
+        HStack {
+            weekArrow(systemName: "chevron.left",
+                      label: "Previous week",
+                      destination: weekNav.previousWeekStart)
+            Spacer()
+            if !weekNav.isCurrentWeek {
+                FluffyTextLink(title: "This week", showArrow: false) {
+                    changeWeek(to: weekNav.currentWeekStart)
+                }
+            }
+            Spacer()
+            weekArrow(systemName: "chevron.right",
+                      label: "Next week",
+                      destination: weekNav.nextWeekStart)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 12)
+    }
+
+    /// One navigation chevron. A nil destination means the bound is
+    /// reached: the arrow stays (the row keeps its shape) but goes
+    /// tertiary and inert.
+    private func weekArrow(
+        systemName: String,
+        label: String,
+        destination: Date?
+    ) -> some View {
+        Button {
+            changeWeek(to: destination)
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(destination == nil
+                                 ? Color.fluffyTertiary : Color.fluffyPrimary)
+                .frame(width: 44, height: 32, alignment: .center)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(destination == nil)
+        .accessibilityLabel(label)
+    }
+
+    /// Horizontal swipe anywhere on the week view: left = forward,
+    /// right = back, matching the arrows (and no-op at the bounds).
+    /// Thresholds keep ordinary vertical scrolling from ever reading
+    /// as a week change.
+    private var weekSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                changeWeek(to: dx < 0 ? weekNav.nextWeekStart
+                                      : weekNav.previousWeekStart)
+            }
+    }
+
+    /// Display a different week and fetch it. nil (a bound) no-ops.
+    private func changeWeek(to newStart: Date?) {
+        guard let newStart, newStart != weekStart else { return }
+        weekStart = newStart
+        // The cached rows belong to the week we just left; keyed by
+        // date they'd render the new week as seven "Nothing planned"
+        // rows until the fetch lands. Drop them so the honest
+        // "Fetching your week…" line shows instead.
+        mealPlanService.plansByDate = [:]
+        isChangingWeek = true
+        weekLoadTask?.cancel()
+        weekLoadTask = Task {
+            await reloadWeek()
+            // A cancelled task must not clear the flag the newer
+            // navigation just set.
+            if !Task.isCancelled { isChangingWeek = false }
+        }
     }
 
     private static let countWords = [
@@ -262,7 +389,7 @@ struct SupabaseMealPlanView: View {
     private var emptyWeekView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                masthead
+                weekHeader
 
                 VStack(alignment: .leading, spacing: 0) {
                     Image(systemName: "frying.pan")
@@ -373,10 +500,14 @@ struct SupabaseMealPlanView: View {
         List {
             Group {
                 VStack(alignment: .leading, spacing: 0) {
-                    masthead
+                    weekHeader
                         .padding(.bottom, 10)
 
-                    Text(weekSummary.stateLine)
+                    // On a past week the count lines would mislead
+                    // ("settled" just means the days are gone), so the
+                    // read-only note stands in for the state line.
+                    Text(weekNav.isPastWeek ? Self.pastWeekNoteText
+                                            : weekSummary.stateLine)
                         .font(.custom(FluffyFace.italic, size: 14))
                         .foregroundStyle(Color.fluffySecondary)
                         .padding(.horizontal, 22)
@@ -390,15 +521,20 @@ struct SupabaseMealPlanView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     FluffyRule().padding(.horizontal, 22)
 
-                    Text(weekSummary.openNightsLine)
-                        .font(.custom(FluffyFace.italic, size: 15))
-                        .foregroundStyle(Color.fluffySecondary)
-                        .padding(.horizontal, 22)
-                        .padding(.top, 26)
-                        .padding(.bottom, 20)
+                    // Past weeks are read-only: no open-nights line
+                    // (nothing can be filled) and no Copy last week —
+                    // the note under the masthead already said so.
+                    if !weekNav.isPastWeek {
+                        Text(weekSummary.openNightsLine)
+                            .font(.custom(FluffyFace.italic, size: 15))
+                            .foregroundStyle(Color.fluffySecondary)
+                            .padding(.horizontal, 22)
+                            .padding(.top, 26)
+                            .padding(.bottom, 20)
+                    }
 
                     VStack(alignment: .leading, spacing: 20) {
-                        if hasOpenFutureDay {
+                        if hasOpenFutureDay && !weekNav.isPastWeek {
                             FluffyTextLink(title: "Copy last week") {
                                 Task { await copyLastWeek() }
                             }
@@ -411,6 +547,7 @@ struct SupabaseMealPlanView: View {
                         }
                     }
                     .padding(.horizontal, 22)
+                    .padding(.top, weekNav.isPastWeek ? 26 : 0)
                     .padding(.bottom, 40)
                 }
             }
@@ -480,7 +617,10 @@ struct SupabaseMealPlanView: View {
         let isPast = Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
 
         return Button {
-            if isPast {
+            if weekNav.isPastWeek {
+                // Read-only week: the inline note under the masthead
+                // already explains; no toast, nothing to do.
+            } else if isPast {
                 withAnimation { toastMessage = "You can only plan meals for today or future days." }
             } else {
                 pickerContext = MealPickerContext(date: date, memberID: nil)
@@ -868,10 +1008,14 @@ struct SupabaseMealPlanView: View {
         return "Copied \(word(copied)) \(dinners) from last week."
     }
 
-    /// Fetch the current week and record whether it succeeded, so a
+    /// Fetch the displayed week and record whether it succeeded, so a
     /// failed load shows the retry banner instead of an empty week.
+    /// If the user navigated on while this fetch was in flight, its
+    /// result belongs to a week no longer shown — drop it.
     private func reloadWeek() async {
-        let ok = await mealPlanService.fetchPlans(weekStart: weekStart)
+        let target = weekStart
+        let ok = await mealPlanService.fetchPlans(weekStart: target)
+        guard !Task.isCancelled, target == weekStart else { return }
         fetchFailed = !ok
     }
 
@@ -936,6 +1080,10 @@ struct RecipePickerSheet: View {
     var initialMemberID: UUID? = nil
     /// Lowercased ingredient names per recipe, for the dietary hint.
     var ingredientsByRecipeID: [UUID: [String]] = [:]
+    /// Month the seasonal shelf and leaf badges are computed for —
+    /// the month of the day being planned (which, with week
+    /// navigation, is not always the current month).
+    var seasonalMonth: Int = Calendar.current.component(.month, from: Date())
     let onPick: (RecipeRow, UUID?) -> Void
     let onCancel: () -> Void
 
@@ -958,7 +1106,7 @@ struct RecipePickerSheet: View {
             recipes: recipes,
             ingredientsByRecipeID: ingredientsByRecipeID,
             region: USRegion(rawValue: seasonalRegionRaw),
-            month: Calendar.current.component(.month, from: Date())
+            month: seasonalMonth
         )
     }
 
@@ -969,7 +1117,7 @@ struct RecipePickerSheet: View {
             recipes: recipes,
             ingredientsByRecipeID: ingredientsByRecipeID,
             region: USRegion(rawValue: seasonalRegionRaw),
-            month: Calendar.current.component(.month, from: Date())
+            month: seasonalMonth
         )
     }
 

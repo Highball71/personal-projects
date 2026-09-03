@@ -238,4 +238,43 @@ final class CopyWeekTests: XCTestCase {
         XCTAssertTrue(result.sourceEmpty)
         XCTAssertEqual(result.copied, 0)
     }
+
+    /// Week navigation: "Copy last week" operates on the DISPLAYED
+    /// week — displaying next week, the source is the current week
+    /// (displayed weekStart − 7), and nothing is skipped as past
+    /// because every target day is still ahead.
+    @MainActor
+    func testCopyIntoDisplayedFutureWeekPullsFromItsPreviousWeek() async throws {
+        let mealPlanService = MealPlanService()
+        let groceryService = GroceryService()
+        let recipeService = RecipeService()
+
+        let soupID = TestFixtures.seedRecipe(
+            householdID: Self.householdID, name: "Soup",
+            ingredients: [("lentils", 1, "cup")])
+
+        // Displayed week starts a week from today; its source week
+        // therefore starts TODAY. Seed today's household meal.
+        let displayedStart = day(7, from: Calendar.current.startOfDay(for: Date()))
+        TestFixtures.seedMealPlan(
+            householdID: Self.householdID, recipeID: soupID,
+            memberID: nil, dateISO: iso(day(-7, from: displayedStart)))
+
+        let copyResult = await mealPlanService.copyPreviousWeek(
+            weekStart: displayedStart,
+            recipeService: recipeService,
+            groceryService: groceryService
+        )
+        let result = try XCTUnwrap(copyResult)
+
+        XCTAssertEqual(result.copied, 1)
+        XCTAssertEqual(result.skippedPast, 0, "a wholly future week has no past days")
+        XCTAssertEqual(result.failed, 0)
+        XCTAssertFalse(result.sourceEmpty)
+
+        // The copy landed on the displayed week's matching day.
+        let copied = targetRows(dateISO: iso(displayedStart))
+        XCTAssertEqual(copied.count, 1)
+        XCTAssertEqual(recipeID(of: copied.first), soupID.uuidString.lowercased())
+    }
 }
