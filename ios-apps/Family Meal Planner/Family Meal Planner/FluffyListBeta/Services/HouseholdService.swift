@@ -64,7 +64,7 @@ final class HouseholdService: ObservableObject {
                 return false
             }
 
-            print("🟢 [HouseholdService] household id=\(newHousehold.id), join_code=\(newHousehold.joinCode)")
+            print("🟢 [HouseholdService] household id=\(newHousehold.id), join_code=\(newHousehold.joinCode ?? "none")")
 
             // ── DEBUG: household_members INSERT ──
             let memberPayload = HouseholdMemberInsert(

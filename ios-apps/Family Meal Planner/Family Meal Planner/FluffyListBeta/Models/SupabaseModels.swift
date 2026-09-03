@@ -244,6 +244,17 @@ struct MealPlanRow: Codable, Identifiable, Equatable {
         memberID = try? c.decode(UUID.self, forKey: .memberID)
         date = (try? c.decode(String.self, forKey: .date)) ?? ""
     }
+
+    /// Memberwise init (the custom init(from:) above suppresses the
+    /// synthesized one) — used to build the local row after an
+    /// optimistic Replace, mirroring the row the server just inserted.
+    init(id: UUID, householdID: UUID, recipeID: UUID?, memberID: UUID?, date: String) {
+        self.id = id
+        self.householdID = householdID
+        self.recipeID = recipeID
+        self.memberID = memberID
+        self.date = date
+    }
 }
 
 struct MealPlanInsert: Codable {

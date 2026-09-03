@@ -61,14 +61,19 @@ enum SeasonalMatch {
     /// fold simple plurals so "tomatoes" meets "tomato". Both produce
     /// keywords and recipe text go through the same fold, so imperfect
     /// singulars ("asparagus" → "asparagu") still match themselves.
-    static func tokens(_ text: String) -> [String] {
+    /// nonisolated: pure string work with no shared state. Under the
+    /// project's default MainActor isolation these helpers would be
+    /// actor-isolated, and passing them to `map` (a nonisolated
+    /// context) warned under Swift 6 — there is nothing here that
+    /// needs the main actor.
+    nonisolated static func tokens(_ text: String) -> [String] {
         text.lowercased()
             .components(separatedBy: CharacterSet.letters.inverted)
             .filter { !$0.isEmpty }
             .map(singularize)
     }
 
-    private static func singularize(_ word: String) -> String {
+    private nonisolated static func singularize(_ word: String) -> String {
         if word.hasSuffix("ies") && word.count > 4 {
             return String(word.dropLast(3)) + "y"
         }
