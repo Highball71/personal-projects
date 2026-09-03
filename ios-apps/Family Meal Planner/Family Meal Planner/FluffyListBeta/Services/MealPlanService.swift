@@ -89,8 +89,14 @@ final class MealPlanService: ObservableObject {
     /// Load all meal plans for the 7 days starting at weekStart.
     /// Returns false when the load failed (so the UI can show an error
     /// instead of an empty week); discardable for legacy call sites.
+    ///
+    /// `quiet` reconciles without announcing: isLoading is never
+    /// touched, so no loading UI appears — used after an optimistic
+    /// local edit, where the screen already shows the expected result
+    /// and the fetch only confirms it (or picks up another household
+    /// member's concurrent changes).
     @discardableResult
-    func fetchPlans(weekStart: Date) async -> Bool {
+    func fetchPlans(weekStart: Date, quiet: Bool = false) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.warning("fetchPlans: no household ID set")
             plansByDate = [:]
@@ -101,8 +107,8 @@ final class MealPlanService: ObservableObject {
         let startISO = Self.isoDate(from: weekStart)
         let endISO = Self.isoDate(from: weekEnd)
 
-        Logger.supabase.info("fetchPlans: loading week \(startISO)..<\(endISO) for household \(householdID.uuidString)")
-        isLoading = true
+        Logger.supabase.info("fetchPlans: loading week \(startISO)..<\(endISO) for household \(householdID.uuidString)\(quiet ? " (quiet)" : "")")
+        if !quiet { isLoading = true }
         fetchGeneration += 1
         let generation = fetchGeneration
 
@@ -127,13 +133,18 @@ final class MealPlanService: ObservableObject {
             plansByDate = map
 
             Logger.supabase.info("fetchPlans: loaded \(rows.count) plan(s)")
-            isLoading = false
+            if !quiet { isLoading = false }
             return true
         } catch {
             guard generation == fetchGeneration else { return true }
             Logger.supabase.error("fetchPlans: failed — \(error.localizedDescription)")
-            errorMessage = error.localizedDescription
-            isLoading = false
+            // A quiet reconcile failing is not an event: the local
+            // state already shows the confirmed result, so no
+            // errorMessage either — the next loud fetch will report.
+            if !quiet {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
             return false
         }
     }
@@ -262,6 +273,65 @@ final class MealPlanService: ObservableObject {
         }
 
         return newPlanID
+    }
+
+    // MARK: - Local (optimistic) week-map edits
+
+    /// The optimistic half of swipe-to-remove: take one plan row out
+    /// of the local week map WITHOUT any server call, so the row can
+    /// leave the screen immediately instead of waiting on the round
+    /// trip. Returns the date's previous rows so a failed delete can
+    /// restore them exactly. Purely local — the server delete (and its
+    /// grocery unwind) still goes through removeMeal.
+    func removeLocalPlan(_ planID: UUID, dateISO: String) -> [MealPlanRow]? {
+        invalidateInFlightFetches()
+        let snapshot = plansByDate[dateISO]
+        let remaining = (snapshot ?? []).filter { $0.id != planID }
+        plansByDate[dateISO] = remaining.isEmpty ? nil : remaining
+        return snapshot
+    }
+
+    /// Optimistically clear a whole date locally — the "Clear the
+    /// Whole Day" counterpart of removeLocalPlan. Same contract:
+    /// returns the previous rows for restore on failure.
+    func removeLocalDay(dateISO: String) -> [MealPlanRow]? {
+        invalidateInFlightFetches()
+        let snapshot = plansByDate[dateISO]
+        plansByDate[dateISO] = nil
+        return snapshot
+    }
+
+    /// Optimistically replace one slot's rows with a single new row —
+    /// the local half of Replace. Removes any rows for (date, member)
+    /// and appends the new one, mirroring what addMealWithGroceries
+    /// just did on the server.
+    func replaceLocalSlot(with row: MealPlanRow) {
+        invalidateInFlightFetches()
+        var rows = (plansByDate[row.date] ?? [])
+            .filter { $0.memberID != row.memberID }
+        rows.append(row)
+        plansByDate[row.date] = rows
+    }
+
+    /// Put back the rows captured before an optimistic removal whose
+    /// server delete then failed.
+    func restoreLocalPlans(_ rows: [MealPlanRow]?, dateISO: String) {
+        invalidateInFlightFetches()
+        plansByDate[dateISO] = rows
+    }
+
+    /// A local edit makes any fetch already in flight stale — its rows
+    /// predate the edit, so letting it land would resurrect a removed
+    /// row (or erase an optimistic replace) for a beat. Bumping the
+    /// generation makes such a fetch drop its result; the quiet
+    /// reconcile that follows every optimistic edit re-reads truth on
+    /// a fresh generation.
+    private func invalidateInFlightFetches() {
+        fetchGeneration += 1
+        // A superseded fetch skips its own isLoading = false (it must
+        // not stomp newer state), and no newer fetch exists yet to
+        // clear it — so clear it here or it could stick true forever.
+        isLoading = false
     }
 
     // MARK: - Remove Single Meal

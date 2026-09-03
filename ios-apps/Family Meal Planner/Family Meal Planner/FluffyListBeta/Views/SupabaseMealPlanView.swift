@@ -1031,11 +1031,30 @@ struct SupabaseMealPlanView: View {
             groceryService: groceryService
         )
 
-        guard result != nil else {
+        guard let newPlanID = result else {
             actionErrorMessage = "Couldn't add that meal. Please try again."
             return
         }
-        await reloadWeek()
+
+        // The insert succeeded and we know the new row's id — apply
+        // the same change locally (replace this slot's rows with the
+        // new meal) instead of a full reloadWeek, so an add or Replace
+        // never makes the week's rows flicker. Then reconcile quietly
+        // against the server, which also picks up anything another
+        // household member changed meanwhile.
+        if let householdID = SupabaseManager.shared.currentHouseholdID {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                mealPlanService.replaceLocalSlot(with: MealPlanRow(
+                    id: newPlanID,
+                    householdID: householdID,
+                    recipeID: recipe.id,
+                    memberID: memberID,
+                    date: MealPlanService.isoDate(from: date)
+                ))
+            }
+        }
+        await mealPlanService.fetchPlans(weekStart: weekStart, quiet: true)
+
         let day = fullDayName(for: date)
         let memberName = memberID.flatMap { id in
             householdService.members.first { $0.id == id }?.displayName
@@ -1046,25 +1065,49 @@ struct SupabaseMealPlanView: View {
         }
     }
 
-    /// Remove one specific meal (unwind-first, per-row).
+    /// Remove one specific meal (unwind-first, per-row). Optimistic:
+    /// the row animates out immediately, THEN the server delete runs;
+    /// success reconciles quietly (no loading UI — the screen already
+    /// shows the result), failure animates the row back and raises the
+    /// error banner. No full reloadWeek, so the rest of the week never
+    /// flickers.
     private func removeMeal(_ target: MealActionTarget) async {
         Logger.supabase.info("MealPlan removeMeal: plan=\(target.plan.id.uuidString)")
+        let iso = MealPlanService.isoDate(from: target.date)
+        let snapshot = withAnimation(.easeInOut(duration: 0.25)) {
+            mealPlanService.removeLocalPlan(target.plan.id, dateISO: iso)
+        }
+
         let removed = await mealPlanService.removeMeal(target.plan.id, groceryService: groceryService)
-        if !removed {
+        if removed {
+            await mealPlanService.fetchPlans(weekStart: weekStart, quiet: true)
+        } else {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                mealPlanService.restoreLocalPlans(snapshot, dateISO: iso)
+            }
             actionErrorMessage = "Couldn't remove that meal. Please try again."
         }
-        await reloadWeek()
     }
 
     /// Remove ALL meals on a date — the "Clear the Whole Day" action.
     /// clearDayWithGroceries settles groceries for every removed meal.
+    /// Same optimistic shape as removeMeal, for the whole date.
     private func removeSlot(date: Date) async {
         Logger.supabase.info("MealPlan removeSlot: date=\(MealPlanService.isoDate(from: date))")
+        let iso = MealPlanService.isoDate(from: date)
+        let snapshot = withAnimation(.easeInOut(duration: 0.25)) {
+            mealPlanService.removeLocalDay(dateISO: iso)
+        }
+
         let cleared = await mealPlanService.clearDayWithGroceries(on: date, groceryService: groceryService)
-        if !cleared {
+        if cleared {
+            await mealPlanService.fetchPlans(weekStart: weekStart, quiet: true)
+        } else {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                mealPlanService.restoreLocalPlans(snapshot, dateISO: iso)
+            }
             actionErrorMessage = "Couldn't remove that meal. Please try again."
         }
-        await reloadWeek()
     }
 }
 
