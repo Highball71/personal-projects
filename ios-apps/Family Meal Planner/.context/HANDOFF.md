@@ -230,3 +230,4 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
   6. Sheets on iPad: edit + "Add to the week" day picker present at a workable size (page-size on iPadOS 18+).
   7. iPhone spot-check: Recipe Detail renders EXACTLY as build 116 (the layout tests pin the constants, but eyeball one recipe).
   8. Everything else on iPad (week view, lists, grocery) is phase 2 — expect stretched phone layouts there; that's known and fine.
+- 2026-09-04: ipad-support merged; iPad device pass passed (rotation, long recipe, screen-awake, sheets, iPhone unchanged). Uploaded as build 117; project set to 117. Next = 118. Screen-awake kept on for iPhone too.
