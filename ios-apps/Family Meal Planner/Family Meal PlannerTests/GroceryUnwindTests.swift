@@ -253,7 +253,10 @@ final class FakePostgRESTProtocol: URLProtocol {
 
     override func stopLoading() {}
 
-    private static func readAll(_ stream: InputStream) -> Data {
+    // nonisolated: pure stream draining, passed to `map` (a
+    // nonisolated context) — same treatment as SeasonalMatch's string
+    // helpers under the project's default MainActor isolation.
+    private nonisolated static func readAll(_ stream: InputStream) -> Data {
         stream.open()
         defer { stream.close() }
         var data = Data()
