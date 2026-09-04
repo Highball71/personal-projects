@@ -51,6 +51,24 @@ struct SupabaseRecipeListView: View {
         )
     }
 
+    /// The "In season now" shelf at the top of the browse — the same
+    /// computation as the picker's shelf (SeasonalMatch.inSeasonNow,
+    /// best match first, capped at 8), keyed to the current month.
+    /// Empty when dormant (region unset), which hides the shelf.
+    private var seasonalShelfPicks: [SeasonalMatch.Pick] {
+        SeasonalMatch.inSeasonNow(
+            recipes: recipeService.recipes,
+            ingredientsByRecipeID: recipeService.ingredientsByRecipeID,
+            region: USRegion(rawValue: seasonalRegionRaw),
+            month: Calendar.current.component(.month, from: Date())
+        )
+    }
+
+    /// Collapsed state of the shelf, remembered for the session (not
+    /// across launches — a new day may bring a new month's harvest,
+    /// and the shelf should get to reintroduce itself).
+    @State private var seasonalShelfCollapsed = SeasonalShelfSession.isCollapsed
+
     // MARK: - Filtering
 
     /// Recipes filtered by favorites toggle, browse tag, then search text.
@@ -289,6 +307,20 @@ struct SupabaseRecipeListView: View {
                     .padding(.horizontal, 22)
                     .padding(.bottom, 20)
 
+                // "In season now" — the picker's shelf, surfaced
+                // before any day is picked. Only in the default browse
+                // (no search, ALL tag, favorites off): its picks
+                // ignore the filters, and a shelf that contradicts an
+                // active filter reads as broken. Hidden when dormant.
+                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && selectedTag == .all && !showFavoritesOnly {
+                    let shelfPicks = seasonalShelfPicks
+                    if !shelfPicks.isEmpty {
+                        seasonalShelf(shelfPicks)
+                            .padding(.bottom, 30)
+                    }
+                }
+
                 // Hero — full-width halftone image, square corners, no
                 // scrim; kicker, title, and metadata sit below it.
                 if let hero = heroRecipe {
@@ -390,6 +422,66 @@ struct SupabaseRecipeListView: View {
                     .fixedSize()
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Seasonal Shelf
+
+    /// The collapsible "In season now" section: a tappable section
+    /// head (chevron shows the state) over the picker's own rows —
+    /// FluffyRecipeRowLabel with the match line — as a ruled list.
+    /// Rows navigate to the recipe like every other row on this tab.
+    private func seasonalShelf(_ picks: [SeasonalMatch.Pick]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    seasonalShelfCollapsed.toggle()
+                    SeasonalShelfSession.isCollapsed = seasonalShelfCollapsed
+                }
+            } label: {
+                HStack {
+                    FluffySectionHead(title: "In season now")
+                    Spacer()
+                    Image(systemName: seasonalShelfCollapsed ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.fluffySecondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(seasonalShelfCollapsed
+                                ? "Show in season now" : "Hide in season now")
+            .padding(.horizontal, 22)
+            .padding(.bottom, 10)
+
+            if !seasonalShelfCollapsed {
+                ForEach(picks, id: \.recipe.id) { pick in
+                    VStack(spacing: 0) {
+                        FluffyRule().padding(.horizontal, 22)
+                        NavigationLink {
+                            SupabaseRecipeDetailView(recipe: pick.recipe)
+                        } label: {
+                            HStack(spacing: 14) {
+                                FluffyRecipeRowLabel(
+                                    recipe: pick.recipe,
+                                    seasonalScore: pick.score,
+                                    showsLeaf: true
+                                )
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundStyle(Color.fluffyAccent)
+                            }
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { recipeContextMenu(pick.recipe) }
+                    }
+                }
+                FluffyRule().padding(.horizontal, 22)
             }
         }
     }
@@ -666,6 +758,18 @@ struct SupabaseRecipeListView: View {
             showDeleteConfirmAlert = true
         }
     }
+}
+
+// MARK: - Seasonal Shelf Session
+
+/// Session-scoped memory for the shelf's collapsed state. A plain
+/// static (not @AppStorage) on purpose: the choice should survive the
+/// view being recreated — tab switches, navigation pushes — but reset
+/// on the next launch, when a new session (maybe a new month) gets
+/// the expanded shelf again. MainActor-safe under the project's
+/// default isolation.
+enum SeasonalShelfSession {
+    static var isCollapsed = false
 }
 
 // MARK: - Browse Tags

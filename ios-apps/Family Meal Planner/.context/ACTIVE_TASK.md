@@ -1,17 +1,16 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** (2026-09-03 night — Claude Code on MacBook, autonomous) **iPad phase 1: the "cookbook on a stand" Recipe Detail**, on branch `ipad-support` (NOT merged to main — merge after the iPad device pass). Session was interrupted mid-verification and resumed; all work landed.
+**Session Focus:** (2026-09-04 — Claude Code, autonomous) **Seasonal visibility: suggestions before a day is picked**, on branch `seasonal-visibility` (NOT merged to main — merge after its device pass).
 
-1. **Recipe Detail on the regular width:** two ruled columns (ingredients 300pt left, method right behind a vertical hairline, capped at 680pt ≈ 65 characters), taller photo (345pt), Press type scaled up with the same faces (title 44, body 21, quantities 17, step numerals 34/42pt column), content block capped at 1080pt and centered, "Add to the week" button capped at 560pt. All decisions in the pure `Models/RecipeDetailLayout.swift`, keyed only off `horizontalSizeClass == .regular` — no device checks; the compact branch is the old phone VStack verbatim and its constants are pinned by tests. iPad destination needed no project change (device family was already "1,2", all four iPad orientations declared).
-2. **Screen awake:** `Utilities/ScreenAwake.swift` — hold-counting keeper over the idle timer (injected setter, unit-tested); Recipe Detail begins on appear / ends on disappear, nowhere else. Active on both size classes (spec's plain reading; flip to regular-only if preferred).
-3. **Sheets:** edit + day-picker sheets present page-size on iPadOS 18+ via `fluffyRegularSheetSizing` (no-op on compact and older iPadOS).
-4. **Warning cleanup complete:** `GroceryUnwindTests.readAll` is `nonisolated` — zero compiler warnings left in app + test targets.
+1. **Recipes tab:** collapsible "In season now" shelf at the top of the browse (default browse only — hidden while searching/filtering), reusing the picker's computation and rows via the extracted `Design/FluffyRecipeRowLabel.swift`; collapse remembered for the session (`SeasonalShelfSession` static — resets next launch by design).
+2. **Empty-week strip:** up to four in-season recipes above the wide-open state's action links (Press ruled list), keyed to the month of the week's first open night. Tap opens `RecipePickerSheet` for that night with the recipe pinned in a new "Your pick" section (`preselectedRecipeID` on `MealPickerContext` + the sheet; chips stay first). Never shows on past weeks.
+3. **New pure model `Models/SeasonalStrip.swift`:** picker-ranked picks deduped by normalized name + capped at 4; `firstOpenNight` = first displayed-week day ≥ today, nil on past weeks.
 
-**Suite: 192 tests, 0 failures** (184 + 5 `RecipeDetailLayoutTests` + 3 `ScreenAwakeTests`). Verified: iPhone 17 sim launch; iPad Pro 11" (M5) launch + render in BOTH orientations (window screenshots; only the sign-in screen reachable — no account on sims).
+**Suite: 200 tests, 0 failures** (192 + 8 `SeasonalStripTests`: ranking/cap, name dedup + back-fill, dormancy, first-open-night incl. start-of-day and past-week nil). Zero compiler warnings. Launch verified on iPhone 17 + iPad Pro 11" sims (sign-in screen only — no account).
 
 ## Next up
 
-1. **iPad device pass** (checklist in HANDOFF, 2026-09-03 night entry): two-column detail portrait + landscape, long recipes, missing photo/instructions/notes, screen-awake past auto-lock, sheet sizes, iPhone unchanged spot-check. Then merge `ipad-support` to main.
+1. **Device pass of seasonal visibility** (checklist in HANDOFF, 2026-09-04 entry), then merge `seasonal-visibility` to main.
 2. **iPad phase 2** (when David says go): week view, recipe list, grocery list on regular width.
 3. Announcement email for the 113/116 rollout.
 4. Seasonal v1.5 (parked): seasonal produce list into the AI suggestion prompt.
