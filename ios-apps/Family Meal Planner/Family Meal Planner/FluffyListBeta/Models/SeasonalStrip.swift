@@ -2,7 +2,8 @@
 //  SeasonalStrip.swift
 //  FluffyList
 //
-//  The empty-week ("wide open") seasonal strip: a handful of
+//  The week footer's seasonal strip (formerly the empty-week "wide
+//  open" strip — that state was retired 2026-09-04): a handful of
 //  in-season recipes shown before any day is picked, so the harvest
 //  can start the plan instead of only decorating it. Pure and
 //  injectable (WeekSummary-style) so the recipe selection and the
@@ -21,8 +22,8 @@ import Foundation
 
 enum SeasonalStrip {
 
-    /// The strip is short on purpose: it sits above the empty week's
-    /// action links, not instead of them.
+    /// The strip is short on purpose: it sits in the week footer
+    /// above the action links, not instead of them.
     static let cap = 4
 
     /// The strip's recipes: best seasonal score first, one row per

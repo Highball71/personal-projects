@@ -311,13 +311,20 @@ struct SupabaseRecipeListView: View {
                 // before any day is picked. Only in the default browse
                 // (no search, ALL tag, favorites off): its picks
                 // ignore the filters, and a shelf that contradicts an
-                // active filter reads as broken. Hidden when dormant.
+                // active filter reads as broken. With no region set,
+                // the one-time region prompt (or its one-line link)
+                // stands in the shelf's place.
                 if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     && selectedTag == .all && !showFavoritesOnly {
-                    let shelfPicks = seasonalShelfPicks
-                    if !shelfPicks.isEmpty {
-                        seasonalShelf(shelfPicks)
+                    if USRegion(rawValue: seasonalRegionRaw) == nil {
+                        SeasonalRegionPrompt()
                             .padding(.bottom, 30)
+                    } else {
+                        let shelfPicks = seasonalShelfPicks
+                        if !shelfPicks.isEmpty {
+                            seasonalShelf(shelfPicks)
+                                .padding(.bottom, 30)
+                        }
                     }
                 }
 

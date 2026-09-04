@@ -13,8 +13,12 @@
 //  its recipe detail; Replace and Remove live on swipe-left (which is
 //  why the week body is a plain List — swipe actions need list rows).
 //  "Clear the Whole Day" stays in a confirmation dialog, reached from
-//  the Remove swipe on multi-meal days. Closes with the "Build the
-//  grocery list" text-link CTA.
+//  the Remove swipe on multi-meal days. Closes with a planning footer
+//  — seasonal strip (or the region prompt in its place) + "Copy last
+//  week" whenever an open night remains (see WeekFooter) — then the
+//  "Build the grocery list" text-link CTA. An EMPTY week is no longer
+//  a special case (the "wide open" state was retired 2026-09-04): it
+//  renders the same seven day rows, every open slot tappable.
 //
 
 import os
@@ -27,7 +31,7 @@ struct MealPickerContext: Identifiable {
     let date: Date
     let memberID: UUID?
     /// Recipe to pin at the top of the picker — set when the picker
-    /// opens from the empty-week seasonal strip, where the user has
+    /// opens from the week footer's seasonal strip, where the user has
     /// already chosen the recipe and only needs to confirm (or change
     /// their mind with the full sheet underneath).
     var preselectedRecipeID: UUID? = nil
@@ -77,7 +81,6 @@ struct SupabaseMealPlanView: View {
     /// reuses the overlay with its own wording.
     @State private var assigningText = "Adding to meal plan..."
     @State private var toastMessage: String?
-    @State private var showingAddRecipe = false
     /// True when the last week fetch failed — drives the retry banner
     /// and stops the view from rendering a failed load as an empty week.
     @State private var fetchFailed = false
@@ -106,54 +109,24 @@ struct SupabaseMealPlanView: View {
         }
     }
 
-    /// True when no day in the current week has a meal assigned.
-    private var isWeekEmpty: Bool {
-        !weekDates.contains { !plans(for: $0).isEmpty }
-    }
-
-    /// A handful of recipes to suggest in the empty state.
-    ///
-    /// Dedup is keyed on the recipe's **normalized name** (trimmed +
-    /// lowercased), not on `id`. Two `recipes` rows with different
-    /// UUIDs but the same name (a known consequence of repeat imports)
-    /// are the same recipe to the user, so we keep just one occurrence.
-    /// When a name has multiple rows we keep the most recent (newest
-    /// `createdAt`), favoring user-marked favorites first.
-    private var suggestedRecipes: [RecipeRow] {
-        // Sort once: favorites first, then newest createdAt. The first
-        // row we encounter for each name is therefore both "most
-        // important" (favorite) and "most recent" within its priority.
-        let sorted = recipeService.recipes.sorted { lhs, rhs in
-            if lhs.isFavorite != rhs.isFavorite { return lhs.isFavorite }
-            return lhs.createdAt > rhs.createdAt
-        }
-
-        var seenNames = Set<String>()
-        var unique: [RecipeRow] = []
-        for recipe in sorted {
-            let key = recipe.name
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-            guard !key.isEmpty else { continue }
-            if seenNames.insert(key).inserted {
-                unique.append(recipe)
-                if unique.count == 4 { break }
-            }
-        }
-        return unique
-    }
-
     /// Seasonal Suggestions: region setting; "" = dormant.
     @AppStorage("seasonalRegion") private var seasonalRegionRaw = ""
 
     /// The night a seasonal-strip tap plans for — the displayed
     /// week's first day that is today or later. nil on a fully past
-    /// week (where the planning state never renders anyway).
+    /// week (where the footer never renders anyway).
     private var stripFirstOpenNight: Date? {
         SeasonalStrip.firstOpenNight(weekDates: weekDates)
     }
 
-    /// The empty-week seasonal strip: up to four in-season recipes.
+    /// Whether the planning footer (seasonal strip / region prompt +
+    /// "Copy last week") renders below the day rows — see WeekFooter.
+    private var isFooterVisible: Bool {
+        WeekFooter.isVisible(openCount: weekSummary.openCount,
+                             isPastWeek: weekNav.isPastWeek)
+    }
+
+    /// The week footer's seasonal strip: up to four in-season recipes.
     /// Computed for the month of the first open night — the night a
     /// tap will plan — so the strip and the picker it opens always
     /// agree on the harvest cell, even when a displayed week straddles
@@ -205,12 +178,10 @@ struct SupabaseMealPlanView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                    } else if isWeekEmpty && !recipeService.recipes.isEmpty && !weekNav.isPastWeek {
-                        // A past empty week falls through to weekContent:
-                        // "wide open" is planning copy, and its links all
-                        // write — a read-only week shows its PASSED days.
-                        emptyWeekView
                     } else {
+                        // Empty weeks included — seven day rows with
+                        // open slots is the planning surface; nothing
+                        // is special-cased any more.
                         weekContent
                     }
                 }
@@ -257,9 +228,6 @@ struct SupabaseMealPlanView: View {
                     },
                     onCancel: { pickerContext = nil }
                 )
-            }
-            .sheet(isPresented: $showingAddRecipe) {
-                SupabaseAddRecipeView()
             }
             .confirmationDialog(
                 mealActionTitle,
@@ -415,85 +383,26 @@ struct SupabaseMealPlanView: View {
         )
     }
 
-    // MARK: - Empty Week State
+    // MARK: - Seasonal Strip (week footer)
 
-    private var emptyWeekView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                weekHeader
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Image(systemName: "frying.pan")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundStyle(Color.fluffyAccent)
-                        .padding(.bottom, 30)
-
-                    Text("Your week is\nwide open.")
-                        .font(.fluffyDisplaySmall)
-                        .fluffyTracking(-0.025, at: 30)
-                        .foregroundStyle(Color.fluffyPrimary)
-                        .padding(.bottom, 10)
-
-                    Text("Plan a few dinners and the grocery list builds itself.")
-                        .font(.fluffyCallout)
-                        .foregroundStyle(Color.fluffySecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.bottom, 30)
-
-                    // Seasonal strip: what the harvest suggests before
-                    // any day is picked. Hidden when dormant (region
-                    // unset), when nothing matches, and on past weeks
-                    // (this whole state never renders there, and the
-                    // model returns no open night for one either).
-                    let stripPicks = seasonalStripPicks
-                    if !stripPicks.isEmpty, let night = stripFirstOpenNight,
-                       !weekNav.isPastWeek {
-                        seasonalStrip(stripPicks, planningFor: night)
-                            .padding(.bottom, 30)
-                    }
-
-                    VStack(alignment: .leading, spacing: 20) {
-                        FluffyTextLink(title: "Browse recipes") {
-                            selectedTab = .recipes
-                        }
-                        FluffyTextLink(title: "Add a custom meal") {
-                            showingAddRecipe = true
-                        }
-                        FluffyTextLink(title: "Copy last week") {
-                            Task { await copyLastWeek() }
-                        }
-                    }
-                    .padding(.bottom, 40)
-                }
-                .padding(.top, 50)
-                .padding(.horizontal, 22)
-
-                // Suggested recipes
-                if !suggestedRecipes.isEmpty {
-                    suggestedSection
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    // MARK: - Seasonal Strip (empty week)
-
-    /// A short ruled list of in-season recipes — the same rows the
-    /// picker's "In season now" shelf draws (FluffyRecipeRowLabel).
-    /// Tapping one opens the picker for the week's first open night
-    /// with that recipe pinned on top, ready to confirm.
+    /// A short ruled list of in-season recipes in the week footer —
+    /// the same rows the picker's "In season now" shelf draws
+    /// (FluffyRecipeRowLabel). Tapping one opens the picker for the
+    /// week's first open night with that recipe pinned on top, ready
+    /// to confirm. Draws its own 22pt insets: the footer VStack it
+    /// sits in is unpadded so the rules can span like the day rows'.
     private func seasonalStrip(
         _ picks: [SeasonalMatch.Pick],
         planningFor night: Date
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             FluffySectionHead(title: "In season now")
+                .padding(.horizontal, 22)
                 .padding(.bottom, 10)
 
             ForEach(picks, id: \.recipe.id) { pick in
                 VStack(spacing: 0) {
-                    FluffyRule()
+                    FluffyRule().padding(.horizontal, 22)
                     Button {
                         pickerContext = MealPickerContext(
                             date: night,
@@ -512,69 +421,30 @@ struct SupabaseMealPlanView: View {
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(Color.fluffyAccent)
                         }
+                        .padding(.horizontal, 22)
                         .padding(.vertical, 12)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            FluffyRule()
-        }
-    }
-
-    // MARK: - Suggested Recipes
-
-    private var suggestedSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            FluffySectionHead(title: "Popular in your kitchen")
-                .padding(.horizontal, 22)
-                .padding(.bottom, 10)
-
-            ForEach(suggestedRecipes) { recipe in
-                VStack(spacing: 0) {
-                    FluffyRule().padding(.horizontal, 22)
-                    suggestedRow(recipe)
-                }
-            }
             FluffyRule().padding(.horizontal, 22)
         }
-        .padding(.bottom, 32)
     }
 
-    private func suggestedRow(_ recipe: RecipeRow) -> some View {
-        Button {
-            // Assign to the first empty day that is today or later
-            let today = Calendar.current.startOfDay(for: Date())
-            if let emptyDate = weekDates.first(where: {
-                plans(for: $0).isEmpty && Calendar.current.startOfDay(for: $0) >= today
-            }) {
-                Task { await addMeal(recipe, to: emptyDate) }
+    /// The footer's seasonal slot: the strip when a region is set and
+    /// anything matches this month; the one-time region prompt (card,
+    /// or the one-line link after "Not now") when no region is set.
+    @ViewBuilder
+    private var footerSeasonal: some View {
+        if USRegion(rawValue: seasonalRegionRaw) == nil {
+            SeasonalRegionPrompt()
+        } else {
+            let picks = seasonalStripPicks
+            if !picks.isEmpty, let night = stripFirstOpenNight {
+                seasonalStrip(picks, planningFor: night)
             }
-        } label: {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(recipe.name)
-                        .font(.fluffyHeadline)
-                        .fluffyTracking(-0.01, at: 19)
-                        .foregroundStyle(Color.fluffyPrimary)
-                        .lineLimit(1)
-                    let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
-                    FluffyMetadataLine(text: total > 0
-                         ? "\(recipe.category) \u{00B7} \(total) min"
-                         : recipe.category)
-                }
-
-                Spacer()
-
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(Color.fluffyAccent)
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Week Content
@@ -610,8 +480,8 @@ struct SupabaseMealPlanView: View {
                     FluffyRule().padding(.horizontal, 22)
 
                     // Past weeks are read-only: no open-nights line
-                    // (nothing can be filled) and no Copy last week —
-                    // the note under the masthead already said so.
+                    // (nothing can be filled) and no footer — the
+                    // note under the masthead already said so.
                     if !weekNav.isPastWeek {
                         Text(weekSummary.openNightsLine)
                             .font(.custom(FluffyFace.italic, size: 15))
@@ -621,8 +491,18 @@ struct SupabaseMealPlanView: View {
                             .padding(.bottom, 20)
                     }
 
+                    // The planning footer: seasonal strip (or the
+                    // region prompt in its place) + "Copy last week",
+                    // whenever an open night remains — WeekFooter
+                    // owns the rule. A settled or past week closes
+                    // with just the grocery-list CTA.
+                    if isFooterVisible {
+                        footerSeasonal
+                            .padding(.bottom, 24)
+                    }
+
                     VStack(alignment: .leading, spacing: 20) {
-                        if hasOpenFutureDay && !weekNav.isPastWeek {
+                        if isFooterVisible {
                             FluffyTextLink(title: "Copy last week") {
                                 Task { await copyLastWeek() }
                             }
@@ -1036,19 +916,6 @@ struct SupabaseMealPlanView: View {
 
     // MARK: - Actions
 
-    /// True when at least one future day has an open slot — household
-    /// or member — i.e. copy-last-week could actually land something.
-    /// (Whether last week can fill a given open slot isn't knowable
-    /// here; the copy itself applies the exact per-slot skip rules.)
-    private var hasOpenFutureDay: Bool {
-        let today = Calendar.current.startOfDay(for: Date())
-        let slotCapacity = 1 + householdService.members.count
-        return weekDates.contains { date in
-            plans(for: date).count < slotCapacity &&
-            Calendar.current.startOfDay(for: date) >= today
-        }
-    }
-
     /// Copy the previous week's meals forward. Days already planned
     /// are kept and past days are skipped silently (decided
     /// 2026-08-27) — see MealPlanService.copyPreviousWeek.
@@ -1301,13 +1168,18 @@ struct RecipePickerSheet: View {
                             }
                         }
 
-                        // Seasonal Suggestions v1: what's in season in
+                        // Seasonal Suggestions: what's in season in
                         // the household's region right now, best match
-                        // first. Absent entirely when the region is
-                        // unset — the sheet then looks exactly as
-                        // before. All Recipes below stays complete;
+                        // first. With no region set, the one-time
+                        // region prompt (or its one-line link, after
+                        // "Not now") stands where the section would
+                        // be. All Recipes below stays complete;
                         // nothing is ever hidden.
-                        if !picks.isEmpty {
+                        if USRegion(rawValue: seasonalRegionRaw) == nil {
+                            Section {
+                                SeasonalRegionPrompt(inList: true)
+                            }
+                        } else if !picks.isEmpty {
                             Section("In season now") {
                                 ForEach(picks, id: \.recipe.id) { pick in
                                     recipeRow(pick.recipe, seasonalScore: pick.score, showsLeaf: true)
