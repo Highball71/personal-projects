@@ -26,6 +26,11 @@ struct MealPickerContext: Identifiable {
     let id = UUID()
     let date: Date
     let memberID: UUID?
+    /// Recipe to pin at the top of the picker — set when the picker
+    /// opens from the empty-week seasonal strip, where the user has
+    /// already chosen the recipe and only needs to confirm (or change
+    /// their mind with the full sheet underneath).
+    var preselectedRecipeID: UUID? = nil
 }
 
 /// The meal a Remove swipe controls: drives the confirmation dialog
@@ -138,6 +143,31 @@ struct SupabaseMealPlanView: View {
         return unique
     }
 
+    /// Seasonal Suggestions: region setting; "" = dormant.
+    @AppStorage("seasonalRegion") private var seasonalRegionRaw = ""
+
+    /// The night a seasonal-strip tap plans for — the displayed
+    /// week's first day that is today or later. nil on a fully past
+    /// week (where the planning state never renders anyway).
+    private var stripFirstOpenNight: Date? {
+        SeasonalStrip.firstOpenNight(weekDates: weekDates)
+    }
+
+    /// The empty-week seasonal strip: up to four in-season recipes.
+    /// Computed for the month of the first open night — the night a
+    /// tap will plan — so the strip and the picker it opens always
+    /// agree on the harvest cell, even when a displayed week straddles
+    /// a month boundary. Empty when dormant (region unset).
+    private var seasonalStripPicks: [SeasonalMatch.Pick] {
+        guard let night = stripFirstOpenNight else { return [] }
+        return SeasonalStrip.picks(
+            recipes: recipeService.recipes,
+            ingredientsByRecipeID: recipeService.ingredientsByRecipeID,
+            region: USRegion(rawValue: seasonalRegionRaw),
+            month: Calendar.current.component(.month, from: night)
+        )
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -220,6 +250,7 @@ struct SupabaseMealPlanView: View {
                     // planned, not today — two weeks ahead can cross a
                     // month boundary into a different harvest period.
                     seasonalMonth: Calendar.current.component(.month, from: context.date),
+                    preselectedRecipeID: context.preselectedRecipeID,
                     onPick: { recipe, memberID in
                         pickerContext = nil
                         Task { await addMeal(recipe, to: context.date, for: memberID) }
@@ -409,6 +440,18 @@ struct SupabaseMealPlanView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 30)
 
+                    // Seasonal strip: what the harvest suggests before
+                    // any day is picked. Hidden when dormant (region
+                    // unset), when nothing matches, and on past weeks
+                    // (this whole state never renders there, and the
+                    // model returns no open night for one either).
+                    let stripPicks = seasonalStripPicks
+                    if !stripPicks.isEmpty, let night = stripFirstOpenNight,
+                       !weekNav.isPastWeek {
+                        seasonalStrip(stripPicks, planningFor: night)
+                            .padding(.bottom, 30)
+                    }
+
                     VStack(alignment: .leading, spacing: 20) {
                         FluffyTextLink(title: "Browse recipes") {
                             selectedTab = .recipes
@@ -431,6 +474,51 @@ struct SupabaseMealPlanView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: - Seasonal Strip (empty week)
+
+    /// A short ruled list of in-season recipes — the same rows the
+    /// picker's "In season now" shelf draws (FluffyRecipeRowLabel).
+    /// Tapping one opens the picker for the week's first open night
+    /// with that recipe pinned on top, ready to confirm.
+    private func seasonalStrip(
+        _ picks: [SeasonalMatch.Pick],
+        planningFor night: Date
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            FluffySectionHead(title: "In season now")
+                .padding(.bottom, 10)
+
+            ForEach(picks, id: \.recipe.id) { pick in
+                VStack(spacing: 0) {
+                    FluffyRule()
+                    Button {
+                        pickerContext = MealPickerContext(
+                            date: night,
+                            memberID: nil,
+                            preselectedRecipeID: pick.recipe.id
+                        )
+                    } label: {
+                        HStack(spacing: 14) {
+                            FluffyRecipeRowLabel(
+                                recipe: pick.recipe,
+                                seasonalScore: pick.score,
+                                showsLeaf: true
+                            )
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(Color.fluffyAccent)
+                        }
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            FluffyRule()
         }
     }
 
@@ -1127,6 +1215,12 @@ struct RecipePickerSheet: View {
     /// the month of the day being planned (which, with week
     /// navigation, is not always the current month).
     var seasonalMonth: Int = Calendar.current.component(.month, from: Date())
+    /// Recipe pinned in a "Your pick" section on top — set when the
+    /// sheet opens from the empty-week seasonal strip, where the user
+    /// has already chosen a recipe and one more tap confirms it. The
+    /// full sheet stays underneath (the pick may appear again in the
+    /// seasonal and All Recipes sections; nothing is ever hidden).
+    var preselectedRecipeID: UUID? = nil
     let onPick: (RecipeRow, UUID?) -> Void
     let onCancel: () -> Void
 
@@ -1191,6 +1285,19 @@ struct RecipePickerSheet: View {
                                     selection: $selectedMemberID
                                 )
                                 .padding(.vertical, 4)
+                            }
+                        }
+
+                        // The strip's pick, pinned and ready to
+                        // confirm. Chips stay first — they configure
+                        // who the meal is for before the pick lands.
+                        if let preselected = recipes.first(where: { $0.id == preselectedRecipeID }) {
+                            Section("Your pick") {
+                                recipeRow(
+                                    preselected,
+                                    seasonalScore: picks.first { $0.recipe.id == preselected.id }?.score,
+                                    showsLeaf: leafIDs.contains(preselected.id)
+                                )
                             }
                         }
 
@@ -1272,27 +1379,14 @@ struct RecipePickerSheet: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(recipe.name)
-                            .font(.fluffyHeadline)
-                            .foregroundStyle(Color.fluffyPrimary)
-                        if showsLeaf {
-                            Image(systemName: "leaf.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.fluffyInk2)
-                        }
-                    }
-                    Text(recipe.category.capitalized)
-                        .font(.fluffyCaption)
-                        .foregroundStyle(Color.fluffySecondary)
-                    // "IN SEASON · TOMATO, BASIL" — only in the
-                    // seasonal section, where the match is the point.
-                    if let seasonalScore {
-                        FluffyMetadataLine(
-                            text: SeasonalMatch.matchText(for: seasonalScore),
-                            color: .fluffyInk2
-                        )
-                    }
+                    // Name + leaf, category, and the seasonal match
+                    // line — the shared label the Recipes tab's shelf
+                    // and the empty-week strip also draw.
+                    FluffyRecipeRowLabel(
+                        recipe: recipe,
+                        seasonalScore: seasonalScore,
+                        showsLeaf: showsLeaf
+                    )
                     // Keyword-only dietary hint — a gentle flag, never
                     // a block. A selected person gets their own check;
                     // EVERYONE checks the whole household and names
