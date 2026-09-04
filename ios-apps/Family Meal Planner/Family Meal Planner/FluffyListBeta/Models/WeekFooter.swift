@@ -6,20 +6,21 @@
 //  seasonal strip (or the region prompt standing in for it) and
 //  "Copy last week", which live below the day rows now that the
 //  special-cased "wide open" empty-week state is gone (2026-09-04).
-//  Pure and one-line-testable, WeekSummary-style.
+//  Pure and injectable (WeekSummary-style) so the slot math is
+//  unit-testable without SwiftUI.
 //
-//  The rule: the footer shows whenever the displayed week still has
-//  at least one OPEN night (WeekSummary's rule — today or later with
-//  no household meal) and the week isn't past. A fully planned week
-//  reads "The week is settled." and offers nothing to fill; a past
+//  The rule (widened same day it shipped): the footer shows whenever
+//  any SLOT in the displayed week is still open on a day that is
+//  today or later — the household slot or any member's — and the
+//  week isn't past. This is the old "Copy last week" gate's breadth
+//  (hasOpenFutureDay): a family that plans per person can still have
+//  somewhere to put a meal after every household night is filled, so
+//  the footer stays. A week with every slot taken is settled; a past
 //  week is read-only and its quiet note already says so.
 //
-//  Note this deliberately retires the old "Copy last week" gate
-//  (hasOpenFutureDay, which also counted open MEMBER slots): a week
-//  whose seven household slots are full is settled, and copying into
-//  leftover member slots from a settled page was a corner nobody
-//  planned from. An open night implies an open household slot, so
-//  inside a visible footer the copy link can always show.
+//  (The first cut keyed off WeekSummary's open-NIGHT count instead,
+//  which hid the footer while member slots remained — that narrowing
+//  bit exactly the per-person households the slots exist for.)
 //
 
 import Foundation
@@ -27,7 +28,26 @@ import Foundation
 enum WeekFooter {
 
     /// Whether the planning footer renders under the day rows.
-    static func isVisible(openCount: Int, isPastWeek: Bool) -> Bool {
-        !isPastWeek && openCount > 0
+    ///
+    /// `plannedSlotCount` is the number of meal rows on a date; a
+    /// day is open while that count is below 1 + memberCount (the
+    /// household slot plus one per member — the same capacity rule
+    /// the picker plans against). `today` and `calendar` are
+    /// injectable for tests.
+    static func isVisible(
+        weekDates: [Date],
+        memberCount: Int,
+        isPastWeek: Bool,
+        today: Date = Date(),
+        calendar: Calendar = .current,
+        plannedSlotCount: (Date) -> Int
+    ) -> Bool {
+        guard !isPastWeek else { return false }
+        let todayStart = calendar.startOfDay(for: today)
+        let slotCapacity = 1 + memberCount
+        return weekDates.contains { date in
+            calendar.startOfDay(for: date) >= todayStart
+                && plannedSlotCount(date) < slotCapacity
+        }
     }
 }

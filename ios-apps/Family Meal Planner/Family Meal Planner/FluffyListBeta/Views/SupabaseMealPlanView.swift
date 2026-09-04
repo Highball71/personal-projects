@@ -15,7 +15,7 @@
 //  "Clear the Whole Day" stays in a confirmation dialog, reached from
 //  the Remove swipe on multi-meal days. Closes with a planning footer
 //  — seasonal strip (or the region prompt in its place) + "Copy last
-//  week" whenever an open night remains (see WeekFooter) — then the
+//  week" whenever an open slot remains (see WeekFooter) — then the
 //  "Build the grocery list" text-link CTA. An EMPTY week is no longer
 //  a special case (the "wide open" state was retired 2026-09-04): it
 //  renders the same seven day rows, every open slot tappable.
@@ -120,10 +120,15 @@ struct SupabaseMealPlanView: View {
     }
 
     /// Whether the planning footer (seasonal strip / region prompt +
-    /// "Copy last week") renders below the day rows — see WeekFooter.
+    /// "Copy last week") renders below the day rows — see WeekFooter:
+    /// any open slot (household or member) on a today-or-later day.
     private var isFooterVisible: Bool {
-        WeekFooter.isVisible(openCount: weekSummary.openCount,
-                             isPastWeek: weekNav.isPastWeek)
+        WeekFooter.isVisible(
+            weekDates: weekDates,
+            memberCount: householdService.members.count,
+            isPastWeek: weekNav.isPastWeek,
+            plannedSlotCount: { plans(for: $0).count }
+        )
     }
 
     /// The week footer's seasonal strip: up to four in-season recipes.
@@ -493,9 +498,9 @@ struct SupabaseMealPlanView: View {
 
                     // The planning footer: seasonal strip (or the
                     // region prompt in its place) + "Copy last week",
-                    // whenever an open night remains — WeekFooter
-                    // owns the rule. A settled or past week closes
-                    // with just the grocery-list CTA.
+                    // whenever an open slot (household or member)
+                    // remains — WeekFooter owns the rule. A settled
+                    // or past week closes with just the grocery CTA.
                     if isFooterVisible {
                         footerSeasonal
                             .padding(.bottom, 24)

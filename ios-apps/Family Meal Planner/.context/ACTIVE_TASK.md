@@ -2,10 +2,10 @@
 
 **Session Focus:** (2026-09-04 later — Claude Code, autonomous) **Empty-week retirement + one-time region prompt**, on branch `empty-week-and-region` (NOT merged to main — merge after its device pass).
 
-1. **"Wide open" state deleted.** An empty week renders like any week: seven day rows, open slots tappable. The seasonal strip + "Copy last week" moved into a planning footer below the day rows — visible iff the week has ≥1 open night and isn't past (new pure `Models/WeekFooter.swift`; past weeks keep PASSED rows, no footer). The old member-slot copy gate (`hasOpenFutureDay`) is retired with it. Also deleted: "Popular in your kitchen", standalone Browse/Add links, `showingAddRecipe`.
+1. **"Wide open" state deleted.** An empty week renders like any week: seven day rows, open slots tappable. The seasonal strip + "Copy last week" moved into a planning footer below the day rows — visible iff any slot (household OR member) is open on a today-or-later day and the week isn't past (new pure `Models/WeekFooter.swift` — the old `hasOpenFutureDay` breadth, restored on David's instruction after a first cut counted only open household nights; past weeks keep PASSED rows, no footer). Also deleted: "Popular in your kitchen", standalone Browse/Add links, `showingAddRecipe`.
 2. **Region prompt.** New `Views/SeasonalRegionPrompt.swift` stands wherever a seasonal surface would render with no region set (tab shelf, picker section via `inList: true`, week footer): Press ruled card — region Menu (same `seasonalRegion` key as Settings) + "Use my location" + "Not now" (persists via `seasonalRegionPromptDismissed`, leaves a one-line Menu link). Location: `Utilities/RegionLocator.swift` — when-in-use once, one reduced-accuracy fix, **MKReverseGeocodingRequest** (CLGeocoder is deprecated at the real deployment target, iOS 26.2), state parsed from `cityWithContext`, `Models/StateRegionMap.swift` (50+DC; HI deliberately unmapped → manual). All failures fall back to the manual menu. Usage-description key added to both configs.
 
-**Suite: 210 tests, 0 failures** (200 + 4 `WeekFooterTests` + 6 `StateRegionMapTests`). Zero warnings. Launch verified on iPhone 17 + iPad Pro 11" sims.
+**Suite: 212 tests, 0 failures** (200 + 6 `WeekFooterTests` + 6 `StateRegionMapTests`). Zero warnings. Launch verified on iPhone 17 + iPad Pro 11" sims.
 
 ## Next up
 

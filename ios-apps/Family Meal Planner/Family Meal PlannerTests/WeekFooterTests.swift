@@ -3,11 +3,12 @@
 //  Family Meal PlannerTests
 //
 //  Visibility of the week view's planning footer (seasonal strip /
-//  region prompt + "Copy last week"): shows while the displayed week
-//  still has an open night, never on past weeks, and not on a fully
-//  planned week. Open nights come from WeekSummary's tested rule, so
-//  these cases drive the real pipeline (dates + meal closures →
-//  WeekSummary → WeekFooter), not hand-fed counts alone.
+//  region prompt + "Copy last week"): shows while any SLOT in the
+//  displayed week — household or member — is open on a today-or-
+//  later day; never on past weeks; not on a week with every slot
+//  taken. This is the old "Copy last week" gate's breadth, restored
+//  after a first cut keyed it to open household NIGHTS only and hid
+//  the footer from per-person households with member slots to fill.
 //
 
 import XCTest
@@ -25,77 +26,106 @@ final class WeekFooterTests: XCTestCase {
         (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: start) }
     }
 
-    /// Mid-current-week with open nights remaining → footer shows.
+    // Sun Aug 30 – Sat Sep 5, viewed from Wednesday.
+    private var weekDates: [Date] { week(startingAt: date(2026, 8, 30)) }
+    private var wednesday: Date { date(2026, 9, 2) }
+
+    /// Mid-current-week with nothing planned ahead → footer shows.
     func testFooterShowsWhileAnOpenNightRemains() {
-        let weekDates = week(startingAt: date(2026, 8, 30))     // Sun Aug 30
-        let today = date(2026, 9, 2)                            // Wed
-        // Only Wednesday itself is planned; Thu–Sat are open.
-        let summary = WeekSummary.build(
+        // Household of 2: capacity 3 per day; only Wednesday planned.
+        XCTAssertTrue(WeekFooter.isVisible(
             weekDates: weekDates,
-            today: today,
+            memberCount: 2,
+            isPastWeek: false,
+            today: wednesday,
             calendar: cal,
-            hasMeal: { cal.isDate($0, inSameDayAs: today) },
-            hasHouseholdMeal: { cal.isDate($0, inSameDayAs: today) }
-        )
-        XCTAssertGreaterThan(summary.openCount, 0)
-        XCTAssertTrue(WeekFooter.isVisible(openCount: summary.openCount,
-                                           isPastWeek: false))
+            plannedSlotCount: { cal.isDate($0, inSameDayAs: self.wednesday) ? 3 : 0 }
+        ))
     }
 
     /// An entirely EMPTY current week (the old "wide open" state) is
-    /// the fullest case of "open nights remain" — footer shows.
+    /// the fullest case of "open slots remain" — footer shows.
     func testFooterShowsOnAnEmptyWeek() {
-        let weekDates = week(startingAt: date(2026, 8, 30))
-        let summary = WeekSummary.build(
+        XCTAssertTrue(WeekFooter.isVisible(
             weekDates: weekDates,
+            memberCount: 0,
+            isPastWeek: false,
             today: date(2026, 8, 30),
             calendar: cal,
-            hasMeal: { _ in false },
-            hasHouseholdMeal: { _ in false }
-        )
-        XCTAssertEqual(summary.openCount, 7)
-        XCTAssertTrue(WeekFooter.isVisible(openCount: summary.openCount,
-                                           isPastWeek: false))
+            plannedSlotCount: { _ in 0 }
+        ))
     }
 
-    /// A past week never shows the footer — its days can't be filled.
-    /// Both guards hold: WeekSummary already counts zero open nights
-    /// for past dates, and isPastWeek hides the footer even if a
-    /// caller ever fed a nonzero count.
+    /// The widened rule: every household night is filled, but a
+    /// member slot is still open on a future day — the footer (and
+    /// its Copy last week) stays, exactly like the old gate.
+    func testFooterShowsWhenOnlyAMemberSlotIsOpen() {
+        // Household of 2: capacity 3. Every day holds the household
+        // meal + one member meal (2 of 3 slots) — one member slot
+        // open per remaining day.
+        XCTAssertTrue(WeekFooter.isVisible(
+            weekDates: weekDates,
+            memberCount: 2,
+            isPastWeek: false,
+            today: wednesday,
+            calendar: cal,
+            plannedSlotCount: { _ in 2 }
+        ))
+    }
+
+    /// A past week never shows the footer — its days can't be filled,
+    /// however many slots are technically empty.
     func testFooterHiddenOnPastWeek() {
-        let weekDates = week(startingAt: date(2026, 8, 16))
-        let today = date(2026, 9, 2)
+        let pastWeek = week(startingAt: date(2026, 8, 16))
         let nav = WeekNavigation(displayedWeekStart: date(2026, 8, 16),
-                                 today: today, calendar: cal)
+                                 today: wednesday, calendar: cal)
         XCTAssertTrue(nav.isPastWeek)
-
-        let summary = WeekSummary.build(
-            weekDates: weekDates,
-            today: today,
+        XCTAssertFalse(WeekFooter.isVisible(
+            weekDates: pastWeek,
+            memberCount: 2,
+            isPastWeek: nav.isPastWeek,
+            today: wednesday,
             calendar: cal,
-            hasMeal: { _ in false },
-            hasHouseholdMeal: { _ in false }
-        )
-        XCTAssertEqual(summary.openCount, 0)
-        XCTAssertFalse(WeekFooter.isVisible(openCount: summary.openCount,
-                                            isPastWeek: nav.isPastWeek))
-        // The belt-and-suspenders guard.
-        XCTAssertFalse(WeekFooter.isVisible(openCount: 7, isPastWeek: true))
+            plannedSlotCount: { _ in 0 }
+        ))
+        // Past-day gating holds on its own too: a past week's dates
+        // are all before today, so even isPastWeek: false finds no
+        // fillable slot.
+        XCTAssertFalse(WeekFooter.isVisible(
+            weekDates: pastWeek,
+            memberCount: 2,
+            isPastWeek: false,
+            today: wednesday,
+            calendar: cal,
+            plannedSlotCount: { _ in 0 }
+        ))
     }
 
-    /// A fully planned week (every remaining night has a household
-    /// meal) reads "settled" — no footer, no Copy last week.
-    func testFooterHiddenWhenWeekIsFull() {
-        let weekDates = week(startingAt: date(2026, 8, 30))
-        let summary = WeekSummary.build(
+    /// A week with EVERY slot taken (household + all members, every
+    /// remaining day) is settled — no footer, no Copy last week.
+    func testFooterHiddenWhenEverySlotIsTaken() {
+        XCTAssertFalse(WeekFooter.isVisible(
             weekDates: weekDates,
-            today: date(2026, 9, 2),
+            memberCount: 2,
+            isPastWeek: false,
+            today: wednesday,
             calendar: cal,
-            hasMeal: { _ in true },
-            hasHouseholdMeal: { _ in true }
-        )
-        XCTAssertEqual(summary.openCount, 0)
-        XCTAssertFalse(WeekFooter.isVisible(openCount: summary.openCount,
-                                            isPastWeek: false))
+            plannedSlotCount: { _ in 3 }
+        ))
+    }
+
+    /// Past DAYS within the current week don't count: open slots on
+    /// Sun–Tue are gone by Wednesday, so a week whose remaining days
+    /// are full is settled even though its early days sit empty.
+    func testPastDaysWithinTheWeekDoNotCount() {
+        let today = cal.startOfDay(for: wednesday)
+        XCTAssertFalse(WeekFooter.isVisible(
+            weekDates: weekDates,
+            memberCount: 0,
+            isPastWeek: false,
+            today: wednesday,
+            calendar: cal,
+            plannedSlotCount: { cal.startOfDay(for: $0) < today ? 0 : 1 }
+        ))
     }
 }
