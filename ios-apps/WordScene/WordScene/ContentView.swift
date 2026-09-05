@@ -7,16 +7,12 @@ struct ContentView: View {
                 HomeView()
             }
 
-            Tab("Deeper", systemImage: "book.pages") {
-                DeeperTabView()
-            }
-
             Tab("Progress", systemImage: "chart.bar") {
                 ProgressTabView()
             }
 
-            Tab("Words", systemImage: "text.book.closed") {
-                WordListView()
+            Tab("Collection", systemImage: "books.vertical") {
+                CollectionView()
             }
         }
     }
@@ -24,5 +20,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [WordProgress.self, DailyActivity.self, EtymologyProgress.self], inMemory: true)
+        .modelContainer(for: [WordState.self, UserScene.self, ReviewLog.self, DailyActivity.self], inMemory: true)
 }

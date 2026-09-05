@@ -59,6 +59,8 @@ Domains and ladders are derived from the seed (group by `domain`, sort by `ladde
 - `producesOnPrompt → usesUnprompted`: user self-report — one "I used it" tap, with optional note
 - Demotion: 2 consecutive misses at any rung drops one rung and resets the schedule
 
+**Hard constraint (David, 2026-09-05):** `usesUnprompted` may ONLY be reached via an explicit user-reported "I used it" event. Review performance can never promote to it, no matter how strong. Encoded in `WordState`: the review-outcome path caps promotion at `producesOnPrompt`; only the separate `recordUnpromptedUse()` method can set the top rung.
+
 Key point: **mastery transitions are gated on evidence counts, not on SM-2 intervals.** SM-2 only decides *when* the next check happens; the mastery ladder decides *what kind* of check it is.
 
 ### UserScene — decision #6, both directions

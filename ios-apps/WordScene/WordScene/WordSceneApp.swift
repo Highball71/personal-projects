@@ -7,6 +7,6 @@ struct WordSceneApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [WordProgress.self, DailyActivity.self, EtymologyProgress.self])
+        .modelContainer(for: [WordState.self, UserScene.self, ReviewLog.self, DailyActivity.self])
     }
 }

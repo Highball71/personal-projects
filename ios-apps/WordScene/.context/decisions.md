@@ -12,6 +12,12 @@
 9. **Sideshow track**, clearly labelled, ≤5 fun-but-undeployable words. Must not dilute main.
 10. **No deep teal anywhere.**
 
+## Phase-1 decisions (David, 2026-09-05)
+- **Level switch**: never existed in code — the brief was sourced from an old design discussion. Build fresh: **Broad / Narrow / Needle**, mapped to ladder-rank bands (Broad = ranks 1–2, Narrow = 3–4, Needle = 5+). Closes open question #1.
+- **Etymology "Deeper" mode**: retired in phase 1. If revived later, it lives on the sideshow shelf. Closes open question #2.
+- **`.teal` in ProgressTabView**: fixed in phase 1, not deferred. Closes open question #3.
+- **Mastery constraint**: the `usesUnprompted` rung may ONLY be reached via an explicit user-reported "I used it" event. Review performance can never promote to it. Encoded in `WordState` (separate `recordUnpromptedUse()` method; review path caps at `producesOnPrompt`).
+
 ## Phase-0 curation decisions (Claude, delegated under #8)
 - **9 domain ladders**: states-of-mind, wounded-pride, social-manner, ways-of-speaking, argument-and-evasion, effort-and-care, bodily-sensations, weather-and-light, blandness. 46 main words; ladders of 3–7, ordered broadest→narrowest via `ladderRank`.
 - **Deployability bar**: every main word must survive the test "could David say this at dinner without sounding like he swallowed a thesaurus." Cut for fame/ease: schadenfreude, ennui, sonder, visceral, equanimity. Cut for undeployability: torpor kept only as a stated neighbour, casuistry etc. never considered in.
