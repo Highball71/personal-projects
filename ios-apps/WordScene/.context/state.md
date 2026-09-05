@@ -32,3 +32,17 @@ David answered all four open questions (recorded in decisions.md): level switch 
 
 ## Current status
 Phase 1 shipped (code complete, builds, launches). Needs a human pass on device/simulator: hear the voice loop (open question: TTS quality), run a lesson + next-day review end-to-end. Then phase 2: production prompts, "I used it" UI, user-authored scenes, fresh review scenes.
+
+### 2026-09-05 (later still) — Phase 2 A–E (Office iMac, branch wordscene-phase2 from 76c9ef0)
+David deferred the OpenAI voice probe (no OPENAI_API_KEY) and directed: build the audio pipeline on AVSpeech with the best downloaded en-AU Premium voice (rate ~0.42–0.45), provider-pluggable, then proceed through B–E. NOTE: the A–E lettering wasn't in the repo; interpreted as the five PLAN.md phase-2 items with audio promoted to A (flagged to David in-session).
+
+**Shipped:**
+- E first (content): 46 fresh `reviewScene`s merged into words.json (v2), validated 40–100 words / no word stem ("office" scrubbed from officious again).
+- A: `VoiceProfile` (best en-AU premium→enhanced→any-en fallback; scene 0.44 / word 0.42), `SpeechAudioGenerator` protocol + `AVSpeechFileGenerator` (AAC .m4a via synthesizer.write — verified in a standalone harness: 5.44s file produced), `AudioStore` actor (manifest, SHA-256 fingerprints over provider+voice+rate+text, lazy per-session generation, stale-file cleanup), `Narrator` (file playback with completion-driven beat via AVAudioPlayer delegate; transparent live-TTS fallback; same Phase enum drives the lesson reveal). Swapping in OpenAI TTS = one conforming file + one line in `SpeechAudioGeneratorFactory`.
+- B: production prompts (type the word) for words ≥ Recognizes; `WordState.applyProductionOutcome` mirrors recognition with separate evidence date; promotion recognizes→producesOnPrompt at 2 correct days; still hard-capped below usesUnprompted.
+- C: "I used it unprompted" on WordDetailView (confirmation dialog → recordUnpromptedUse) + weekly nudge card on Home when produces-tier words exist and nothing reported in 7 days.
+- D: SceneComposerView (20–120 words, rejects scenes containing the word); entry points after lesson reveal and on word detail; user scenes shown on detail and preferred as review scenes.
+- Verified: build clean; generator harness OK; app launches with v2 seed + migrated store (screenshot). Not verified headless: audible loop, tap-through flows (simulator MCP still refusing — see environment note).
+
+## Current status
+Phases 1–2 shipped. Awaiting: David's ears on the AVSpeech Premium loop; OPENAI_API_KEY for the TTS probe + provider swap; then phase 3 (scene→word finder, sideshow shelf, second word pack).

@@ -28,8 +28,11 @@ final class WordState {
     var recognitionEvidenceDays: Int
     /// Days on which the user answered a production prompt correctly (phase 2)
     var productionEvidenceDays: Int
-    /// The last day evidence was banked, so two answers in one sitting count once
+    /// The last day recognition evidence was banked, so two answers in one
+    /// sitting count once
     var lastEvidenceDate: Date?
+    /// Same, for production prompts (separate so one day can bank both kinds)
+    var lastProductionEvidenceDate: Date?
     /// Consecutive incorrect reviews; 2 demotes a rung and resets the schedule
     var consecutiveMisses: Int
 
@@ -107,6 +110,48 @@ final class WordState {
             if mastery == .seen && recognitionEvidenceDays >= 2 {
                 mastery = .recognizes
                 dateRecognized = date
+            }
+        } else {
+            consecutiveMisses += 1
+            if consecutiveMisses >= 2 {
+                demoteOneRung(on: date)
+            }
+        }
+    }
+
+    /// Applies a production-prompt outcome (scene shown, user supplies the
+    /// word). Same shape as recognition, but banks production evidence and
+    /// promotes recognizes → producesOnPrompt after 2 correct days.
+    ///
+    /// The same HARD CONSTRAINT applies: this path stops at producesOnPrompt.
+    /// Producing the word on demand, however reliably, is not using it
+    /// unprompted — only `recordUnpromptedUse()` reaches the top rung.
+    func applyProductionOutcome(correct: Bool, on date: Date = Date()) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: date)
+
+        let result = SM2Engine.calculate(
+            quality: correct ? .knewIt : .noClue,
+            currentEaseFactor: easeFactor,
+            currentInterval: intervalDays,
+            currentRepetitions: repetitions
+        )
+        easeFactor = result.easeFactor
+        intervalDays = result.interval
+        repetitions = result.repetitions
+        dueDate = result.nextReviewDate
+        lastReviewedAt = date
+
+        if correct {
+            consecutiveMisses = 0
+            let alreadyBankedToday = lastProductionEvidenceDate.map { calendar.startOfDay(for: $0) == today } ?? false
+            if !alreadyBankedToday {
+                productionEvidenceDays += 1
+                lastProductionEvidenceDate = date
+            }
+            if mastery == .recognizes && productionEvidenceDays >= 2 {
+                mastery = .producesOnPrompt
+                dateProduced = date
             }
         } else {
             consecutiveMisses += 1

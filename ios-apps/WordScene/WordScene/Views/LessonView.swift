@@ -12,10 +12,11 @@ struct LessonView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var speech = SpeechService()
+    @State private var narrator = Narrator()
     @State private var index = 0
     @State private var revealed = false
     @State private var showSceneText = false
+    @State private var composingScene = false
 
     private var currentWord: SeedWord? {
         index < words.count ? words[index] : nil
@@ -35,7 +36,7 @@ struct LessonView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") {
-                        speech.stop()
+                        narrator.stop()
                         dismiss()
                     }
                 }
@@ -46,12 +47,27 @@ struct LessonView: View {
                 }
             }
         }
-        .interactiveDismissDisabled(speech.phase == .speakingScene)
-        .onAppear { startWord() }
-        // When the spoken word begins, the visual reveal lands with it
-        .onChange(of: speech.phase) { _, newPhase in
+        .interactiveDismissDisabled(narrator.phase == .speakingScene)
+        .onAppear {
+            // Pre-generate this lesson's audio in the background. The first
+            // word may still play via live synthesis; later ones (and
+            // replays) get the generated files.
+            let requests = words.flatMap { [AudioStore.AssetRequest.scene(for: $0), .word(for: $0)] }
+            Task.detached(priority: .utility) {
+                await AudioStore.shared.ensureGenerated(requests)
+            }
+            startWord()
+        }
+        // When the spoken word begins, the visual reveal lands with it —
+        // regardless of whether it came from a file or live synthesis
+        .onChange(of: narrator.phase) { _, newPhase in
             if newPhase == .speakingWord && !revealed {
                 reveal()
+            }
+        }
+        .sheet(isPresented: $composingScene) {
+            if let word = currentWord {
+                SceneComposerView(word: word)
             }
         }
     }
@@ -85,7 +101,7 @@ struct LessonView: View {
             Image(systemName: phaseSymbol)
                 .font(.system(size: 64))
                 .foregroundStyle(.indigo)
-                .symbolEffect(.pulse, isActive: speech.phase == .speakingScene)
+                .symbolEffect(.pulse, isActive: narrator.phase == .speakingScene)
                 .frame(maxWidth: .infinity)
 
             Text(phaseCaption)
@@ -121,16 +137,24 @@ struct LessonView: View {
             .padding()
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
-        WordCardView(word: word) { text in
-            speech.speak(text, slowly: true)
+        WordCardView(word: word) { _ in
+            narrator.speak(text: word.word, asset: .word(for: word), style: .word)
         }
+
+        Button {
+            composingScene = true
+        } label: {
+            Label("Write your own scene for it", systemImage: "square.and.pencil")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
     }
 
     private func bottomBar(for word: SeedWord) -> some View {
         HStack(spacing: 12) {
             if !revealed {
                 Button {
-                    speech.speakLesson(scene: word.systemScene, word: word.word)
+                    narrator.speakLesson(for: word)
                 } label: {
                     Label("Replay", systemImage: "arrow.counterclockwise")
                         .frame(maxWidth: .infinity)
@@ -138,7 +162,7 @@ struct LessonView: View {
                 .buttonStyle(.bordered)
 
                 Button {
-                    speech.stop()
+                    narrator.stop()
                     reveal()
                 } label: {
                     Label("Reveal", systemImage: "sparkles")
@@ -147,7 +171,7 @@ struct LessonView: View {
                 .buttonStyle(.borderedProminent)
             } else {
                 Button {
-                    speech.speak(word.systemScene)
+                    narrator.speak(text: word.systemScene, asset: .scene(for: word))
                 } label: {
                     Label("Hear scene", systemImage: "speaker.wave.2")
                         .frame(maxWidth: .infinity)
@@ -181,7 +205,7 @@ struct LessonView: View {
     // MARK: - Flow
 
     private var phaseSymbol: String {
-        switch speech.phase {
+        switch narrator.phase {
         case .speakingScene: return "waveform"
         case .beatOfSilence: return "ellipsis"
         default: return "headphones"
@@ -189,7 +213,7 @@ struct LessonView: View {
     }
 
     private var phaseCaption: String {
-        switch speech.phase {
+        switch narrator.phase {
         case .speakingScene: return "Listen. There's a word for this…"
         case .beatOfSilence: return "…"
         default: return "Ready"
@@ -200,7 +224,7 @@ struct LessonView: View {
         guard let word = currentWord else { return }
         revealed = false
         showSceneText = false
-        speech.speakLesson(scene: word.systemScene, word: word.word)
+        narrator.speakLesson(for: word)
     }
 
     /// Marks the word as seen: this is the moment the gap gets its name.
@@ -219,7 +243,7 @@ struct LessonView: View {
     }
 
     private func advance() {
-        speech.stop()
+        narrator.stop()
         index += 1
         if currentWord != nil {
             startWord()
