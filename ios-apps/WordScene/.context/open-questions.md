@@ -6,6 +6,8 @@ Still open:
 
 1. ~~Fresh-scene supply~~ CLOSED 2026-09-05: 46 authored reviewScenes shipped (words.json v2); user-authored scenes preferred when present; API generation remains a future option for variety.
 
-2. **TTS quality / OpenAI probe.** Pipeline is provider-pluggable and running on AVSpeech Premium en-AU (rate 0.44/0.42). Voice probe deferred — OPENAI_API_KEY unavailable this session. When the key exists: probe OpenAI TTS, and if it wins, add one `SpeechAudioGenerator` conformer + flip `SpeechAudioGeneratorFactory.make()`. Also still awaiting David's ears on the Premium-voice loop.
+2. **OpenAI voice pick (BLOCKING full audio generation).** Probe delivered 2026-09-05: ~/Desktop/WordScene-voice-probe/ has the full lesson beat for equivocate/obfuscate/insipid in ash, sage, and onyx (gpt-4o-mini-tts, real gap timings baked in). David picks; then run:
+   `OPENAI_API_KEY=... python3 scripts/generate_bundled_audio.py --voice <pick>`
+   which fills Resources/audio/ (~230 MP3s + audio-manifest.json, ~$1) — commit the output and the bundle serves it. Until then the app behaves as before (on-device AVSpeech).
 
 3. **Sideshow fifth slot.** Held open deliberately (4/5 used). Candidates can come from direction-(b) scenes that resolve to undeployable-but-delightful words.

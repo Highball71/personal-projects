@@ -21,6 +21,11 @@
 ## Phase-2 decisions (David, 2026-09-05)
 1. **Lesson loop is fully spoken**: scene → beat of silence (1.6s) → word → short pause (~0.8s) → one-line definition → short pause → one nearest-neighbour distinction. The nearest neighbour is the first listed in the seed. All four elements are generated through the same AudioStore fingerprinting; each has its own phase in the lesson phase enum so the card reveals word → definition → neighbours in step with the audio. (Was missing from this file until 2026-09-05 — the loop originally stopped at the word; corrected same day.)
 
+## Audio provider decisions (David, 2026-09-05)
+- **Seed audio is generated once and bundled**, not synthesized on-device and not fetched from the API at runtime: main-track content is fixed, so `scripts/generate_bundled_audio.py` renders every asset (scene, word, definition, neighbour line, review scene — main track only) with OpenAI TTS (gpt-4o-mini-tts) into `Resources/audio/` + `audio-manifest.json`, keyed by text hash so edited scenes stop matching automatically. AudioStore serves bundle-first.
+- **AVSpeech remains the fallback for user scenes only** (and interim seed content until the bundle is generated). The factory still returns the AVSpeech generator; `OpenAITTSGenerator` implements the same seam for tooling/server use.
+- **Voice**: probe delivered (ash / sage / onyx); David picks — see open questions.
+
 ## Phase-0 curation decisions (Claude, delegated under #8)
 - **9 domain ladders**: states-of-mind, wounded-pride, social-manner, ways-of-speaking, argument-and-evasion, effort-and-care, bodily-sensations, weather-and-light, blandness. 46 main words; ladders of 3–7, ordered broadest→narrowest via `ladderRank`.
 - **Deployability bar**: every main word must survive the test "could David say this at dinner without sounding like he swallowed a thesaurus." Cut for fame/ease: schadenfreude, ennui, sonder, visceral, equanimity. Cut for undeployability: torpor kept only as a stated neighbour, casuistry etc. never considered in.
