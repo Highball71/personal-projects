@@ -4,8 +4,8 @@ Closed 2026-09-05 (answers recorded in decisions.md): #1 level switch (build Bro
 
 Still open:
 
-1. **Fresh-scene supply for reviews.** Decision #4 requires a *fresh* scene at review time, but the seed carries one system scene per word. Phase 1 reuses the system scene (weak but workable for first reviews); real fix is phase 2: a second authored scene per word, user-authored scenes, and/or Claude API generation (Meal Planner has the integration pattern). Which mix does David want, and is on-device-only a constraint?
+1. ~~Fresh-scene supply~~ CLOSED 2026-09-05: 46 authored reviewScenes shipped (words.json v2); user-authored scenes preferred when present; API generation remains a future option for variety.
 
-2. **TTS quality.** Phase 1 starts with AVSpeechSynthesizer (free, offline). If the voice undermines the mood of the scenes, alternatives: pre-generated audio bundled per scene, or API voices. Decide after hearing it on device.
+2. **TTS quality / OpenAI probe.** Pipeline is provider-pluggable and running on AVSpeech Premium en-AU (rate 0.44/0.42). Voice probe deferred — OPENAI_API_KEY unavailable this session. When the key exists: probe OpenAI TTS, and if it wins, add one `SpeechAudioGenerator` conformer + flip `SpeechAudioGeneratorFactory.make()`. Also still awaiting David's ears on the Premium-voice loop.
 
 3. **Sideshow fifth slot.** Held open deliberately (4/5 used). Candidates can come from direction-(b) scenes that resolve to undeployable-but-delightful words.

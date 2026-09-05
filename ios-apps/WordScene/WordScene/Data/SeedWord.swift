@@ -15,6 +15,10 @@ struct SeedWord: Codable, Identifiable, Hashable {
     let neighbors: [Neighbor]   // 2–3 near-neighbours, each with the distinction stated
     let systemScene: String     // 60–120 words; never contains the word or its definition
 
+    /// A second, fresh scene used at review time (decision #4: review shows a
+    /// FRESH scene, never a replay of the lesson). Main-track words only.
+    let reviewScene: String?
+
     /// Which precision tier this word's ladder rank falls into.
     var tier: PrecisionTier { PrecisionTier(ladderRank: ladderRank) }
 

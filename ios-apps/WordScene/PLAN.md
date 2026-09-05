@@ -13,14 +13,14 @@ Ships:
 - Domain-ladder browsing (replaces old Words tab) with the Broad / Narrow / Needle precision switch (decision 2026-09-05; unlearned words stay locked so the reveal isn't spoiled).
 - Design pass: no deep teal anywhere (removes existing `.teal` in ProgressTabView).
 
-## Phase 2 — Owning the words
+## Phase 2 — Owning the words — SHIPPED 2026-09-05 (audio via AVSpeech; OpenAI TTS swap pending API key)
 
 Ships:
 - Production prompts (scene shown → user says/types the word) → `producesOnPrompt` rung.
 - "I used it" self-report → `usesUnprompted` rung; gentle weekly nudge to review the produces-tier words.
 - User-authored scenes, direction (a): write a scene for a word you just learned; becomes review material for that word.
 - Review-scene supply: second authored scene per word and/or Claude API generation (Meal Planner already has the integration pattern) with the same no-word-in-scene rule.
-- Better TTS if AVSpeech quality disappoints (pre-generated audio or API voices).
+- Pre-generated audio pipeline: provider-pluggable generator (AVSpeech Premium en-AU now; OpenAI TTS later is a one-file change), manifest + store with fingerprint-driven regeneration, completion-driven gap timing, live-TTS fallback. Voice probe deferred — no OPENAI_API_KEY this session.
 
 ## Phase 3 — The word finder + sideshow
 

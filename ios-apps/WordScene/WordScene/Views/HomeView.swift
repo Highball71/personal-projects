@@ -10,6 +10,8 @@ struct HomeView: View {
 
     @Query private var wordStates: [WordState]
     @Query private var activities: [DailyActivity]
+    @Query private var userScenes: [UserScene]
+    @Query private var reviewLogs: [ReviewLog]
 
     /// Persisted so the app opens where the user left off
     @AppStorage("selectedTier") private var selectedTierRaw = PrecisionTier.broad.rawValue
@@ -44,6 +46,22 @@ struct HomeView: View {
         LessonBuilder.remainingCount(tier: selectedTier, learnedWordIDs: learnedWordIDs)
     }
 
+    /// Words sitting at the Produces rung, waiting for real-world use — the
+    /// one promotion the app can't grant (hard constraint: self-report only).
+    private var wildCandidates: [WordState] {
+        wordStates.filter { $0.mastery == .producesOnPrompt }
+    }
+
+    /// Gentle weekly cadence: only nudge if nothing was reported in 7 days.
+    private var shouldNudgeWildUse: Bool {
+        guard !wildCandidates.isEmpty else { return false }
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        let recentReport = reviewLogs.contains {
+            $0.activity == ReviewLog.Activity.unpromptedUse.rawValue && $0.date > weekAgo
+        }
+        return !recentReport
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -56,6 +74,10 @@ struct HomeView: View {
                     learnCard
 
                     reviewCard
+
+                    if shouldNudgeWildUse {
+                        wildUseNudge
+                    }
                 }
                 .padding()
             }
@@ -105,7 +127,13 @@ struct HomeView: View {
 
     private var reviewCard: some View {
         Button {
-            let questions = ReviewBuilder.buildSession(dueWordIDs: dueWordIDs, learnedWordIDs: learnedWordIDs)
+            let questions = ReviewBuilder.buildSession(.init(
+                dueWordIDs: dueWordIDs,
+                learnedWordIDs: learnedWordIDs,
+                masteryByID: Dictionary(uniqueKeysWithValues: wordStates.map { ($0.wordID, $0.mastery) }),
+                userScenesByWordID: Dictionary(grouping: userScenes.filter { $0.wordID != nil }, by: { $0.wordID! })
+                    .mapValues { $0.map(\.text) }
+            ))
             if !questions.isEmpty { reviewPayload = ReviewPayload(questions: questions) }
         } label: {
             actionCard(
@@ -120,6 +148,30 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .disabled(dueWordIDs.isEmpty)
+    }
+
+    /// The top rung waits on life, not the app: a quiet reminder that some
+    /// words are ready to be used out loud. Marking it lives on each word's
+    /// page in the Collection.
+    private var wildUseNudge: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "star")
+                .font(.title2)
+                .foregroundStyle(.orange)
+                .frame(width: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(wildCandidates.count == 1
+                     ? "1 word is ready for the wild"
+                     : "\(wildCandidates.count) words are ready for the wild")
+                    .font(.headline)
+                Text("Drop one into a real conversation this week, then mark it on its page in the Collection.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 
     private func actionCard(title: String, subtitle: String, symbol: String, tint: Color, enabled: Bool) -> some View {

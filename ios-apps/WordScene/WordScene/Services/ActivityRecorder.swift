@@ -19,6 +19,23 @@ struct ActivityRecorder {
         todayActivity(in: context).wordsReviewed += 1
     }
 
+    /// Logs a production-prompt answer.
+    static func recordProduction(wordID: String, correct: Bool, in context: ModelContext) {
+        context.insert(ReviewLog(wordID: wordID, activity: .productionPrompt, correct: correct))
+        todayActivity(in: context).wordsReviewed += 1
+    }
+
+    /// Logs the user reporting they used a word unprompted in real life —
+    /// the only event that reaches the top mastery rung.
+    static func recordUnpromptedUse(wordID: String, in context: ModelContext) {
+        context.insert(ReviewLog(wordID: wordID, activity: .unpromptedUse))
+    }
+
+    /// Logs the user writing their own scene for a word.
+    static func recordSceneAuthored(wordID: String, in context: ModelContext) {
+        context.insert(ReviewLog(wordID: wordID, activity: .sceneAuthored))
+    }
+
     /// Finds or creates today's DailyActivity row.
     private static func todayActivity(in context: ModelContext) -> DailyActivity {
         let today = Calendar.current.startOfDay(for: Date())

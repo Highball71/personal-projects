@@ -96,31 +96,38 @@ struct CollectionView: View {
     }
 }
 
-/// Full card for a learned word, plus its original scene and mastery info.
+/// Full card for a learned word: pronunciation, distinctions, the original
+/// scene, mastery — and the two ways the user takes ownership: writing their
+/// own scene, and reporting real-world use (the ONLY path to the top rung).
 struct WordDetailView: View {
     let word: SeedWord
     let state: WordState
 
-    @State private var speech = SpeechService()
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allUserScenes: [UserScene]
+
+    @State private var narrator = Narrator()
+    @State private var composingScene = false
+    @State private var confirmingUse = false
+
+    private var userScenes: [UserScene] {
+        allUserScenes
+            .filter { $0.wordID == word.id }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                WordCardView(word: word) { text in
-                    speech.speak(text, slowly: true)
+                WordCardView(word: word) { _ in
+                    narrator.speak(text: word.word, asset: .word(for: word), style: .word)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("The scene")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(word.systemScene)
-                        .font(.subheadline)
-                        .lineSpacing(3)
+                sceneBox(title: "The scene", text: word.systemScene)
+
+                ForEach(userScenes, id: \.id) { scene in
+                    sceneBox(title: "Your scene · \(scene.createdAt.formatted(date: .abbreviated, time: .omitted))", text: scene.text)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
                 LabeledContent("Mastery") {
                     Label(state.mastery.displayName, systemImage: state.mastery.symbolName)
@@ -128,12 +135,72 @@ struct WordDetailView: View {
                 LabeledContent("Next review") {
                     Text(state.dueDate, style: .date)
                 }
+
+                actionButtons
             }
             .padding()
         }
         .navigationTitle(word.word)
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear { speech.stop() }
+        .onDisappear { narrator.stop() }
+        .sheet(isPresented: $composingScene) {
+            SceneComposerView(word: word)
+        }
+        .confirmationDialog(
+            "You used \"\(word.word)\" out loud, unprompted, in real life?",
+            isPresented: $confirmingUse,
+            titleVisibility: .visible
+        ) {
+            Button("Yes — it just came out") {
+                // The only path to the top rung (hard constraint): an
+                // explicit self-report, never review performance.
+                state.recordUnpromptedUse()
+                ActivityRecorder.recordUnpromptedUse(wordID: word.id, in: modelContext)
+            }
+            Button("Not yet", role: .cancel) {}
+        }
+    }
+
+    private var actionButtons: some View {
+        VStack(spacing: 10) {
+            if state.mastery != .usesUnprompted {
+                Button {
+                    confirmingUse = true
+                } label: {
+                    Label("I used it unprompted", systemImage: "star")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+            } else if let date = state.dateUsedUnprompted {
+                Label("Used in the wild on \(date.formatted(date: .abbreviated, time: .omitted))", systemImage: "star.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Button {
+                composingScene = true
+            } label: {
+                Label("Write your own scene", systemImage: "square.and.pencil")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private func sceneBox(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.subheadline)
+                .lineSpacing(3)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

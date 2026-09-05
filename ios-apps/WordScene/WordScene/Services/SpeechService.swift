@@ -1,12 +1,12 @@
 import Foundation
 import AVFoundation
 
-/// Drives the voice-first learning loop (design decision #7):
-/// hear the scene → a beat of silence → hear the word.
+/// Live speech synthesis — the always-available fallback behind Narrator.
+/// Views should talk to Narrator, which prefers generated audio files and
+/// drops down to this when a file isn't ready yet.
 ///
-/// The beat of silence is the whole point: the scene opens a gap, the pause
-/// lets the user feel it, and the word arrives to fill it. The UI observes
-/// `phase` so the visual reveal can land exactly when the word is spoken.
+/// Speaks with the app-wide VoiceProfile (best downloaded en-AU voice,
+/// rates ~0.42–0.45), so live speech and generated files sound the same.
 @Observable
 final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
 
@@ -18,9 +18,15 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
         case finished
     }
 
-    private(set) var phase: Phase = .idle
+    private(set) var phase: Phase = .idle {
+        didSet { phaseHandler?(phase) }
+    }
+
+    /// Lets a wrapper (Narrator) mirror phase changes without SwiftUI observation.
+    var phaseHandler: ((Phase) -> Void)?
 
     private let synthesizer = AVSpeechSynthesizer()
+    private let profile = VoiceProfile.current
 
     /// How long the gap breathes between scene and word, in seconds.
     private let beatDuration: TimeInterval = 1.6
@@ -41,13 +47,12 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
     func speakLesson(scene: String, word: String) {
         stop()
 
-        let sceneUtt = utterance(for: scene)
-        // postUtteranceDelay creates the beat of silence without a timer
+        let sceneUtt = profile.utterance(for: scene, style: .scene)
+        // postUtteranceDelay creates the beat of silence without a timer —
+        // it begins only when the scene utterance actually completes
         sceneUtt.postUtteranceDelay = beatDuration
 
-        let wordUtt = utterance(for: word)
-        // The word lands slightly slower and after a breath, like an answer
-        wordUtt.rate = AVSpeechUtteranceDefaultSpeechRate * 0.82
+        let wordUtt = profile.utterance(for: word, style: .word)
         wordUtt.preUtteranceDelay = 0.1
 
         sceneUtterance = sceneUtt
@@ -60,8 +65,7 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
     /// Speaks a single piece of text (scene replay in reviews, word replay on cards).
     func speak(_ text: String, slowly: Bool = false) {
         stop()
-        let utt = utterance(for: text)
-        if slowly { utt.rate = AVSpeechUtteranceDefaultSpeechRate * 0.78 }
+        let utt = profile.utterance(for: text, style: slowly ? .word : .scene)
         sceneUtterance = nil
         wordUtterance = utt // treat as "word" so phase ends in .finished
         phase = .speakingWord
@@ -73,13 +77,6 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
         sceneUtterance = nil
         wordUtterance = nil
         phase = .idle
-    }
-
-    private func utterance(for text: String) -> AVSpeechUtterance {
-        let utt = AVSpeechUtterance(string: text)
-        utt.voice = AVSpeechSynthesisVoice(language: "en-US")
-        utt.rate = AVSpeechUtteranceDefaultSpeechRate * 0.92
-        return utt
     }
 
     // MARK: - AVSpeechSynthesizerDelegate
