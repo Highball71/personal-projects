@@ -345,6 +345,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "FluffyList Beta";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Family Meal Planner uses your camera to photograph cookbook pages and extract recipes.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "FluffyList uses your location once to pick the growing region for seasonal recipe suggestions. Your location is never stored or shared.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -385,6 +386,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "FluffyList Beta";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Family Meal Planner uses your camera to photograph cookbook pages and extract recipes.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "FluffyList uses your location once to pick the growing region for seasonal recipe suggestions. Your location is never stored or shared.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -1,17 +1,16 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** (2026-09-04 — Claude Code, autonomous) **Seasonal visibility: suggestions before a day is picked**, on branch `seasonal-visibility` (NOT merged to main — merge after its device pass).
+**Session Focus:** (2026-09-04 later — Claude Code, autonomous) **Empty-week retirement + one-time region prompt**, on branch `empty-week-and-region` (NOT merged to main — merge after its device pass).
 
-1. **Recipes tab:** collapsible "In season now" shelf at the top of the browse (default browse only — hidden while searching/filtering), reusing the picker's computation and rows via the extracted `Design/FluffyRecipeRowLabel.swift`; collapse remembered for the session (`SeasonalShelfSession` static — resets next launch by design).
-2. **Empty-week strip:** up to four in-season recipes above the wide-open state's action links (Press ruled list), keyed to the month of the week's first open night. Tap opens `RecipePickerSheet` for that night with the recipe pinned in a new "Your pick" section (`preselectedRecipeID` on `MealPickerContext` + the sheet; chips stay first). Never shows on past weeks.
-3. **New pure model `Models/SeasonalStrip.swift`:** picker-ranked picks deduped by normalized name + capped at 4; `firstOpenNight` = first displayed-week day ≥ today, nil on past weeks.
+1. **"Wide open" state deleted.** An empty week renders like any week: seven day rows, open slots tappable. The seasonal strip + "Copy last week" moved into a planning footer below the day rows — visible iff any slot (household OR member) is open on a today-or-later day and the week isn't past (new pure `Models/WeekFooter.swift` — the old `hasOpenFutureDay` breadth, restored on David's instruction after a first cut counted only open household nights; past weeks keep PASSED rows, no footer). Also deleted: "Popular in your kitchen", standalone Browse/Add links, `showingAddRecipe`.
+2. **Region prompt.** New `Views/SeasonalRegionPrompt.swift` stands wherever a seasonal surface would render with no region set (tab shelf, picker section via `inList: true`, week footer): Press ruled card — region Menu (same `seasonalRegion` key as Settings) + "Use my location" + "Not now" (persists via `seasonalRegionPromptDismissed`, leaves a one-line Menu link). Location: `Utilities/RegionLocator.swift` — when-in-use once, one reduced-accuracy fix, **MKReverseGeocodingRequest** (CLGeocoder is deprecated at the real deployment target, iOS 26.2), state parsed from `cityWithContext`, `Models/StateRegionMap.swift` (50+DC; HI deliberately unmapped → manual). All failures fall back to the manual menu. Usage-description key added to both configs.
 
-**Suite: 200 tests, 0 failures** (192 + 8 `SeasonalStripTests`: ranking/cap, name dedup + back-fill, dormancy, first-open-night incl. start-of-day and past-week nil). Zero compiler warnings. Launch verified on iPhone 17 + iPad Pro 11" sims (sign-in screen only — no account).
+**Suite: 212 tests, 0 failures** (200 + 6 `WeekFooterTests` + 6 `StateRegionMapTests`). Zero warnings. Launch verified on iPhone 17 + iPad Pro 11" sims.
 
 ## Next up
 
-1. **Device pass of seasonal visibility** (checklist in HANDOFF, 2026-09-04 entry), then merge `seasonal-visibility` to main.
+1. **Device pass of empty-week + region prompt** (checklist in HANDOFF, 2026-09-04 later entry — includes the on-device location flow), then merge `empty-week-and-region` to main.
 2. **iPad phase 2** (when David says go): week view, recipe list, grocery list on regular width.
 3. Announcement email for the 113/116 rollout.
 4. Seasonal v1.5 (parked): seasonal produce list into the AI suggestion prompt.
-5. Parked: Engineer Mode; pantry-scan suggestions; community recipes; toast icon string-match cosmetic.
+5. Parked: Engineer Mode; pantry-scan suggestions; community recipes; toast icon string-match cosmetic. Doc nit: RULES/CLAUDE.md still say "target iOS 17+" — the project's deployment target is 26.2.
