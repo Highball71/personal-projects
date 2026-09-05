@@ -17,6 +17,9 @@ struct LessonView: View {
     @State private var revealed = false
     @State private var showSceneText = false
     @State private var composingScene = false
+    // Staged card disclosure: definition and neighbours appear as spoken
+    @State private var definitionRevealed = false
+    @State private var neighborsRevealed = false
 
     private var currentWord: SeedWord? {
         index < words.count ? words[index] : nil
@@ -52,17 +55,31 @@ struct LessonView: View {
             // Pre-generate this lesson's audio in the background. The first
             // word may still play via live synthesis; later ones (and
             // replays) get the generated files.
-            let requests = words.flatMap { [AudioStore.AssetRequest.scene(for: $0), .word(for: $0)] }
+            let requests = words.flatMap { AudioStore.AssetRequest.lessonAssets(for: $0) }
             Task.detached(priority: .utility) {
                 await AudioStore.shared.ensureGenerated(requests)
             }
             startWord()
         }
-        // When the spoken word begins, the visual reveal lands with it —
-        // regardless of whether it came from a file or live synthesis
+        // Each element of the card lands as it is spoken — word, then
+        // definition, then the neighbour distinction — regardless of whether
+        // the audio came from files or live synthesis
         .onChange(of: narrator.phase) { _, newPhase in
-            if newPhase == .speakingWord && !revealed {
+            switch newPhase {
+            case .speakingWord where !revealed:
                 reveal()
+            case .speakingDefinition:
+                withAnimation { definitionRevealed = true }
+            case .speakingNeighbor:
+                withAnimation { neighborsRevealed = true }
+            case .finished:
+                // However we got here, the full card should be showing
+                withAnimation {
+                    definitionRevealed = true
+                    neighborsRevealed = true
+                }
+            default:
+                break
             }
         }
         .sheet(isPresented: $composingScene) {
@@ -137,9 +154,14 @@ struct LessonView: View {
             .padding()
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
-        WordCardView(word: word) { _ in
-            narrator.speak(text: word.word, asset: .word(for: word), style: .word)
-        }
+        WordCardView(
+            word: word,
+            onSpeak: { _ in
+                narrator.speak(text: word.word, asset: .word(for: word), style: .word)
+            },
+            showDefinition: definitionRevealed,
+            showNeighbors: neighborsRevealed
+        )
 
         Button {
             composingScene = true
@@ -162,8 +184,11 @@ struct LessonView: View {
                 .buttonStyle(.bordered)
 
                 Button {
+                    // Manual reveal skips the audio, so show the whole card
                     narrator.stop()
                     reveal()
+                    definitionRevealed = true
+                    neighborsRevealed = true
                 } label: {
                     Label("Reveal", systemImage: "sparkles")
                         .frame(maxWidth: .infinity)
@@ -224,6 +249,8 @@ struct LessonView: View {
         guard let word = currentWord else { return }
         revealed = false
         showSceneText = false
+        definitionRevealed = false
+        neighborsRevealed = false
         narrator.speakLesson(for: word)
     }
 

@@ -18,6 +18,9 @@
 - **`.teal` in ProgressTabView**: fixed in phase 1, not deferred. Closes open question #3.
 - **Mastery constraint**: the `usesUnprompted` rung may ONLY be reached via an explicit user-reported "I used it" event. Review performance can never promote to it. Encoded in `WordState` (separate `recordUnpromptedUse()` method; review path caps at `producesOnPrompt`).
 
+## Phase-2 decisions (David, 2026-09-05)
+1. **Lesson loop is fully spoken**: scene → beat of silence (1.6s) → word → short pause (~0.8s) → one-line definition → short pause → one nearest-neighbour distinction. The nearest neighbour is the first listed in the seed. All four elements are generated through the same AudioStore fingerprinting; each has its own phase in the lesson phase enum so the card reveals word → definition → neighbours in step with the audio. (Was missing from this file until 2026-09-05 — the loop originally stopped at the word; corrected same day.)
+
 ## Phase-0 curation decisions (Claude, delegated under #8)
 - **9 domain ladders**: states-of-mind, wounded-pride, social-manner, ways-of-speaking, argument-and-evasion, effort-and-care, bodily-sensations, weather-and-light, blandness. 46 main words; ladders of 3–7, ordered broadest→narrowest via `ladderRank`.
 - **Deployability bar**: every main word must survive the test "could David say this at dinner without sounding like he swallowed a thesaurus." Cut for fame/ease: schadenfreude, ennui, sonder, visceral, equanimity. Cut for undeployability: torpor kept only as a stated neighbour, casuistry etc. never considered in.

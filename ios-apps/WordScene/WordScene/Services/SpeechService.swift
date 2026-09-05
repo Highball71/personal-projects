@@ -10,11 +10,17 @@ import AVFoundation
 @Observable
 final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
 
+    /// The lesson beat, in order (phase-2 decision 1):
+    /// scene → beat of silence → word → definition → neighbour distinction.
+    /// The short pauses after word and definition keep their neighbour's
+    /// phase — only the big gap after the scene gets its own.
     enum Phase {
         case idle
         case speakingScene
         case beatOfSilence
         case speakingWord
+        case speakingDefinition
+        case speakingNeighbor
         case finished
     }
 
@@ -28,12 +34,17 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
     private let synthesizer = AVSpeechSynthesizer()
     private let profile = VoiceProfile.current
 
-    /// How long the gap breathes between scene and word, in seconds.
+    /// The gap that lets the user feel the missing word, in seconds.
     private let beatDuration: TimeInterval = 1.6
+    /// The smaller breaths after the word and after the definition.
+    private let shortPause: TimeInterval = 0.8
 
-    /// Set when speaking so the delegate can tell scene and word utterances apart.
+    // Utterance identity → phase mapping for the delegate
     private var sceneUtterance: AVSpeechUtterance?
     private var wordUtterance: AVSpeechUtterance?
+    private var definitionUtterance: AVSpeechUtterance?
+    private var neighborUtterance: AVSpeechUtterance?
+    private var finalUtterance: AVSpeechUtterance?
 
     override init() {
         super.init()
@@ -43,31 +54,43 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
     }
 
-    /// Speaks the full lesson beat for one word: scene, pause, word.
-    func speakLesson(scene: String, word: String) {
+    /// Speaks the full lesson beat for one word:
+    /// scene, pause, word, pause, definition, pause, neighbour line.
+    func speakLesson(for word: SeedWord) {
         stop()
 
-        let sceneUtt = profile.utterance(for: scene, style: .scene)
-        // postUtteranceDelay creates the beat of silence without a timer —
-        // it begins only when the scene utterance actually completes
+        let sceneUtt = profile.utterance(for: word.systemScene, style: .scene)
+        // postUtteranceDelay creates each gap without a timer — it begins
+        // only when the utterance actually completes
         sceneUtt.postUtteranceDelay = beatDuration
 
-        let wordUtt = profile.utterance(for: word, style: .word)
+        let wordUtt = profile.utterance(for: word.word, style: .word)
         wordUtt.preUtteranceDelay = 0.1
+        wordUtt.postUtteranceDelay = shortPause
+
+        let defUtt = profile.utterance(for: word.definition, style: .scene)
+
+        var utterances = [sceneUtt, wordUtt, defUtt]
+        if let neighborLine = word.spokenNeighborLine {
+            defUtt.postUtteranceDelay = shortPause
+            let neighborUtt = profile.utterance(for: neighborLine, style: .scene)
+            neighborUtterance = neighborUtt
+            utterances.append(neighborUtt)
+        }
 
         sceneUtterance = sceneUtt
         wordUtterance = wordUtt
+        definitionUtterance = defUtt
+        finalUtterance = utterances.last
         phase = .speakingScene
-        synthesizer.speak(sceneUtt)
-        synthesizer.speak(wordUtt)
+        utterances.forEach { synthesizer.speak($0) }
     }
 
     /// Speaks a single piece of text (scene replay in reviews, word replay on cards).
     func speak(_ text: String, slowly: Bool = false) {
         stop()
         let utt = profile.utterance(for: text, style: slowly ? .word : .scene)
-        sceneUtterance = nil
-        wordUtterance = utt // treat as "word" so phase ends in .finished
+        finalUtterance = utt // single utterance: ends in .finished
         phase = .speakingWord
         synthesizer.speak(utt)
     }
@@ -76,6 +99,9 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
         synthesizer.stopSpeaking(at: .immediate)
         sceneUtterance = nil
         wordUtterance = nil
+        definitionUtterance = nil
+        neighborUtterance = nil
+        finalUtterance = nil
         phase = .idle
     }
 
@@ -83,20 +109,25 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
     // Delegate callbacks arrive on an arbitrary queue; hop to the main actor
     // before touching observable state.
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            if utterance === self.sceneUtterance {
-                self.phase = .beatOfSilence
-            } else if utterance === self.wordUtterance {
-                self.phase = .finished
-            }
-        }
-    }
-
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
         Task { @MainActor in
             if utterance === self.wordUtterance {
                 self.phase = .speakingWord
+            } else if utterance === self.definitionUtterance {
+                self.phase = .speakingDefinition
+            } else if utterance === self.neighborUtterance {
+                self.phase = .speakingNeighbor
+            }
+        }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            if utterance === self.sceneUtterance {
+                self.phase = .beatOfSilence
+            }
+            if utterance === self.finalUtterance {
+                self.phase = .finished
             }
         }
     }

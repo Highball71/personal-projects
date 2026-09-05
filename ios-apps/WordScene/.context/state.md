@@ -46,3 +46,7 @@ David deferred the OpenAI voice probe (no OPENAI_API_KEY) and directed: build th
 
 ## Current status
 Phases 1–2 shipped. Awaiting: David's ears on the AVSpeech Premium loop; OPENAI_API_KEY for the TTS probe + provider swap; then phase 3 (scene→word finder, sideshow shelf, second word pack).
+
+### 2026-09-05 (evening) — Lesson tail: spoken definition + neighbour (branch wordscene-lesson-tail from f3a134f)
+David confirmed the A–E mapping and flagged a real gap: phase-2 decision 1 (fully spoken loop: scene → beat → word → definition → nearest-neighbour distinction) was neither in decisions.md nor implemented — the loop stopped at the word. Fixed: two new phases (speakingDefinition, speakingNeighbor); SpeechService queues four utterances with 0.8s postUtteranceDelay pauses; Narrator refactored to a queued file player (per-item phase + gap, completion-driven); definition and neighbour-line assets go through the same AudioStore fingerprinting (`<id>.definition`, `<id>.neighbor`); the card reveals word → definition → neighbours in step with audio (manual Reveal shows all at once). Decision recorded in decisions.md with the correction note.
+Simulator MCP: xcode-select fix worked — the old error is gone; attach now waits on the one-time device-access prompt, which needs David at the keyboard.

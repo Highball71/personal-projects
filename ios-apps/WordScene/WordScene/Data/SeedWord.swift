@@ -22,6 +22,16 @@ struct SeedWord: Codable, Identifiable, Hashable {
     /// Which precision tier this word's ladder rank falls into.
     var tier: PrecisionTier { PrecisionTier(ladderRank: ladderRank) }
 
+    /// The neighbour spoken in the lesson tail — the first listed is the nearest.
+    var nearestNeighbor: Neighbor? { neighbors.first }
+
+    /// The lesson's final spoken beat (phase-2 decision 1): one nearest-
+    /// neighbour distinction, phrased for the ear.
+    var spokenNeighborLine: String? {
+        guard let n = nearestNeighbor else { return nil }
+        return "Not to be confused with \(n.word). \(n.distinction)"
+    }
+
     /// Human-readable domain name: "wounded-pride" → "Wounded pride"
     var domainDisplayName: String {
         domain.replacingOccurrences(of: "-", with: " ").capitalized(firstWordOnly: true)
