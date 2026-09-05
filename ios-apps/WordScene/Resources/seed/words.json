@@ -1,0 +1,819 @@
+{
+  "version": 1,
+  "generated": "2026-09-05",
+  "notes": "WordScene reimagining seed set. Difficulty axis is precision (how narrow the word's job is), not frequency. ladderRank orders words within a domain from broadest (1) to narrowest; rank 0 means the word sits outside its domain's ladder (sideshow track). systemScene never contains the word or its definition — the scene creates the gap, the reveal fills it.",
+  "domains": [
+    "states-of-mind",
+    "wounded-pride",
+    "social-manner",
+    "ways-of-speaking",
+    "argument-and-evasion",
+    "effort-and-care",
+    "bodily-sensations",
+    "weather-and-light",
+    "blandness",
+    "curiosities"
+  ],
+  "words": [
+    {
+      "id": "enervated",
+      "word": "enervated",
+      "ipa": "/ˈɛnərˌveɪtɪd/",
+      "partOfSpeech": "adjective",
+      "definition": "Drained of vitality or strength, often without obvious exertion.",
+      "domain": "states-of-mind",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "exhausted", "distinction": "Exhausted follows exertion; enervated is depletion without an obvious cause — you did nothing and have nothing left." },
+        { "word": "lethargic", "distinction": "Lethargic is sluggish and drowsy; enervated is depleted of vigor while possibly wide awake." },
+        { "word": "listless", "distinction": "Listless is lacking interest or desire; enervated is lacking the strength itself." }
+      ],
+      "systemScene": "The beach day was supposed to be restorative. Instead, after six hours of sun, you drive home feeling like someone pulled the batteries out of you. Not sleepy, exactly — you couldn't nap if you tried. Not sore, either. Just emptied. You stand in the kitchen holding a glass of water, trying to remember what you meant to do next, and realize that even deciding feels like lifting something heavy. Tired is the word people would use, but it's wrong. Tired is what you feel after effort. This came from nothing at all."
+    },
+    {
+      "id": "lassitude",
+      "word": "lassitude",
+      "ipa": "/ˈlæsɪˌtuːd/",
+      "partOfSpeech": "noun",
+      "definition": "A weariness of body or mind that saps the will to act.",
+      "domain": "states-of-mind",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "fatigue", "distinction": "Fatigue is the body's tiredness after work; lassitude includes the will — you can't bring yourself to start." },
+        { "word": "lethargy", "distinction": "Lethargy is heavier and more physical, near-drowsiness; lassitude can be mostly mental — a weariness of wanting." },
+        { "word": "ennui", "distinction": "Ennui is dissatisfied boredom with the world; lassitude doesn't need boredom — it's the heaviness itself." }
+      ],
+      "systemScene": "It's four on a Sunday afternoon and the list is right there: dishes, one email, a phone call to your mother. None of it is hard. You have done all of it a hundred times. But you lie on the couch watching the ceiling fan turn, and the distance between wanting to get up and getting up has quietly become unwalkable. You're not sick. You're not even unhappy. There's just a heaviness over your limbs and your will at the same time, like the afternoon itself is sitting on you."
+    },
+    {
+      "id": "languor",
+      "word": "languor",
+      "ipa": "/ˈlæŋɡər/",
+      "partOfSpeech": "noun",
+      "definition": "A pleasant, dreamy sluggishness of body and mind.",
+      "domain": "states-of-mind",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "lassitude", "distinction": "Lassitude is unwelcome heaviness; languor is the enjoyable version — dreamy, warm, almost luxurious." },
+        { "word": "lethargy", "distinction": "Lethargy is dull and torpid; languor has a sensuous, contented glow." },
+        { "word": "torpor", "distinction": "Torpor is near-shutdown, hibernation-grade; languor is soft and awake." }
+      ],
+      "systemScene": "Late August, a porch, the last afternoon of vacation. Lunch was long and there was wine. Now you're stretched out in the shade, one foot moving the porch swing an inch at a time, and your thoughts have gone slow and golden. Somebody asks if you want to walk down to the water. You mean to answer. In a minute. The heat, the cicadas, the heaviness in your arms — none of it is unpleasant. In fact it might be the best you've felt all summer. You are not tired. You are something sweeter than tired, and you'd stay in it for hours if the world allowed."
+    },
+    {
+      "id": "reverie",
+      "word": "reverie",
+      "ipa": "/ˈrɛvəri/",
+      "partOfSpeech": "noun",
+      "definition": "A state of being pleasantly absorbed in drifting, dreamlike thought.",
+      "domain": "states-of-mind",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "daydream", "distinction": "A daydream is often deliberate wish-play; reverie is a state you slip into — absorbed, drifting, unwilled." },
+        { "word": "trance", "distinction": "A trance implies absence and blankness; reverie is full of content — you're somewhere, vividly." },
+        { "word": "rumination", "distinction": "Rumination circles distressing thoughts; reverie drifts through pleasant ones." }
+      ],
+      "systemScene": "The train pulls out and you look up from your phone, and somewhere between one station and the next you slip away. Not asleep — your eyes are open, fixed on the blur of backyards. You're revisiting a house from childhood, walking rooms you haven't thought about in years, and it has the drifting logic of a dream while being nothing like sleep. Someone's elbow brushes yours and you surface, faintly embarrassed, to discover you've missed your stop by two. Where were you just now? There should be a name for the place, and there is."
+    },
+    {
+      "id": "disquiet",
+      "word": "disquiet",
+      "ipa": "/dɪsˈkwaɪət/",
+      "partOfSpeech": "noun",
+      "definition": "A persistent, low-grade unease without a clear object.",
+      "domain": "states-of-mind",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "anxiety", "distinction": "Anxiety has force and usually an object; disquiet is diffuse — a quiet hum of something wrong." },
+        { "word": "dread", "distinction": "Dread points at something coming; disquiet can't say what it's about." },
+        { "word": "unease", "distinction": "Unease is the generic term; disquiet is quieter, more persistent, more interior." }
+      ],
+      "systemScene": "The dinner went well. Everyone laughed, plates cleared, hugs at the door. But driving home you notice a low hum under your thoughts, like a fridge in another room. Nothing is wrong that you can point to. The kids are fine, work is fine, the tests came back fine. Still, some part of you keeps circling, checking locks that are already locked. You lie awake at midnight doing inventory and finding nothing, which somehow makes it worse. It isn't fear. It's quieter than fear, and it won't say its name."
+    },
+    {
+      "id": "qualm",
+      "word": "qualm",
+      "ipa": "/kwɑːm/",
+      "partOfSpeech": "noun",
+      "definition": "A sudden pang of doubt about the rightness of what you're about to do.",
+      "domain": "wounded-pride",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "scruple", "distinction": "A scruple is a standing moral hesitation; a qualm is a sudden pang, arriving in the moment." },
+        { "word": "misgiving", "distinction": "A misgiving doubts whether a plan will work; a qualm doubts whether it's right." },
+        { "word": "compunction", "distinction": "Compunction pricks during or after the deed; a qualm arrives before, while you can still stop." }
+      ],
+      "systemScene": "The email is written. It's honest — maybe more honest than it needs to be — and forwarding that thread will settle an argument in your favor once and for all. Your cursor is on Send. And right then something taps you on the shoulder from inside. A single beat of hesitation, arriving uninvited: should you? It isn't guilt, because you haven't done anything yet. It's smaller and earlier than guilt — a flicker, a check, the conscience clearing its throat. You could ignore it. People do, all the time. But it was there, and you felt it."
+    },
+    {
+      "id": "compunction",
+      "word": "compunction",
+      "ipa": "/kəmˈpʌŋkʃən/",
+      "partOfSpeech": "noun",
+      "definition": "The prick of guilt over a specific act, often invoked by its absence.",
+      "domain": "wounded-pride",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "guilt", "distinction": "Guilt is the broad state; compunction is the sharp pang of it, tied to one specific act." },
+        { "word": "remorse", "distinction": "Remorse is deep and lasting; compunction can be a twinge — most famous in the phrase 'without compunction.'" },
+        { "word": "qualm", "distinction": "A qualm precedes the act; compunction pricks during or after." }
+      ],
+      "systemScene": "The cashier gave you change for a fifty when you paid with a twenty. You noticed in the parking lot, thirty dollars up, and got in the car anyway. All the way home a small stone sits in your chest. It's not fear of getting caught — nobody will ever know. It's the thing itself, pressing. At dinner you're quiet. By eight o'clock you've decided to drive back tomorrow and return it, and the moment you decide, the pressure lifts. Whatever that pressing was, some people apparently never feel it at all. You've met a few."
+    },
+    {
+      "id": "chagrin",
+      "word": "chagrin",
+      "ipa": "/ʃəˈɡrɪn/",
+      "partOfSpeech": "noun",
+      "definition": "The sting of embarrassment at your own failure or misjudgment.",
+      "domain": "wounded-pride",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "embarrassment", "distinction": "Embarrassment is the general blush; chagrin is specifically about your own failure or misjudgment." },
+        { "word": "shame", "distinction": "Shame condemns the self; chagrin stings the pride and fades into a rueful story." },
+        { "word": "humiliation", "distinction": "Humiliation is inflicted by others; chagrin is self-administered — you were confidently wrong." }
+      ],
+      "systemScene": "In the meeting you correct your coworker's numbers, kindly but publicly, because you're sure. You're not sure, it turns out. He pulls up the source, and the room does that polite thing where nobody looks at you. What floods in isn't quite shame — nobody thinks you're a bad person — and it isn't quite anger, though some of it is aimed at yourself. It's the specific hot sting of having been confident, out loud, and wrong. You spend the afternoon composing the joke you'll make about it later, because the only exit is through."
+    },
+    {
+      "id": "pique",
+      "word": "pique",
+      "ipa": "/piːk/",
+      "partOfSpeech": "noun",
+      "definition": "Irritation arising from a slight to one's pride.",
+      "domain": "wounded-pride",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "annoyance", "distinction": "Annoyance is generic irritation; pique has wounded pride at its center." },
+        { "word": "umbrage", "distinction": "Umbrage formally registers a slight; pique is the prickly mood that follows being overlooked." },
+        { "word": "resentment", "distinction": "Resentment simmers for the long term; pique is bright, petty, and comparatively brief." }
+      ],
+      "systemScene": "You suggested the restaurant two weeks ago and nobody responded in the group chat. Today someone else suggests the same restaurant and gets six thumbs up and a 'great call!' You are not going to say anything. Obviously. It would be pathetic to say something. But a small, bright irritation settles in and stays through the whole dinner, souring the bread, the wine, the conversation. It's not anger — too petty for anger. It's your pride, specifically, that got scratched, and the scratch is out of all proportion to the wound."
+    },
+    {
+      "id": "umbrage",
+      "word": "umbrage",
+      "ipa": "/ˈʌmbrɪdʒ/",
+      "partOfSpeech": "noun",
+      "definition": "Offense taken at a slight, formally registered and quietly held.",
+      "domain": "wounded-pride",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "offense", "distinction": "Taking offense is the plain term; umbrage adds a formal, almost ceremonious registering of the slight." },
+        { "word": "pique", "distinction": "Pique is the sulk of scratched vanity; umbrage is the dignified filing of a grievance." },
+        { "word": "indignation", "distinction": "Indignation is moral outrage at unfairness; umbrage is personal — the insult was to you." }
+      ],
+      "systemScene": "At the barbecue your brother-in-law announces, to the table at large, that people who buy new cars are 'basically bad at math.' You bought a new car in March. He knows this. Or does he? Either way, something in you sits up straight. You keep smiling, but the insult has been received somewhere internal, filed, stamped, and archived under his name. For the rest of the afternoon you're a few degrees cooler toward him. If asked, you would deny it with complete dignity, and everyone at the table can tell anyway."
+    },
+    {
+      "id": "rankle",
+      "word": "rankle",
+      "ipa": "/ˈræŋkəl/",
+      "partOfSpeech": "verb",
+      "definition": "To keep causing resentment long after the original slight.",
+      "domain": "wounded-pride",
+      "ladderRank": 6,
+      "track": "main",
+      "neighbors": [
+        { "word": "fester", "distinction": "Fester suggests something rotting and worsening; rankle is precisely an old slight that keeps stinging." },
+        { "word": "smart", "distinction": "A remark smarts in the moment; it rankles when it's still stinging years later." },
+        { "word": "gall", "distinction": "Gall is bitter irritation now; rankle is about duration — the wound that won't close." }
+      ],
+      "systemScene": "Eight years ago, at your wedding, your uncle gave a toast and joked that you'd 'finally found someone with low enough standards.' Everyone laughed, including you. It was eight years ago. You have a mortgage now, a kid, a whole life. And yet every couple of months, folding laundry or stopped at a red light, the joke walks back in uninvited and stings exactly as much as it did in the moment — maybe more. Most insults fade. This one took root and stayed green. There's a word for what it's been doing all these years."
+    },
+    {
+      "id": "diffident",
+      "word": "diffident",
+      "ipa": "/ˈdɪfɪdənt/",
+      "partOfSpeech": "adjective",
+      "definition": "Hesitant to assert oneself out of modesty or self-doubt.",
+      "domain": "social-manner",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "shy", "distinction": "Shy is discomfort around people; diffident is hesitance to assert or claim — a diffident person may be socially at ease." },
+        { "word": "timid", "distinction": "Timid fears the thing itself; diffident doubts one's own standing to speak." },
+        { "word": "modest", "distinction": "Modest downplays achievement by choice or virtue; diffident downplays it from self-doubt." }
+      ],
+      "systemScene": "There's an engineer on your team who solves the problem two days before anyone else and then, in the meeting, raises her hand halfway and says, 'This is probably wrong, but—' before giving the exact right answer. She apologizes on the way into her own conclusions. When praised, she deflects it to the group. At lunch she's funny and relaxed, so it isn't about people. It's specifically about claiming anything: her ideas, her credit, her space. Watching her, you want to hand her a word for what's holding her back, gently, like a ladder."
+    },
+    {
+      "id": "gauche",
+      "word": "gauche",
+      "ipa": "/ɡoʊʃ/",
+      "partOfSpeech": "adjective",
+      "definition": "Socially graceless; tactless without meaning to be.",
+      "domain": "social-manner",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "awkward", "distinction": "Awkward covers any clumsiness; gauche is social clumsiness — wrong moves in polite company." },
+        { "word": "tactless", "distinction": "Tactless is a single failure of consideration; gauche is a whole manner, graceless across situations." },
+        { "word": "boorish", "distinction": "Boorish is crude and doesn't care; gauche means well and still steps on the rake." }
+      ],
+      "systemScene": "Your new coworker means well. At the retirement party he asks the guest of honor, loudly, whether she's 'scared of being irrelevant now.' He compliments your boss's dress by naming the discount store it looks like it came from. He is not cruel — that's what makes it impossible to be angry. He simply arrives at every social moment like a man stepping on a rake he brought himself. There's a word for this, elegant and French, which is fitting: the word describes the exact opposite of itself."
+    },
+    {
+      "id": "obsequious",
+      "word": "obsequious",
+      "ipa": "/əbˈsiːkwiəs/",
+      "partOfSpeech": "adjective",
+      "definition": "So excessively eager to please or agree that it becomes servile.",
+      "domain": "social-manner",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "sycophantic", "distinction": "Sycophantic emphasizes flattering the powerful for gain; obsequious emphasizes the cringing readiness to serve and agree." },
+        { "word": "fawning", "distinction": "Fawning is the affectionate, puppyish display; obsequious is more servile — the bow built into the posture." },
+        { "word": "deferential", "distinction": "Deferential is appropriate respect; obsequious is deference overdone until it curdles." }
+      ],
+      "systemScene": "The new account manager laughs at the client's jokes a half-second before the punchline lands. He agrees with the client's first suggestion, then agrees just as warmly when the client reverses it completely. At dinner he leaps to fill water glasses the waiter was already filling. Watching him is like watching a man bow so continuously that he never actually stands up. The strange thing is the effect: with every yes, every little courtesy, the client trusts him a bit less. Whatever he thinks he's buying with all this, he's spending it."
+    },
+    {
+      "id": "unctuous",
+      "word": "unctuous",
+      "ipa": "/ˈʌŋktʃuəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Ingratiating in an oily, falsely earnest way.",
+      "domain": "social-manner",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "obsequious", "distinction": "Obsequious over-serves; unctuous over-smooths — the slick warmth of a salesman's sincerity." },
+        { "word": "smarmy", "distinction": "Smarmy is the casual register of the same slickness; unctuous is the formal word, with a hint of false piety." },
+        { "word": "ingratiating", "distinction": "Ingratiating seeks to be liked, sometimes innocently; unctuous is never innocent — the charm has grease on it." }
+      ],
+      "systemScene": "The man selling you the car has a voice like warm syrup. He says your name too often. He calls your trade-in 'a beautiful machine' — it is an eleven-year-old sedan with a missing hubcap — and when you mention your budget he presses a hand to his chest as if moved. Everything he says is technically kind, and all of it slides off him with a faint sheen, like it's been buttered. You leave without the car, mostly because you want to wash your hands. Smooth isn't the word. It's smoother than smooth, and worse."
+    },
+    {
+      "id": "officious",
+      "word": "officious",
+      "ipa": "/əˈfɪʃəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Intrusively asserting unwanted authority or help.",
+      "domain": "social-manner",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "meddlesome", "distinction": "Meddlesome interferes broadly; officious interferes specifically by asserting unasked-for authority or help." },
+        { "word": "bossy", "distinction": "Bossy just likes giving orders; officious dresses the orders up as duty and service." },
+        { "word": "intrusive", "distinction": "Intrusive crosses boundaries; officious does it while insisting it's for your benefit." }
+      ],
+      "systemScene": "Nobody elected Gary to anything. Yet there he is at the neighborhood picnic, moving other people's folding chairs 'for sightlines,' telling children which games are permitted on which grass, reminding you — with a binder — that coolers belong on the north table. He is not mean. He's helping. He's helping so hard that people have started arriving late just to miss the orientation. Every workplace, every block, every family reunion has one: the volunteer sheriff, the unrequested manager of everything. English keeps a specific word for him, and it is not 'helpful.'"
+    },
+    {
+      "id": "imperious",
+      "word": "imperious",
+      "ipa": "/ɪmˈpɪriəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Commanding as though authority were self-evident; expecting obedience.",
+      "domain": "social-manner",
+      "ladderRank": 6,
+      "track": "main",
+      "neighbors": [
+        { "word": "bossy", "distinction": "Bossy is petty and nagging; imperious is grand — commands issued as if authority were natural law." },
+        { "word": "domineering", "distinction": "Domineering bullies and pushes; imperious doesn't push — it assumes, and is obeyed." },
+        { "word": "haughty", "distinction": "Haughty is disdain from a height; imperious is command from a height — less sneer, more decree." }
+      ],
+      "systemScene": "Your mother-in-law does not ask for things. She announces them. 'We'll eat at six.' 'You'll want to repaint that hallway.' 'Bring the good coffee when you come.' She has never held an official position of any kind, and yet she issues instructions with the calm of a woman who has commanded fleets. Disagreement doesn't anger her; it simply doesn't register as a possibility. On her birthday you watch her redirect an entire restaurant's seating with one raised finger, and you realize that somewhere behind that finger is a word."
+    },
+    {
+      "id": "reticent",
+      "word": "reticent",
+      "ipa": "/ˈrɛtɪsənt/",
+      "partOfSpeech": "adjective",
+      "definition": "Disinclined to reveal one's thoughts or feelings.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "reserved", "distinction": "Reserved describes an overall contained manner; reticent is specifically about disclosure — a talkative person can be reticent about one subject." },
+        { "word": "taciturn", "distinction": "Taciturn barely talks at all, by temperament; reticent talks freely but keeps certain rooms locked." },
+        { "word": "secretive", "distinction": "Secretive actively hides things; reticent simply declines to volunteer them." }
+      ],
+      "systemScene": "Your friend Marcus will talk for an hour about baseball, sourdough, the history of highways — anything. But ask how he's doing since the divorce and something closes, politely, like a shop pulling its shutter at dusk. 'Oh, you know. Fine.' He's not cold, and he's certainly not quiet — he's the loudest man at the table. There's just a room in him that visitors don't enter, and he guards the doorway with small talk. It isn't shyness. It's a choice about what gets shared, made over and over, always in the same direction."
+    },
+    {
+      "id": "taciturn",
+      "word": "taciturn",
+      "ipa": "/ˈtæsɪˌtɜːrn/",
+      "partOfSpeech": "adjective",
+      "definition": "Habitually saying little, by temperament rather than mood.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "quiet", "distinction": "Quiet describes a moment or a mood; taciturn is a lifelong climate — few words, by nature." },
+        { "word": "laconic", "distinction": "Laconic makes few words do maximum work; taciturn just uses few words, no wit implied." },
+        { "word": "sullen", "distinction": "Sullen is silence with resentment in it; taciturn silence is neutral — nothing is wrong." }
+      ],
+      "systemScene": "Your grandfather worked with his hands for fifty years and produces roughly eleven words a day, distributed carefully, like water in a drought. At dinner he eats, nods, and occasionally offers a single dry observation that lands better than anyone's stories. It's not that he's sad, or angry, or hiding something — ask his opinion and he'll give it, in six words, and it will be a good opinion. Silence is simply his native country, and conversation is a place he visits briefly, on business. There's a word for men like him, and it sounds like a door closing softly."
+    },
+    {
+      "id": "laconic",
+      "word": "laconic",
+      "ipa": "/ləˈkɑːnɪk/",
+      "partOfSpeech": "adjective",
+      "definition": "Using very few words, with pointed or dry effect.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "terse", "distinction": "Terse is brevity that can read as curt; laconic brevity has style — pointed, dry compression." },
+        { "word": "concise", "distinction": "Concise avoids waste in any register; laconic is a personal manner, almost a stance." },
+        { "word": "taciturn", "distinction": "Taciturn is the disposition to be silent; laconic is what the rare words are like when they come." }
+      ],
+      "systemScene": "You send your brother four paragraphs about the family drama: who said what, the group-chat schism, your proposed peace plan. His reply arrives an hour later: 'Skip the dinner.' That's it. That's the whole answer — and, you realize with some irritation, it's correct, complete, and better than your four paragraphs. He's always been like this. Where other people build sentences, he flicks pebbles, and each one hits. It isn't rudeness and it isn't silence. It's compression. An entire argument, folded until it fits in three words."
+    },
+    {
+      "id": "brusque",
+      "word": "brusque",
+      "ipa": "/brʌsk/",
+      "partOfSpeech": "adjective",
+      "definition": "Abrupt in manner to the point of seeming rude.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "curt", "distinction": "Curt is short in words; brusque is short in the whole manner — words, movement, exit." },
+        { "word": "abrupt", "distinction": "Abrupt describes the suddenness; brusque adds the sandpaper — you feel slightly scraped." },
+        { "word": "blunt", "distinction": "Blunt is about content — unsoftened truth; brusque is about delivery — unsoftened style." }
+      ],
+      "systemScene": "The specialist is, everyone agrees, the best in the region. She enters without greeting, reads your chart in silence, and says: 'It's not cancer. Stop googling. Come back in a year.' She's gone in ninety seconds. In the parking lot you feel two things at once: enormous relief, and the odd sting of having been handled like a package. She wasn't wrong, and she wasn't even unkind, exactly — the news was good and she delivered it fast. But there's sandpaper in her manner, and you drove an hour to be sanded."
+    },
+    {
+      "id": "glib",
+      "word": "glib",
+      "ipa": "/ɡlɪb/",
+      "partOfSpeech": "adjective",
+      "definition": "Fluent and easy in a way that outruns sincerity or substance.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "slick", "distinction": "Slick emphasizes polish and self-presentation; glib emphasizes speech — fluent answers with nothing under them." },
+        { "word": "facile", "distinction": "Facile describes the too-easy solution or argument itself; glib describes the person or the delivery." },
+        { "word": "articulate", "distinction": "Articulate is fluency as a virtue; glib is fluency gone bad — the compliment with the bottom fallen out." }
+      ],
+      "systemScene": "The consultant has an answer before you finish the question. Every answer is smooth, quotable, delivered with a little smile — 'Culture eats strategy for breakfast,' he says, twice. It takes you until the drive home to notice that nothing he said had any weight. Pressed on specifics, he pivoted, gleaming. The fluency was real; that's what's confusing. He talks the way a figure skater moves — beautifully, on top of a frozen surface — and underneath there is only more surface. There's a word for exactly this kind of easy."
+    },
+    {
+      "id": "pontificate",
+      "word": "pontificate",
+      "ipa": "/pɑːnˈtɪfɪˌkeɪt/",
+      "partOfSpeech": "verb",
+      "definition": "To hold forth pompously, as though one's opinions were official doctrine.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 6,
+      "track": "main",
+      "neighbors": [
+        { "word": "lecture", "distinction": "Lecturing at least aims to teach; pontificating performs authority — the audience is decorative." },
+        { "word": "opine", "distinction": "To opine is merely to offer a view; to pontificate is to issue it from a throne." },
+        { "word": "hold forth", "distinction": "Holding forth is talking at length with enthusiasm; pontificating adds the pomposity and the certainty." }
+      ],
+      "systemScene": "It starts when someone mentions interest rates. Your uncle sets down his fork — a bad sign — and begins. He is not having a conversation; conversations have turns. He is delivering the truth from a great height to the unfortunate laypeople of this dinner table, pausing only to say 'let me finish' to people who had not spoken. He has no particular credentials in economics. He has a tone. Twenty minutes in, your cousin mouths a word at you across the mashed potatoes, and it is the perfect one: it comes from the Pope."
+    },
+    {
+      "id": "equivocate",
+      "word": "equivocate",
+      "ipa": "/ɪˈkwɪvəˌkeɪt/",
+      "partOfSpeech": "verb",
+      "definition": "To use deliberately ambiguous language to avoid committing to anything.",
+      "domain": "argument-and-evasion",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "hedge", "distinction": "Hedging qualifies a claim to limit risk, sometimes honestly; equivocating uses ambiguity to dodge the question entirely." },
+        { "word": "prevaricate", "distinction": "Prevaricate leans toward actively misleading; equivocate is the careful both-ways wording." },
+        { "word": "waffle", "distinction": "Waffling is indecision out loud; equivocating is decision concealed — they know, and won't say." }
+      ],
+      "systemScene": "'So will the deck be done by the Fourth?' You've asked the contractor three times now. 'We're in a really good place,' he says. 'The weather's been the weather, but we're tracking well.' Tracking toward what? He praises the lumber. He mentions his other jobs 'flowing into each other.' Every sentence is technically responsive and commits him to absolutely nothing; it's like trying to grab a handful of fog. You realize he has fielded yes-or-no questions for twenty minutes without producing a yes or a no. This is a skill. There's a name for it."
+    },
+    {
+      "id": "obfuscate",
+      "word": "obfuscate",
+      "ipa": "/ˈɑːbfəˌskeɪt/",
+      "partOfSpeech": "verb",
+      "definition": "To deliberately make something harder to understand.",
+      "domain": "argument-and-evasion",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "confuse", "distinction": "Confusion can be accidental; obfuscation is deliberate — comprehension is the target." },
+        { "word": "muddy", "distinction": "Muddying the waters is the casual idiom; obfuscate is the formal charge, often with jargon as the weapon." },
+        { "word": "equivocate", "distinction": "Equivocation dodges commitment; obfuscation attacks understanding itself." }
+      ],
+      "systemScene": "The bank's letter is one page long, and you've read it four times. 'Per the aforementioned adjustment to the fee schedule referenced in Section 4(b), certain account structures may experience modified rate applicability.' You have a graduate degree. You cannot determine whether your fees went up. That's when it clicks: the letter isn't badly written — it's expertly written. Someone was paid to make this exact sentence resist you, the way squid ink resists vision. The fog is not a side effect here. The fog is the product."
+    },
+    {
+      "id": "dissemble",
+      "word": "dissemble",
+      "ipa": "/dɪˈsɛmbəl/",
+      "partOfSpeech": "verb",
+      "definition": "To conceal one's true feelings or motives behind a false front.",
+      "domain": "argument-and-evasion",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "lie", "distinction": "Lying asserts falsehoods; dissembling may never state one — it wears a false front instead." },
+        { "word": "feign", "distinction": "Feign fakes a specific feeling or state; dissemble is the sustained performance that hides the real one." },
+        { "word": "mislead", "distinction": "Mislead names the effect; dissemble names the method — masking what you actually feel and want." }
+      ],
+      "systemScene": "An hour before the party you learn you didn't get the fellowship. Your best friend did. She's the host. So you put on the face — the genuinely-happy-for-you face, the one with the eyes involved — and you wear it for three hours. You toast her. You retell the story of her acceptance call like a delighted witness. Nobody suspects a thing, which is its own strange ache. You're not exactly lying; you never say one false word all night. You're doing something quieter than lying, with your whole face and voice."
+    },
+    {
+      "id": "specious",
+      "word": "specious",
+      "ipa": "/ˈspiːʃəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Superficially plausible but actually wrong.",
+      "domain": "argument-and-evasion",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "plausible", "distinction": "Plausible might actually be true; specious only looks it — the shine is the warning." },
+        { "word": "fallacious", "distinction": "Fallacious flags the formal error in reasoning; specious flags the deceptive attractiveness — it sounds right." },
+        { "word": "sophistical", "distinction": "Sophistical implies skilled, deliberate deception in argument; specious can be innocent — the arguer may be fooled too." }
+      ],
+      "systemScene": "At the dinner table your teenager explains, with charts, why a later curfew will improve his grades: sleep flexibility, 'European models,' something about circadian autonomy. The presentation is honestly impressive. You find yourself nodding along. It's only at eleven that night, staring at the ceiling, that the whole thing quietly comes apart in your hands — every link in the chain was smooth, and none of them held. The argument didn't survive contact with one hour of silence. It was built to be heard, not examined. There's a word for reasoning like that."
+    },
+    {
+      "id": "platitude",
+      "word": "platitude",
+      "ipa": "/ˈplætɪˌtuːd/",
+      "partOfSpeech": "noun",
+      "definition": "A worn-out remark delivered as though it were wisdom.",
+      "domain": "argument-and-evasion",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "cliché", "distinction": "A cliché is any overused phrase; a platitude is specifically a moral or comforting one posing as insight." },
+        { "word": "truism", "distinction": "A truism is true but empty; a platitude is empty and dressed up as profound." },
+        { "word": "bromide", "distinction": "A bromide is the same emptiness administered as a sedative — meant to calm you down." }
+      ],
+      "systemScene": "After the funeral, people line up to say things. 'He's in a better place.' 'Everything happens for a reason.' 'Time heals all wounds.' Each phrase arrives worn perfectly smooth, like a stone handled by ten thousand mourners before you. The people saying them are kind; they mean every word, and the words mean almost nothing — they were used up long before today. You find yourself grateful anyway, and empty anyway. Late that night your aunt says instead, 'This is terrible and I loved him,' and it lands like the first true sentence of the day."
+    },
+    {
+      "id": "cavil",
+      "word": "cavil",
+      "ipa": "/ˈkævəl/",
+      "partOfSpeech": "verb",
+      "definition": "To raise trivial, fault-finding objections.",
+      "domain": "argument-and-evasion",
+      "ladderRank": 6,
+      "track": "main",
+      "neighbors": [
+        { "word": "quibble", "distinction": "Quibble is the everyday word; cavil adds the fault-finding spirit — objection as a hobby." },
+        { "word": "nitpick", "distinction": "Nitpicking fusses over details, sometimes usefully; caviling objects in order to be objecting." },
+        { "word": "carp", "distinction": "Carping is continual grumbling complaint; caviling is punctual — trivial objections raised as points of order." }
+      ],
+      "systemScene": "You circulate the proposal — eighteen months of work — and the first reply arrives within the hour. Robert has concerns. The concerns: a hyphen on page two, 'utilize' where 'use' would do, and whether Figure 3's caption should be title case. About the actual idea, the budget, the risk — nothing. At the review meeting he spends nine full minutes on the hyphen. You watch him mistake the smallness of his objections for rigor, and you understand that for some people, objecting is not a means to anything. It is the hobby itself."
+    },
+    {
+      "id": "cursory",
+      "word": "cursory",
+      "ipa": "/ˈkɜːrsəri/",
+      "partOfSpeech": "adjective",
+      "definition": "Done quickly and at the surface, without real attention.",
+      "domain": "effort-and-care",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "hasty", "distinction": "Hasty means rushed, and might regret it; cursory means surface-level by design — a skim that never meant to go deep." },
+        { "word": "superficial", "distinction": "Superficial describes depth never reached; cursory describes the quick pass that didn't try." },
+        { "word": "perfunctory", "distinction": "Perfunctory is going through the motions out of duty; cursory is simply brief — duty may not enter into it." }
+      ],
+      "systemScene": "The landlord 'inspects' the apartment on your way out. He opens one cabinet, glances at the ceiling, runs a thumb along the windowsill, and says, 'Looks fine.' Ninety seconds, including the walk in from the hall. You spent two days cleaning behind appliances for this. Later you'll learn he missed the water stain under the sink entirely — of course he did; you could have hidden a canoe in that apartment. His look wasn't careless because he's a careless man. It was a look designed from the start to be brief."
+    },
+    {
+      "id": "perfunctory",
+      "word": "perfunctory",
+      "ipa": "/pərˈfʌŋktəri/",
+      "partOfSpeech": "adjective",
+      "definition": "Performed as a routine duty, with no genuine feeling or care.",
+      "domain": "effort-and-care",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "cursory", "distinction": "Cursory is quick and shallow; perfunctory is dutiful and dead — the ritual completed without care." },
+        { "word": "mechanical", "distinction": "Mechanical emphasizes the automatic motion; perfunctory emphasizes the missing feeling." },
+        { "word": "halfhearted", "distinction": "Halfhearted tries a little; perfunctory doesn't try at all — it performs." }
+      ],
+      "systemScene": "The airline's apology arrives by email. 'We sincerely regret any inconvenience.' Your bag has been gone eleven days; it contained your grandmother's ring. You can feel — through the screen — that no human regretted anything. A template opened, your name populated a field, someone hit send; possibly no one hit send. It's the same species of gesture as the handshake after a lost tournament, or the birthday card from the dentist: executed because the ritual requires it, with the exact minimum of soul needed to complete the motion. The box was checked. Nothing was meant."
+    },
+    {
+      "id": "desultory",
+      "word": "desultory",
+      "ipa": "/ˈdɛsəlˌtɔːri/",
+      "partOfSpeech": "adjective",
+      "definition": "Jumping from thing to thing without plan, purpose, or follow-through.",
+      "domain": "effort-and-care",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "aimless", "distinction": "Aimless lacks a destination; desultory lacks a thread — hopping between things, none pursued." },
+        { "word": "random", "distinction": "Random has no pattern at all; desultory drifts with half-intentions, each one abandoned." },
+        { "word": "listless", "distinction": "Listless is low energy; desultory is scattered attention — you can be desultory at full energy, just unanchored." }
+      ],
+      "systemScene": "The rain cancels the hike, so the afternoon just happens. You reorganize half a drawer, then abandon it. Read four pages, put the book down. The conversation with your roommate wanders from taxes to a guy he knew in college to whether fish sleep, arriving nowhere, in no hurry. You water two plants out of six. Nothing connects to anything; there is no thread, only beads. By evening you've technically done eight things and completed none of them, and honestly, it wasn't unpleasant. But if someone asked what today was like, the true answer needs a word English keeps in its back pocket."
+    },
+    {
+      "id": "fastidious",
+      "word": "fastidious",
+      "ipa": "/fæˈstɪdiəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Exacting about details, cleanliness, and taste; not easily satisfied.",
+      "domain": "effort-and-care",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "picky", "distinction": "Picky is the playground word; fastidious is exacting taste elevated to a discipline." },
+        { "word": "meticulous", "distinction": "Meticulous is precision in work, and it's praise; fastidious extends to comfort and distaste — hard to please, easily put off." },
+        { "word": "squeamish", "distinction": "Squeamish recoils from the gross; fastidious recoils from the imperfect." }
+      ],
+      "systemScene": "Staying at Elena's apartment is like staying inside a museum exhibit about order. The spices are alphabetized. The towels are folded into thirds, always thirds. When you cook together she trails you with a damp cloth, resetting the counter between steps, and she once — you saw it — rewashed a fork the dishwasher had already washed. None of this is anxiety, she insists, and you believe her: she takes real pleasure in it. But watching her straighten a stack of napkins that was already straight, you think: there is a word for you, and it isn't 'neat.'"
+    },
+    {
+      "id": "punctilious",
+      "word": "punctilious",
+      "ipa": "/pʌŋkˈtɪliəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Rigorously exact about the fine points of conduct, etiquette, or procedure.",
+      "domain": "effort-and-care",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "fastidious", "distinction": "Fastidious is exacting about taste and cleanliness; punctilious is exacting about correctness — etiquette, procedure, the fine points of conduct." },
+        { "word": "scrupulous", "distinction": "Scrupulous follows conscience; punctilious follows form." },
+        { "word": "meticulous", "distinction": "Meticulous is careful about details of work; punctilious is ceremonious about details of behavior." }
+      ],
+      "systemScene": "Your colleague Denton has never once missed a thank-you note. Not the concept — the physical note, on paper, mailed within forty-eight hours, referencing the specific kindness. He replies to every email in the order received. Before weddings he inquires, in advance and in writing, about the exact obligations of his role. When he resigned, he gave notice to the precise day required by a contract nobody else had read. It's beyond politeness; politeness is warm and approximate. This is politeness with a ruler and a calendar — correctness observed down to the last small ceremony."
+    },
+    {
+      "id": "malaise",
+      "word": "malaise",
+      "ipa": "/məˈleɪz/",
+      "partOfSpeech": "noun",
+      "definition": "A vague, general feeling of being unwell or off, with no identifiable cause.",
+      "domain": "bodily-sensations",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "fatigue", "distinction": "Fatigue is depleted energy with a nameable cause; malaise is diffuse unwellness that won't localize." },
+        { "word": "ennui", "distinction": "Ennui is existential boredom; malaise sits in the body — you feel slightly ill, not just uninspired." },
+        { "word": "listlessness", "distinction": "Listlessness is absent desire; malaise is present discomfort — vague, but physical." }
+      ],
+      "systemScene": "Wednesday you feel it: not sick, exactly. Nothing you could call in about. No fever, no cough — just a low gray static in the body, as if your battery is stuck at thirty percent and something, somewhere, is quietly wrong. You do the inventory: slept fine, ate fine, nothing hurts, everything's dimmed. 'Are you okay?' someone asks, and you say 'yeah, just—' and stall, because there is no noun. Maybe you're coming down with something. Maybe it's the weather, or the news, or nothing. It hangs around for two days and leaves without explaining itself."
+    },
+    {
+      "id": "peckish",
+      "word": "peckish",
+      "ipa": "/ˈpɛkɪʃ/",
+      "partOfSpeech": "adjective",
+      "definition": "Slightly hungry; ready for a snack rather than a meal.",
+      "domain": "bodily-sensations",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "hungry", "distinction": "Hungry is the real thing; peckish is the polite preview — a handful of almonds would fully resolve it." },
+        { "word": "ravenous", "distinction": "Ravenous is the far end of the same scale; peckish is the near end, barely past neutral." },
+        { "word": "craving", "distinction": "A craving wants something specific; peckish wants approximately anything." }
+      ],
+      "systemScene": "It's 3:40 in the afternoon. Lunch happened; dinner is hours away. You would fail a lie detector if you claimed real hunger. And yet you've drifted into the kitchen twice now, opened the same cupboard, looked at the same crackers, closed it again. It's a small, polite emptiness, more suggestion than demand — the body raising its hand rather than banging the table. Cheese would solve it. An apple would solve it. The British, who keep a word for every minor discomfort known to man, naturally have the exact word for this."
+    },
+    {
+      "id": "frisson",
+      "word": "frisson",
+      "ipa": "/friːˈsɔ̃/",
+      "partOfSpeech": "noun",
+      "definition": "A sudden wave of excited emotion felt physically, as a shiver on the skin.",
+      "domain": "bodily-sensations",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "chill", "distinction": "A chill is thermal or ominous; a frisson is pleasure — the wave that art and awe send through you." },
+        { "word": "thrill", "distinction": "A thrill can last a whole ride; a frisson is a single wave, seconds long, felt on the skin." },
+        { "word": "goosebumps", "distinction": "Goosebumps are the visible effect; frisson names the felt event itself." }
+      ],
+      "systemScene": "It happens at the concert, during the quiet song, when the whole crowd sings the third verse unprompted and the singer steps back from the mic just to listen. Something runs up your spine and across your scalp like cold electricity, and the hair on your arms actually stands up. It lasts maybe two seconds. It isn't fear, and it isn't cold — it's closer to awe with a body attached. You would pay the ticket price again for those two seconds alone. French, of course, has the word for it. English borrowed it and never gave it back."
+    },
+    {
+      "id": "vertiginous",
+      "word": "vertiginous",
+      "ipa": "/vərˈtɪdʒənəs/",
+      "partOfSpeech": "adjective",
+      "definition": "Inducing dizziness, as from great height; whirling and destabilizing.",
+      "domain": "bodily-sensations",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "dizzying", "distinction": "Dizzying is the everyday word; vertiginous adds the height — the plunge felt in the body." },
+        { "word": "precipitous", "distinction": "Precipitous describes the drop itself — steep and sudden; vertiginous describes what the drop does to you." },
+        { "word": "giddy", "distinction": "Giddy is lightheaded, often happily; vertiginous is the unsettling spin — the ground refusing to hold still." }
+      ],
+      "systemScene": "The observation deck has a glass floor, because architects are sadists. You step onto it on a dare, look down eighty stories at toy taxis, and your body files an immediate formal protest: knees soft, stomach airborne, the entire world beginning a slow quarter-turn it never completes. You are perfectly safe, and every cell in you declines to believe it. Later, describing the skyscraper — or the stock chart that fell off a cliff, or the pace of that whole terrible year — you'll reach for a word that means the height and the spin together."
+    },
+    {
+      "id": "sultry",
+      "word": "sultry",
+      "ipa": "/ˈsʌltri/",
+      "partOfSpeech": "adjective",
+      "definition": "Oppressively hot and humid, with a heavy, charged atmosphere.",
+      "domain": "weather-and-light",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "humid", "distinction": "Humid is a measurement; sultry is an atmosphere — heat with weight and a mood." },
+        { "word": "muggy", "distinction": "Muggy is unpleasantly damp; sultry is oppressive, with a strange charged undertone." },
+        { "word": "sweltering", "distinction": "Sweltering is extreme heat, full stop; sultry is heat plus thickness plus intent." }
+      ],
+      "systemScene": "The power goes out at nine on an August night in Charleston, taking the air conditioning with it. You sit on the porch because inside is worse. The air is so thick and warm it feels less like weather than like a presence — something you wade through, something with weight, lying on the whole street at once. Your glass sweats. The candle flame doesn't move. Nobody has the energy to finish sentences, so the conversation dissolves into fanning and sighing. 'Hot' doesn't cover it. Hot is dry and honest. This is hot with intent."
+    },
+    {
+      "id": "leaden",
+      "word": "leaden",
+      "ipa": "/ˈlɛdən/",
+      "partOfSpeech": "adjective",
+      "definition": "Dull, gray, and heavy — of skies, limbs, or spirits.",
+      "domain": "weather-and-light",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "overcast", "distinction": "Overcast reports cloud cover; leaden reports the weight — gray that presses." },
+        { "word": "gloomy", "distinction": "Gloomy is the mood of dim light; leaden is the physics of it — heavy, dull, immobile." },
+        { "word": "gray", "distinction": "Gray is a color; leaden is a burden that happens to be gray." }
+      ],
+      "systemScene": "November in Buffalo. You wake and the light through the blinds is the color of dishwater, and when you pull them up, the sky is one seamless slab from horizon to horizon — no clouds exactly, just a low ceiling of gray, close enough to touch, heavy enough to feel on your shoulders. It's been like this for nine days. It isn't storming and it isn't clearing; the sky is simply pressing down like a lid on a pot. Your limbs match it by noon. There's a word for this sky, borrowed from the heaviest metal people used to handle."
+    },
+    {
+      "id": "squall",
+      "word": "squall",
+      "ipa": "/skwɔːl/",
+      "partOfSpeech": "noun",
+      "definition": "A sudden, brief, violent burst of wind, usually with rain or snow.",
+      "domain": "weather-and-light",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "storm", "distinction": "A storm is the general event, any size or length; this is compact — sudden, violent, and gone." },
+        { "word": "gust", "distinction": "A gust is one push of wind; this is a whole assault, wind leading rain." },
+        { "word": "tempest", "distinction": "A tempest is grand and lasting; this is a tantrum — brief, local, intense." }
+      ],
+      "systemScene": "The lake is glass at two o'clock. At two-fifteen the far shore disappears. It comes across the water like a curtain being yanked — wind out of nowhere, hard sideways rain, the canoe suddenly a bad idea you happen to be sitting in. Eleven minutes of genuine chaos: hat gone, everything soaked, your friend whooping like an idiot. Then it's over. The sun returns as if nothing happened; the lake flattens, almost embarrassed. Back at the dock, the old guy who rents the canoes squints at the sky and gives the thing its right name — one syllable, wet and violent."
+    },
+    {
+      "id": "brackish",
+      "word": "brackish",
+      "ipa": "/ˈbrækɪʃ/",
+      "partOfSpeech": "adjective",
+      "definition": "Slightly salty, as where river water mixes with the sea.",
+      "domain": "weather-and-light",
+      "ladderRank": 4,
+      "track": "main",
+      "neighbors": [
+        { "word": "salty", "distinction": "Salty is the sea at full strength; brackish is diluted — the in-between of estuaries." },
+        { "word": "briny", "distinction": "Briny evokes pickling strength, saltier than the sea in the mouth; brackish is faint, murky, marginal." },
+        { "word": "stagnant", "distinction": "Stagnant water isn't moving; brackish water is mixing — the meeting is the whole point." }
+      ],
+      "systemScene": "You put the kayak in where the river widens toward the sea, and halfway through the marsh you dip a hand and taste it off your fingers — not fresh, not ocean. Something in between, faintly salted, like the river and the sea are still negotiating. The reeds grow differently here; the fish are different too, the guide says — species that spend their whole lives in the in-between. On the map this zone has no name, just a gradient between blue and green. But the water itself has one: an old word that sounds exactly as murky as it tastes."
+    },
+    {
+      "id": "petrichor",
+      "word": "petrichor",
+      "ipa": "/ˈpɛtrɪˌkɔːr/",
+      "partOfSpeech": "noun",
+      "definition": "The distinctive earthy smell of rain arriving on dry ground.",
+      "domain": "weather-and-light",
+      "ladderRank": 5,
+      "track": "main",
+      "neighbors": [
+        { "word": "earthy", "distinction": "Earthy is the general register of soil smells; petrichor is one specific event — rain arriving on dry ground." },
+        { "word": "musty", "distinction": "Musty is trapped damp indoors; petrichor is open air, mineral and green." },
+        { "word": "fresh", "distinction": "Fresh describes the after-rain clarity; petrichor is the moment itself — the scent rising as the first drops hit." }
+      ],
+      "systemScene": "It hasn't rained in six weeks. The lawn crunches underfoot; the flowerbeds are powder. Then one evening the sky finally opens, and before the first drops even reach you — while they're still striking the driveway and the dusty field across the road — it arrives: that smell. Mineral and green and somehow like childhood, rising off the hot pavement in waves. Everyone on the porch inhales at the same time. Your daughter asks what the smell is called, certain that something this specific and this good must have a name. She's right. It does."
+    },
+    {
+      "id": "insipid",
+      "word": "insipid",
+      "ipa": "/ɪnˈsɪpɪd/",
+      "partOfSpeech": "adjective",
+      "definition": "Lacking flavor or interest in a way that disappoints.",
+      "domain": "blandness",
+      "ladderRank": 1,
+      "track": "main",
+      "neighbors": [
+        { "word": "bland", "distinction": "Bland is neutral, even forgivable; insipid carries the verdict — tasteless in a way that lets you down." },
+        { "word": "dull", "distinction": "Dull covers anything boring; insipid began with taste — the soup, the small talk, the prose with no salt." },
+        { "word": "flat", "distinction": "Flat has lost its fizz; insipid never had any." }
+      ],
+      "systemScene": "The restaurant is beautiful and the soup is... nothing. Not bad — bad would at least be an event. It's warm, beige, and completely without argument: no salt to speak of, no herb, no edge, nothing for your attention to grab. You keep eating it, waiting for it to begin. The conversation at the next table is the same soup: weather, traffic, 'anyway, so.' On the walk home you try to review the evening and find your memory sliding off it, frictionless. 'Bland' is close but too kind. You want the word with the disappointment built in."
+    },
+    {
+      "id": "vapid",
+      "word": "vapid",
+      "ipa": "/ˈvæpɪd/",
+      "partOfSpeech": "adjective",
+      "definition": "Empty of ideas or substance; offering nothing to engage with.",
+      "domain": "blandness",
+      "ladderRank": 2,
+      "track": "main",
+      "neighbors": [
+        { "word": "insipid", "distinction": "Insipid lacks flavor; vapid lacks contents — nothing inside, nothing at stake." },
+        { "word": "inane", "distinction": "Inane is actively silly; vapid is passively empty — too hollow even to be wrong." },
+        { "word": "shallow", "distinction": "Shallow has some depth, just not much; vapid is surface all the way down." }
+      ],
+      "systemScene": "The book was everywhere this summer — three hundred pages, gold foil title, forty thousand five-star reviews. You read it on the plane. It goes down easy, like drinking air. Somewhere over Nebraska you notice you cannot name a single idea in it: not one claim, one question, one sentence with pressure behind it. It isn't wrong about anything, because it isn't about anything. Its emptiness is upholstered, professionally. You finish it anyway and feel like you've eaten a meal of packing foam. The review you'd like to write is one word long."
+    },
+    {
+      "id": "anodyne",
+      "word": "anodyne",
+      "ipa": "/ˈænəˌdaɪn/",
+      "partOfSpeech": "adjective",
+      "definition": "Engineered to be inoffensive; deliberately unobjectionable.",
+      "domain": "blandness",
+      "ladderRank": 3,
+      "track": "main",
+      "neighbors": [
+        { "word": "bland", "distinction": "Bland happens by accident; anodyne is engineered — inoffensiveness as a design goal." },
+        { "word": "innocuous", "distinction": "Innocuous merely does no harm; anodyne was drafted so that no one could possibly object." },
+        { "word": "soothing", "distinction": "Soothing comforts, and means to; anodyne dodges — comfort as camouflage." }
+      ],
+      "systemScene": "After the scandal, the company releases its statement. 'We take these matters seriously and remain committed to our values as we look toward the future together.' Read it twice: it contains no apology, no denial, no fact, no name. It has been sanded by lawyers until there is nothing left to grip — a paragraph built the way hospital food is built, to be swallowable by everyone and remembered by no one. It upsets nobody, and that is its entire architecture. There's a word for language like this. Fittingly, it started life as a term for painkillers."
+    },
+    {
+      "id": "borborygmus",
+      "word": "borborygmus",
+      "ipa": "/ˌbɔːrbəˈrɪɡməs/",
+      "partOfSpeech": "noun",
+      "definition": "The rumbling sound made by the movement of gas in the intestines.",
+      "domain": "bodily-sensations",
+      "ladderRank": 0,
+      "track": "sideshow",
+      "neighbors": [
+        { "word": "rumble", "distinction": "A rumble is what everyone calls it; this is what a gastroenterologist calls it." },
+        { "word": "gurgle", "distinction": "A gurgle is any liquid chatter; this is specifically the gut's public address." },
+        { "word": "growl", "distinction": "Your stomach growls in the vernacular; in the clinic, it does this." }
+      ],
+      "systemScene": "The room is silent. Forty people, heads bowed over the exam, nothing but pencil scratches — and then your digestive system decides to speak. Not a polite gurgle: a long, articulate groan, rising at the end like a question, loud enough that the proctor looks up. Two rows over, someone snorts. You press a forearm into your belly as if that has ever worked. Three minutes later it happens again, in a different key. Medicine, wonderfully, keeps a formal Greek name for this exact noise — five syllables long, and saying it aloud sounds like doing it."
+    },
+    {
+      "id": "sesquipedalian",
+      "word": "sesquipedalian",
+      "ipa": "/ˌsɛskwɪpɪˈdeɪliən/",
+      "partOfSpeech": "adjective",
+      "definition": "Given to using unnecessarily long words; (of a word) many-syllabled.",
+      "domain": "ways-of-speaking",
+      "ladderRank": 0,
+      "track": "sideshow",
+      "neighbors": [
+        { "word": "verbose", "distinction": "Verbose uses too many words; this uses words that are individually too long." },
+        { "word": "grandiloquent", "distinction": "Grandiloquent is pompous in overall style; this is specifically about the syllable count." },
+        { "word": "polysyllabic", "distinction": "Polysyllabic is the neutral fact; this is the affectionate accusation." }
+      ],
+      "systemScene": "The keynote speaker will not say 'use.' He says 'operationalize.' He doesn't start things; he 'inaugurates frameworks.' Around minute ten he produces 'incentivization architectures,' and a man in row three writes it down slowly, like evidence. The talk could be one page; it is somehow ninety minutes. Driving home, you learn that the perfect word for his vocabulary exists and is itself the joke: a word so long that using it makes you instantly guilty of it. From the Latin, roughly: 'a foot and a half long.'"
+    },
+    {
+      "id": "apricity",
+      "word": "apricity",
+      "ipa": "/əˈprɪsɪti/",
+      "partOfSpeech": "noun",
+      "definition": "The warmth of the sun felt in winter.",
+      "domain": "weather-and-light",
+      "ladderRank": 0,
+      "track": "sideshow",
+      "neighbors": [
+        { "word": "warmth", "distinction": "Warmth is any heat; this is winter sun specifically — the thin gift through cold air." },
+        { "word": "sunshine", "distinction": "Sunshine is the light; this is what it feels like on your face in January." },
+        { "word": "coziness", "distinction": "Coziness is engineered indoors; this is found, outside, unearned." }
+      ],
+      "systemScene": "January, nineteen degrees, and you find the one bench in the courtyard where the sun clears the roofline. Out of the wind, eyes closed, the light lands on your face with actual weight — a thin, precious heat, like a blanket one molecule thick. Twenty minutes ago you were miserable, and the air hasn't changed at all. Just this: winter light, doing its small impossible kindness. Cats know exactly what this is; they budget their whole day around it. English once had a word for it too — it appeared in one dictionary in 1623 and then essentially vanished. Word collectors have been trying to bring it back ever since."
+    },
+    {
+      "id": "defenestration",
+      "word": "defenestration",
+      "ipa": "/diːˌfɛnɪˈstreɪʃən/",
+      "partOfSpeech": "noun",
+      "definition": "The act of throwing someone or something out of a window.",
+      "domain": "curiosities",
+      "ladderRank": 0,
+      "track": "sideshow",
+      "neighbors": [
+        { "word": "ejection", "distinction": "Ejection is removal by any exit; this insists on the window." },
+        { "word": "ouster", "distinction": "An ouster removes you from power, metaphorically; this can do it literally, with altitude." },
+        { "word": "toss", "distinction": "A toss is generic; this is a toss with a frame, a sill, and a history in Prague." }
+      ],
+      "systemScene": "Prague, 1618. Three imperial officials are hauled to a castle window by a crowd of furious Protestant nobles and — there is no gentler way to say it — put through it. Seventy feet down. Astonishingly, all three survive; Catholic accounts credit angels, Protestant accounts credit the dung heap they landed in. The event helps ignite the Thirty Years' War. Here's the truly wonderful part: the same thing had happened in Prague in 1419, and it would happen again in 1948. It happened enough times, out of enough windows, that historians needed a dedicated word for it. They have one."
+    }
+  ]
+}
