@@ -121,8 +121,23 @@ extension AudioStore.AssetRequest {
     static func word(for word: SeedWord) -> Self {
         .init(id: "\(word.id).word", text: word.word, style: .word)
     }
+    static func definition(for word: SeedWord) -> Self {
+        .init(id: "\(word.id).definition", text: word.definition, style: .scene)
+    }
+    static func neighborLine(for word: SeedWord) -> Self? {
+        guard let line = word.spokenNeighborLine else { return nil }
+        return .init(id: "\(word.id).neighbor", text: line, style: .scene)
+    }
     static func reviewScene(for word: SeedWord) -> Self? {
         guard let text = word.reviewScene else { return nil }
         return .init(id: "\(word.id).review", text: text, style: .scene)
+    }
+
+    /// Everything the full lesson beat needs for one word:
+    /// scene → word → definition → neighbour line.
+    static func lessonAssets(for word: SeedWord) -> [Self] {
+        var assets: [Self] = [.scene(for: word), .word(for: word), .definition(for: word)]
+        if let neighbor = neighborLine(for: word) { assets.append(neighbor) }
+        return assets
     }
 }

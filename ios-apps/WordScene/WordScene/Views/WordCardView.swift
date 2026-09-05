@@ -7,6 +7,12 @@ struct WordCardView: View {
     let word: SeedWord
     var onSpeak: ((String) -> Void)? = nil
 
+    /// Staged disclosure for the lesson: the definition and neighbours appear
+    /// as they are spoken (phase-2 decision 1). Callers outside the lesson
+    /// leave both true and get the whole card at once.
+    var showDefinition: Bool = true
+    var showNeighbors: Bool = true
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // The word itself, with pronunciation
@@ -38,29 +44,35 @@ struct WordCardView: View {
                 }
             }
 
-            Text(word.definition)
-                .font(.title3)
+            if showDefinition {
+                Text(word.definition)
+                    .font(.title3)
+                    .transition(.opacity)
+            }
 
             // The distinctions — this is where precision lives
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Not to be confused with")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            if showNeighbors {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Not to be confused with")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
-                ForEach(word.neighbors, id: \.word) { neighbor in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(neighbor.word)
-                            .font(.body.weight(.semibold))
-                            .italic()
-                        Text(neighbor.distinction)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    ForEach(word.neighbors, id: \.word) { neighbor in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(neighbor.word)
+                                .font(.body.weight(.semibold))
+                                .italic()
+                            Text(neighbor.distinction)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .transition(.opacity)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }
