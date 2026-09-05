@@ -1,0 +1,927 @@
+{
+  "entries": {
+    "anodyne.definition": {
+      "filename": "anodyne.definition.mp3",
+      "textHash": "1fe7f46f94fef716583e642395375d80aa9d3c9c21615da907797cda41743705"
+    },
+    "anodyne.neighbor": {
+      "filename": "anodyne.neighbor.mp3",
+      "textHash": "0c209cb9627a58bd093081dae4fed023d77a91eaaeb16e27f020dca7488e49ee"
+    },
+    "anodyne.review": {
+      "filename": "anodyne.review.mp3",
+      "textHash": "a99d97c9af4ea2e8c1a23e96fe84b75c02e4272e07528f1dd704b51a8f616479"
+    },
+    "anodyne.scene": {
+      "filename": "anodyne.scene.mp3",
+      "textHash": "666debd61a8796035e94e4dc3bad776848c817410a4a926febd1945528e2c5f5"
+    },
+    "anodyne.word": {
+      "filename": "anodyne.word.mp3",
+      "textHash": "32ed75a635be35aa6916c6a2ca7a90b15e64416bd40acfb2c4915658bbd26240"
+    },
+    "brackish.definition": {
+      "filename": "brackish.definition.mp3",
+      "textHash": "3ae238690c96df96e65a6072bfbc52862173eaf215b102e671ab2cf7551b04c1"
+    },
+    "brackish.neighbor": {
+      "filename": "brackish.neighbor.mp3",
+      "textHash": "3e4742b4a46f0f4ba3747bc5c84538857a06efcd61ae1de39c6fb98d8f4a35a7"
+    },
+    "brackish.review": {
+      "filename": "brackish.review.mp3",
+      "textHash": "1809027af351bee1a315a933a44f1fb78d82a576306a71613699b41f49e74b2d"
+    },
+    "brackish.scene": {
+      "filename": "brackish.scene.mp3",
+      "textHash": "5ca3034619fc3e88ed0c37c94c39904e69aedabcb2981ab0035ed5ed4376dc52"
+    },
+    "brackish.word": {
+      "filename": "brackish.word.mp3",
+      "textHash": "40cd666a96ff14b25d785ec862c8ef47beeddefb170d966e33487a9e8aea9cb0"
+    },
+    "brusque.definition": {
+      "filename": "brusque.definition.mp3",
+      "textHash": "88541f665382a6f241de73ccd80228186f96579ed9d887b7ceb52ca14c7c4da2"
+    },
+    "brusque.neighbor": {
+      "filename": "brusque.neighbor.mp3",
+      "textHash": "d8d864627fc1ccff72755864f3966bd5b860a59da008357075c37d9d61b2e877"
+    },
+    "brusque.review": {
+      "filename": "brusque.review.mp3",
+      "textHash": "7615a16d736f39cc7c146cb8a5ea193343a1ba86bf4ddb0ef53af14cb0340076"
+    },
+    "brusque.scene": {
+      "filename": "brusque.scene.mp3",
+      "textHash": "31262d33c0172cebc0c1d6617e278daddddb526ddb48d9bc3c436ea3be10543c"
+    },
+    "brusque.word": {
+      "filename": "brusque.word.mp3",
+      "textHash": "e4c94258cb13ad8a1aab61c3b4f3f7cca55179a0faf7a9892fe356980f1a464f"
+    },
+    "cavil.definition": {
+      "filename": "cavil.definition.mp3",
+      "textHash": "e946f40441e02525d7065c7ade80d8172f6a1f25a90dc76261ef55340f052056"
+    },
+    "cavil.neighbor": {
+      "filename": "cavil.neighbor.mp3",
+      "textHash": "227df01c1541c4706e4bda67652585a1893161e80ac6137c21f8b68e9696aa44"
+    },
+    "cavil.review": {
+      "filename": "cavil.review.mp3",
+      "textHash": "9f951d1da193325da52c626475387b4cc989f83f355bc9d580e957a382a56ade"
+    },
+    "cavil.scene": {
+      "filename": "cavil.scene.mp3",
+      "textHash": "e038dffc37aab954bd2526df975c7b5d9f373360640ac68ae6ea2fd28a23ab2f"
+    },
+    "cavil.word": {
+      "filename": "cavil.word.mp3",
+      "textHash": "aafb9d5d9c5705060438fb306a4e5449535e2c7e056404ef8f0207600530ab3f"
+    },
+    "chagrin.definition": {
+      "filename": "chagrin.definition.mp3",
+      "textHash": "82e6b074177b4030b1bc08c3b63de7d37bb95bc1221710d8941326d5e43ba782"
+    },
+    "chagrin.neighbor": {
+      "filename": "chagrin.neighbor.mp3",
+      "textHash": "763f69217a0ba742dccb7e77884226f807b5fd357fd9571a55baa56333917a1b"
+    },
+    "chagrin.review": {
+      "filename": "chagrin.review.mp3",
+      "textHash": "0cf9326f974edaa25e8fae167b8e386caed460cde7032547f73c668fa31cbd64"
+    },
+    "chagrin.scene": {
+      "filename": "chagrin.scene.mp3",
+      "textHash": "a7c306764668dbc2a34146541ff0fb57653d5afe93128bbc5eaea2f0e99b42c4"
+    },
+    "chagrin.word": {
+      "filename": "chagrin.word.mp3",
+      "textHash": "6aad234d40a147dd6e1e850a5d2751092db289461bc0cf8b2512cfa42c46b6c4"
+    },
+    "compunction.definition": {
+      "filename": "compunction.definition.mp3",
+      "textHash": "622babfa014a05134716dc774abda57685408c83cb7e1a4d73dda7eb7627eb63"
+    },
+    "compunction.neighbor": {
+      "filename": "compunction.neighbor.mp3",
+      "textHash": "f061cd9a634747bddc95d4357de90770f8b33937f17960aa76c6c742b18b9dc0"
+    },
+    "compunction.review": {
+      "filename": "compunction.review.mp3",
+      "textHash": "2bd1439ba466aa1848d1af344a2afec0fe2373d95cf95500f8b93f6ad022cbd6"
+    },
+    "compunction.scene": {
+      "filename": "compunction.scene.mp3",
+      "textHash": "ac0da266e41c45fff2adda23d2e27da1f76e6dc5e7c20b60d2dcd003ccb34eda"
+    },
+    "compunction.word": {
+      "filename": "compunction.word.mp3",
+      "textHash": "2c3f9fbdcc9c7eb77994552b26c5055b1698d590a994e3be2ccf3cfdfe8681a9"
+    },
+    "cursory.definition": {
+      "filename": "cursory.definition.mp3",
+      "textHash": "fa147cbe6c51148e942c4a51d9f735b120928f68a105e6e83a44237116a04d5f"
+    },
+    "cursory.neighbor": {
+      "filename": "cursory.neighbor.mp3",
+      "textHash": "4dfb2b6b70f8581b2e7bb8615a8ea2acf77ad90dca502522ace92e490976e347"
+    },
+    "cursory.review": {
+      "filename": "cursory.review.mp3",
+      "textHash": "086cd85165a866ea3e9a6f8d2d7072a620f72cd63da787c7bfd31e5498adae23"
+    },
+    "cursory.scene": {
+      "filename": "cursory.scene.mp3",
+      "textHash": "e327a8f97f239fb09087f14a6971261e682ea32eaae44118990d8583423b15ce"
+    },
+    "cursory.word": {
+      "filename": "cursory.word.mp3",
+      "textHash": "d47a9be9c254f7bc76ebd1e23de71b492865a13f07fe3d52d141a91ad5b09f1e"
+    },
+    "desultory.definition": {
+      "filename": "desultory.definition.mp3",
+      "textHash": "1b265b07dcb3fcbefe9b331f516ceead327f0be06731c48309e2c558d41befea"
+    },
+    "desultory.neighbor": {
+      "filename": "desultory.neighbor.mp3",
+      "textHash": "4b69fce4be2a863170dee16345615ac994788607196bb461a64541b91ae64c5c"
+    },
+    "desultory.review": {
+      "filename": "desultory.review.mp3",
+      "textHash": "290c725aee764d5fb55476548ca696f4b6b2664dcbe4fb49ddfee75ca17ac24f"
+    },
+    "desultory.scene": {
+      "filename": "desultory.scene.mp3",
+      "textHash": "956d28dc543608179e6190e68b0ac417839fc86e9ec6ff9e719c3dfcf2353b2d"
+    },
+    "desultory.word": {
+      "filename": "desultory.word.mp3",
+      "textHash": "8b623cc2e8c400416510736ec802e9dc9dc8cc7566816775169696c17f7b2b18"
+    },
+    "diffident.definition": {
+      "filename": "diffident.definition.mp3",
+      "textHash": "80655c470b72d192e8855a1a653d36dfc3c6523ed55081a3415653aa5a783640"
+    },
+    "diffident.neighbor": {
+      "filename": "diffident.neighbor.mp3",
+      "textHash": "1c83698b08fd2803056b3d89f62fec0a49432b4b0daa53b75c00ce2a0e1914c4"
+    },
+    "diffident.review": {
+      "filename": "diffident.review.mp3",
+      "textHash": "a6f9e3eb5092bcfadedc1cb6b427fa4c0d0a45dd39372fbc31de91660998fa9a"
+    },
+    "diffident.scene": {
+      "filename": "diffident.scene.mp3",
+      "textHash": "031692b06dc023bd12550cacf005c394e46e05b1a8f4aadbdbffa4ba991f26fa"
+    },
+    "diffident.word": {
+      "filename": "diffident.word.mp3",
+      "textHash": "c02aadcb59e7383874920d0fd3f3402cd561b2ad50f19a6144fa206bf0e2b4e9"
+    },
+    "disquiet.definition": {
+      "filename": "disquiet.definition.mp3",
+      "textHash": "dccce697fbba1e97e612fdef66edc6da7585e153d4603fd70c1ac490f0dea419"
+    },
+    "disquiet.neighbor": {
+      "filename": "disquiet.neighbor.mp3",
+      "textHash": "0be6302d4512a98e077d93ee4bbec571b344df8dfeba1c7524c580324ce08f40"
+    },
+    "disquiet.review": {
+      "filename": "disquiet.review.mp3",
+      "textHash": "0b815c0be9d80fbda8f0a6040f6871b3e9d96830bd0bbb88dc799d52c59a3c1f"
+    },
+    "disquiet.scene": {
+      "filename": "disquiet.scene.mp3",
+      "textHash": "803d54cea28068d8d513beb7224d9dd0e5ca1def6a23142537cab6ba5880f9da"
+    },
+    "disquiet.word": {
+      "filename": "disquiet.word.mp3",
+      "textHash": "4c0098463ee97758cd36e8b04116cf40ff7548fc9427a5218a7372c2abb35681"
+    },
+    "dissemble.definition": {
+      "filename": "dissemble.definition.mp3",
+      "textHash": "dd7cda0619a16f003021aefd26353cadd42d72eaa8d874a9da2da4d03a984961"
+    },
+    "dissemble.neighbor": {
+      "filename": "dissemble.neighbor.mp3",
+      "textHash": "c565609d23a92ddf6e380202ca807654f40ebc72e9c04dc5c748668d917dc727"
+    },
+    "dissemble.review": {
+      "filename": "dissemble.review.mp3",
+      "textHash": "0aedd47294786044716d0944115ffd6ca49f1e64885c91435eca81d447122636"
+    },
+    "dissemble.scene": {
+      "filename": "dissemble.scene.mp3",
+      "textHash": "850be23cd7d9a3f632cd37bc7a3bd472b387bd4fdc69fec27f4a0ee2a0f85cdb"
+    },
+    "dissemble.word": {
+      "filename": "dissemble.word.mp3",
+      "textHash": "6ab39b038ab35e35e68396e8c2567eee883bdde57ed275bb2b126c10d0e317fc"
+    },
+    "enervated.definition": {
+      "filename": "enervated.definition.mp3",
+      "textHash": "f9ea9f7fc580cae00b45cdcb2f43d1c1ae6558cb15e94f2770eb9874e2edd9f7"
+    },
+    "enervated.neighbor": {
+      "filename": "enervated.neighbor.mp3",
+      "textHash": "70fb61169ca84001bc0077ffe0483455703260e861de9a4672624f983cfa2387"
+    },
+    "enervated.review": {
+      "filename": "enervated.review.mp3",
+      "textHash": "1114712e61fafe8e2d522f6fd5db406e0b8717211841e556e18c619c77629582"
+    },
+    "enervated.scene": {
+      "filename": "enervated.scene.mp3",
+      "textHash": "d6fd8ca9340c159eeea6057bf66aec34e409dd307de8cffb555ed6b6ab444d86"
+    },
+    "enervated.word": {
+      "filename": "enervated.word.mp3",
+      "textHash": "818bec8bad4938a740a36e90cb1b3d8433fca31537084295d63d723f031db58d"
+    },
+    "equivocate.definition": {
+      "filename": "equivocate.definition.mp3",
+      "textHash": "311169db0a24a18c12a0f8edcddc94343b3fbe81be2872b008eb3a721595fe1a"
+    },
+    "equivocate.neighbor": {
+      "filename": "equivocate.neighbor.mp3",
+      "textHash": "44d4ab857fdfe6e532101a302d2cbe8529b5d1b890218fa05f5b1b801926579c"
+    },
+    "equivocate.review": {
+      "filename": "equivocate.review.mp3",
+      "textHash": "527c39dd7b9a41081be13f7a477c23cf5dd3a421ce8ebd7e4983abd811830fe4"
+    },
+    "equivocate.scene": {
+      "filename": "equivocate.scene.mp3",
+      "textHash": "775b85671e92c4a998f883e671451cbf8e6780ad7b7cbdb45f4dae1a40ba3072"
+    },
+    "equivocate.word": {
+      "filename": "equivocate.word.mp3",
+      "textHash": "22ae99e2004bb04de1419df3b9c6ed3060a688aa6f8d72b0ec48c4ddecd0e0c2"
+    },
+    "fastidious.definition": {
+      "filename": "fastidious.definition.mp3",
+      "textHash": "06e235de933197c486cebd506a695b8a83101c00e01b00facbd19825969d92d7"
+    },
+    "fastidious.neighbor": {
+      "filename": "fastidious.neighbor.mp3",
+      "textHash": "76772090c54690be2fac8e5c1ebbc4031c67bf13d0c77ef7d24aef1383ebe5bf"
+    },
+    "fastidious.review": {
+      "filename": "fastidious.review.mp3",
+      "textHash": "771a381b212148be028fb79b1dce0080d52c3a1ff23c23b6f8f8c0cc5ac679a4"
+    },
+    "fastidious.scene": {
+      "filename": "fastidious.scene.mp3",
+      "textHash": "761857c294ee84dafffdd61d497176f108e68fcb24822e2b997e7b36bfa002dd"
+    },
+    "fastidious.word": {
+      "filename": "fastidious.word.mp3",
+      "textHash": "cd4568a6ac5ab8d97db1722097e9d7fe4adfedc0908d6a44af048c571dfef4cb"
+    },
+    "frisson.definition": {
+      "filename": "frisson.definition.mp3",
+      "textHash": "b4dfa2aaf46427d34e736ab131ae180d2249db44da9b76c390c87b1be4d0963d"
+    },
+    "frisson.neighbor": {
+      "filename": "frisson.neighbor.mp3",
+      "textHash": "9d66efe72a7fb89d5fe781372333c755fabb075187ddd83774fd2823984ba426"
+    },
+    "frisson.review": {
+      "filename": "frisson.review.mp3",
+      "textHash": "cee52ea59648154791686bedac6d9608553ed68fd19f55da1c69789a37d200a4"
+    },
+    "frisson.scene": {
+      "filename": "frisson.scene.mp3",
+      "textHash": "7e9ce88e8ccd3efc773a96f902de387305df6007fc3e275790744e1a872e2357"
+    },
+    "frisson.word": {
+      "filename": "frisson.word.mp3",
+      "textHash": "aadd78d9b093b0b33334a035adfd3b14bb0c964caff9eb3c5e39fa8419d31d4b"
+    },
+    "gauche.definition": {
+      "filename": "gauche.definition.mp3",
+      "textHash": "7e100f15d1a9d001955182c657235b58d67d99a89213fe69ad02cf875975938c"
+    },
+    "gauche.neighbor": {
+      "filename": "gauche.neighbor.mp3",
+      "textHash": "90f74317da421eec36b22ad86daddae1b404ea571303933eefb5b91be50286c1"
+    },
+    "gauche.review": {
+      "filename": "gauche.review.mp3",
+      "textHash": "05d701742f1dc400e4cf2b9336958be8e6d4aa948daba9e323f3001e01f5398f"
+    },
+    "gauche.scene": {
+      "filename": "gauche.scene.mp3",
+      "textHash": "ba2f44310f5b0c3fa20b61e2a2ab3e959212001eed2908de1ca81a7571df0fbd"
+    },
+    "gauche.word": {
+      "filename": "gauche.word.mp3",
+      "textHash": "96cbc489bf1f6d57f6477c4528a22059c1cddb7a316f0f2933803994502cbda6"
+    },
+    "glib.definition": {
+      "filename": "glib.definition.mp3",
+      "textHash": "25cec7bee5ccc53926363757c7349e9c3255c34c6c8982198f446248d799ec58"
+    },
+    "glib.neighbor": {
+      "filename": "glib.neighbor.mp3",
+      "textHash": "8203ad8f09fc70b5622d085e99f7b28077173a355a6ab4f5715ad27b23c07036"
+    },
+    "glib.review": {
+      "filename": "glib.review.mp3",
+      "textHash": "07af83cb3134b247bccc15dcb6a80b762988b6594bbe22bb053f3ee85c6d5628"
+    },
+    "glib.scene": {
+      "filename": "glib.scene.mp3",
+      "textHash": "19a3faf7f7c989722711eeb27d3fce4a4f250f876ce53cb2086e68640fc298f4"
+    },
+    "glib.word": {
+      "filename": "glib.word.mp3",
+      "textHash": "4430778d0285f6141fdc644d62718630fd40bbaf090a580e3ead4370abd92ad5"
+    },
+    "imperious.definition": {
+      "filename": "imperious.definition.mp3",
+      "textHash": "ac6c43b3b5ffaaee04401230db6aa0897b8474586a579f6a763f19b2ac9e85bd"
+    },
+    "imperious.neighbor": {
+      "filename": "imperious.neighbor.mp3",
+      "textHash": "34b0a6e25ec99b4ffef2f43575441c5c710198deeb0a2c8e1e5bba9c0c3204ca"
+    },
+    "imperious.review": {
+      "filename": "imperious.review.mp3",
+      "textHash": "d89375d7916f2bb56f2b3f57c31ab279c445e26c6ae86b3cf7c00fd1d52a70f2"
+    },
+    "imperious.scene": {
+      "filename": "imperious.scene.mp3",
+      "textHash": "2541eef59be0eec9077eabb594766179e024214e6b8d051f2c7e60c789566853"
+    },
+    "imperious.word": {
+      "filename": "imperious.word.mp3",
+      "textHash": "59e935d6b382247acd79ac4b6a2cef6e7c19c916c721cb8204ccaf85dcbdff1e"
+    },
+    "insipid.definition": {
+      "filename": "insipid.definition.mp3",
+      "textHash": "aab980a54755a651085b673c83d7d25b3f3f330e67b64de69e560e8473041acc"
+    },
+    "insipid.neighbor": {
+      "filename": "insipid.neighbor.mp3",
+      "textHash": "2bad99db7349a0ea2d5d7d6cb9ed12c9cda817313cadf35b06a581a3f56e6d34"
+    },
+    "insipid.review": {
+      "filename": "insipid.review.mp3",
+      "textHash": "7d6b40d1302b0de47cb64933e67e8ea2df2fbf7765978c16c2ea1133df2d4c80"
+    },
+    "insipid.scene": {
+      "filename": "insipid.scene.mp3",
+      "textHash": "8cfcf3ee65cb4127a497c69a79a9aa3be16b46dd8ea59b78b3f43db389259ce8"
+    },
+    "insipid.word": {
+      "filename": "insipid.word.mp3",
+      "textHash": "73a095d1fad4f83fb30895064594ce16aaa2081ad591e1d46b9db1ac624fbe7c"
+    },
+    "laconic.definition": {
+      "filename": "laconic.definition.mp3",
+      "textHash": "01a178ba77c33a16e978c727a4eb4ebe878d427ee55f967d2e2e4cdde6c9f9e0"
+    },
+    "laconic.neighbor": {
+      "filename": "laconic.neighbor.mp3",
+      "textHash": "cb2816ef20f455a662ce1105c9339b5f659c52a043cdc825e57bf32d5bfda4bc"
+    },
+    "laconic.review": {
+      "filename": "laconic.review.mp3",
+      "textHash": "3e40eac9e4dda48597a8ee96bd4dd5c5de3cdd28a5d93686246469b8b2315f9a"
+    },
+    "laconic.scene": {
+      "filename": "laconic.scene.mp3",
+      "textHash": "f83c6d3211a1703e9a6047ee124c02b507166f6813511ce8aedc2f5fe71d3936"
+    },
+    "laconic.word": {
+      "filename": "laconic.word.mp3",
+      "textHash": "84c8b26fab8e9438d5dd0c48ad5e815b56b3145c4af44a99190d3d48bb71ebea"
+    },
+    "languor.definition": {
+      "filename": "languor.definition.mp3",
+      "textHash": "3229573f2b3e602927f0241d90807f3746bc0c60e0b6e4c18b56977cb878d897"
+    },
+    "languor.neighbor": {
+      "filename": "languor.neighbor.mp3",
+      "textHash": "8e086f8f5e39d7e3ec77fccead0e88c13279d48e62d86d08f525b5ed9221c602"
+    },
+    "languor.review": {
+      "filename": "languor.review.mp3",
+      "textHash": "dda5cfb56501a022f9faab3656ee78654152527a09ac552ac8069672b34cd5ef"
+    },
+    "languor.scene": {
+      "filename": "languor.scene.mp3",
+      "textHash": "9cb5efc22f95f26c5f21fc58913189c90033363dd27ad20cb36f17466cea8ee6"
+    },
+    "languor.word": {
+      "filename": "languor.word.mp3",
+      "textHash": "60385a490d4af7b052be38dfc74d874e6470bde975452c124ed5a5f9d67f93d7"
+    },
+    "lassitude.definition": {
+      "filename": "lassitude.definition.mp3",
+      "textHash": "3287115d283d6fe0e6412823dbaf14e777fd5329d452910d28b7f935f3a86631"
+    },
+    "lassitude.neighbor": {
+      "filename": "lassitude.neighbor.mp3",
+      "textHash": "3458f33c488861b5f0b1a3c137dd3753060161fc2fc577fdeef3259dc5fe8346"
+    },
+    "lassitude.review": {
+      "filename": "lassitude.review.mp3",
+      "textHash": "b4dd008a295b984e3364baf7926ad6dc5f97df92aa79134fba77be1fc5bcfa14"
+    },
+    "lassitude.scene": {
+      "filename": "lassitude.scene.mp3",
+      "textHash": "f1c5dc108b4c225ffd0ccac3cfa7e8b07e72c43e96b447948b5c39114b210762"
+    },
+    "lassitude.word": {
+      "filename": "lassitude.word.mp3",
+      "textHash": "c82b649bae468ce8b3198f1bb45d83a4f8760c72f17b395dac4ac03ecd958649"
+    },
+    "leaden.definition": {
+      "filename": "leaden.definition.mp3",
+      "textHash": "fa932f5941db168c061418a26e4d052b86e29abafed2d287d992353fd749dff3"
+    },
+    "leaden.neighbor": {
+      "filename": "leaden.neighbor.mp3",
+      "textHash": "44361235ca3fd7b03e836fbf37268f07ab4d5c71a98e95dd6a21c06253ec066a"
+    },
+    "leaden.review": {
+      "filename": "leaden.review.mp3",
+      "textHash": "fb2502a0a11f73aa4e88496dacc32c4a1c6e993f606cf5c7724f7a7f97038709"
+    },
+    "leaden.scene": {
+      "filename": "leaden.scene.mp3",
+      "textHash": "5582e77b496fac655a5ee7e4e03aff94a7df7704c8155df5b701174e1e7abed7"
+    },
+    "leaden.word": {
+      "filename": "leaden.word.mp3",
+      "textHash": "92968570e83492b219f9ce5a08dd09c1116b9f8ddc6cab964f0862f722fdfe1a"
+    },
+    "malaise.definition": {
+      "filename": "malaise.definition.mp3",
+      "textHash": "898a66e69c35adb1c9480b270f2567a9e7600bf440ba459b8ef7123e90eb6f07"
+    },
+    "malaise.neighbor": {
+      "filename": "malaise.neighbor.mp3",
+      "textHash": "b1506bcd7a59ee30ed46048db1675b79f9e07d5fdaad8c8530ece3194bc4fe35"
+    },
+    "malaise.review": {
+      "filename": "malaise.review.mp3",
+      "textHash": "d79b985d29c7f00c0e65eb51a6042b4088d7f8994bf73e16d44f4454cc2392fb"
+    },
+    "malaise.scene": {
+      "filename": "malaise.scene.mp3",
+      "textHash": "48356b1b946ef7744e92b68d716b8541ff245c1ee9b74f1f476caa4e8dad6dac"
+    },
+    "malaise.word": {
+      "filename": "malaise.word.mp3",
+      "textHash": "3de60b764fa076129d27a80746610236c1b4253f6d4a2d0ea61b2ee5156611d8"
+    },
+    "obfuscate.definition": {
+      "filename": "obfuscate.definition.mp3",
+      "textHash": "0d01fb82c103d48b0fed4bea0eb2bc38ae1b3043b79731f105c07c9a32717dd0"
+    },
+    "obfuscate.neighbor": {
+      "filename": "obfuscate.neighbor.mp3",
+      "textHash": "7ed052b75559770bb97b180f5e52165d5d91e1c40ca719397abc7c2e52747a45"
+    },
+    "obfuscate.review": {
+      "filename": "obfuscate.review.mp3",
+      "textHash": "6c811336723069d557d9355452f667a1dad70c68700a62db9b6b347f24859ddd"
+    },
+    "obfuscate.scene": {
+      "filename": "obfuscate.scene.mp3",
+      "textHash": "fb4150cf149a2664b058fb696e83deb48d28b36297293617e079f5d5bf9f7f95"
+    },
+    "obfuscate.word": {
+      "filename": "obfuscate.word.mp3",
+      "textHash": "03dcfea2969c395d7d43fbf9db867a87759f06af42bba9c37f5d21086a820ef9"
+    },
+    "obsequious.definition": {
+      "filename": "obsequious.definition.mp3",
+      "textHash": "caf3af0845d3a03bb499626445e4f38852dc431badb9bd4b10bd795f9530bbb0"
+    },
+    "obsequious.neighbor": {
+      "filename": "obsequious.neighbor.mp3",
+      "textHash": "aa4456364c21afe86b05be4865fade2c609f21bb2c60179b76ec6c46e041153e"
+    },
+    "obsequious.review": {
+      "filename": "obsequious.review.mp3",
+      "textHash": "798cb9dc83a4d618c3183e0805af85a0f1169c3eccedc2388e59f9eac245d29e"
+    },
+    "obsequious.scene": {
+      "filename": "obsequious.scene.mp3",
+      "textHash": "f8ca1eaf42de8e20499d8f7fb4d20d62ca005ae6074d54409bfe5d7212b9d3a4"
+    },
+    "obsequious.word": {
+      "filename": "obsequious.word.mp3",
+      "textHash": "fed15f1f6678da5e8e0cbe772e4a9ee9df04ff39b982583e266c2d2b3d334fd4"
+    },
+    "officious.definition": {
+      "filename": "officious.definition.mp3",
+      "textHash": "ec0039e9e5b08fbb7e8567a7a58f43141101b48e979774dfd6cbca6c31ff1da3"
+    },
+    "officious.neighbor": {
+      "filename": "officious.neighbor.mp3",
+      "textHash": "8b192d2d56e4d7543c7395121a104162ec37f19df86a0bd281602dc745d34c47"
+    },
+    "officious.review": {
+      "filename": "officious.review.mp3",
+      "textHash": "02f01b780f67e0c03a28e9994c5955dbb21ab00d41e2c2a01f3135af74a91713"
+    },
+    "officious.scene": {
+      "filename": "officious.scene.mp3",
+      "textHash": "bde2e6124c2e4edaa6f27c06cf5c8d4f14840b363172ea1d523b8f40bb0bd24d"
+    },
+    "officious.word": {
+      "filename": "officious.word.mp3",
+      "textHash": "77ebb98db4bb7b561eb477687e63f9ed08484ff3e2c8209bf2ac1d2e9e3b2c89"
+    },
+    "peckish.definition": {
+      "filename": "peckish.definition.mp3",
+      "textHash": "26d8a2fda2e6905784f6795ea01eb8998b3c0012ed69d7b17cebe71a70a564e9"
+    },
+    "peckish.neighbor": {
+      "filename": "peckish.neighbor.mp3",
+      "textHash": "87bce4edc5a52440f8b1d91860bf6c4e720cd4d34e31d45bf6dadbe78558680a"
+    },
+    "peckish.review": {
+      "filename": "peckish.review.mp3",
+      "textHash": "f36985a4f2350733a1edb0789403deb24f0e9ba68ed1642ad6f4b4bc090f24d6"
+    },
+    "peckish.scene": {
+      "filename": "peckish.scene.mp3",
+      "textHash": "e7acd614c6f1a55032b9661bb85553e9aed3992d9bc636e805c4cacf34ab7fba"
+    },
+    "peckish.word": {
+      "filename": "peckish.word.mp3",
+      "textHash": "830852f251c790f9249b98456821801f7d6f61b4e918acc2c1bf8572a20c3c58"
+    },
+    "perfunctory.definition": {
+      "filename": "perfunctory.definition.mp3",
+      "textHash": "d54c49809f5fc6f6684f7d95fc9b4f8af23d63cef7dc37159532cc8c051247a9"
+    },
+    "perfunctory.neighbor": {
+      "filename": "perfunctory.neighbor.mp3",
+      "textHash": "d6f7af89516794c4c4fd30ebe9499ad2312b7c96dec0460cb301c303efc21734"
+    },
+    "perfunctory.review": {
+      "filename": "perfunctory.review.mp3",
+      "textHash": "6fdbfd213baaff44aa1143f1b3cee389739b5bba88c745ac74231ce46c85d2d7"
+    },
+    "perfunctory.scene": {
+      "filename": "perfunctory.scene.mp3",
+      "textHash": "ef55961c9c06c41053748c63715f3dd80a35797c6dc972a587d16e17d97f205a"
+    },
+    "perfunctory.word": {
+      "filename": "perfunctory.word.mp3",
+      "textHash": "0b471ee3ff875f9e44cdef0c41afc3c9c215d591f25a8ab3d11c0575121b0780"
+    },
+    "petrichor.definition": {
+      "filename": "petrichor.definition.mp3",
+      "textHash": "5156de2ae6ea5d3ff6a8b39aaa5a79c683f81be0f80ec4eccf301f0987d19bc2"
+    },
+    "petrichor.neighbor": {
+      "filename": "petrichor.neighbor.mp3",
+      "textHash": "6b173c7e53dc802b55a21b5d82e67c0729162c22882f2ee23a3dcac71a786191"
+    },
+    "petrichor.review": {
+      "filename": "petrichor.review.mp3",
+      "textHash": "e2cd217b131d2c147d7c0a901517363b9ebc54a1f15e316c9632a0851db5cdc3"
+    },
+    "petrichor.scene": {
+      "filename": "petrichor.scene.mp3",
+      "textHash": "6379bb84b241426af1e3e500bd55e7a83399f91b3b233b9ed3054002934fe42b"
+    },
+    "petrichor.word": {
+      "filename": "petrichor.word.mp3",
+      "textHash": "a5a62bf072ce20efe3791ebb415dcd6b672381e9efb9587da93e1e942a37aa1e"
+    },
+    "pique.definition": {
+      "filename": "pique.definition.mp3",
+      "textHash": "296c15003964b8afbc4b9d7dbf4fa5413016d6899e00ebc79f86c74a3bd2caed"
+    },
+    "pique.neighbor": {
+      "filename": "pique.neighbor.mp3",
+      "textHash": "e5b19cbd62b3da140fdc85b1298051f67c7f41ee7baa68ca791d7d9725eb8d50"
+    },
+    "pique.review": {
+      "filename": "pique.review.mp3",
+      "textHash": "2f715231c0c24c5535960999aae662f7af237505c7526be87a35be3217a19fc5"
+    },
+    "pique.scene": {
+      "filename": "pique.scene.mp3",
+      "textHash": "5b411d17ca5d836f7dfc58134412c178595d96aa8c82e05f50ca66f3d974c8c4"
+    },
+    "pique.word": {
+      "filename": "pique.word.mp3",
+      "textHash": "ce39f8b71740347069456319eedef74571d00b9228b023c5c82441cca990c895"
+    },
+    "platitude.definition": {
+      "filename": "platitude.definition.mp3",
+      "textHash": "7d33d17d6f7c04e341795d220a4b680ae42ce563206c3f426a69b3a697869c9c"
+    },
+    "platitude.neighbor": {
+      "filename": "platitude.neighbor.mp3",
+      "textHash": "ade0dfa867ef2cafbc4654849bdc9b76aa17c377170485aa1d0dd370e3606c30"
+    },
+    "platitude.review": {
+      "filename": "platitude.review.mp3",
+      "textHash": "e476c521e48f45a43243f0fed7a4703f3d9a5bf184061ff04a5a6a94c37223af"
+    },
+    "platitude.scene": {
+      "filename": "platitude.scene.mp3",
+      "textHash": "213cc058287eb82604ce6b2fa0af968a38f3b4f4e9e9a3bd5a78c00f16f0d5f8"
+    },
+    "platitude.word": {
+      "filename": "platitude.word.mp3",
+      "textHash": "762052d10492ea4eb86ebf63f54aaed979040308e012cf1100e445264d4a7af0"
+    },
+    "pontificate.definition": {
+      "filename": "pontificate.definition.mp3",
+      "textHash": "af585c18c03f024a146dfb4d85f6018715f4bab6fdcc51ee1cf1c2d4e275232a"
+    },
+    "pontificate.neighbor": {
+      "filename": "pontificate.neighbor.mp3",
+      "textHash": "d4fb8463ed027b1a1bd4b0b03fe29a9aba5fba42d48695a73511904918c527fa"
+    },
+    "pontificate.review": {
+      "filename": "pontificate.review.mp3",
+      "textHash": "d2194ce66c265373454c75995a5d4369f636aead935d8e46a2007c511847791f"
+    },
+    "pontificate.scene": {
+      "filename": "pontificate.scene.mp3",
+      "textHash": "a0c0af28a20571139cef0a8d4bda71ba6459919a0faa1a0f45214645c6bdc817"
+    },
+    "pontificate.word": {
+      "filename": "pontificate.word.mp3",
+      "textHash": "11e0b8c2d6699940dbdb05bb08dde233a706ca6ed469bd2f94297af9b047e350"
+    },
+    "punctilious.definition": {
+      "filename": "punctilious.definition.mp3",
+      "textHash": "9035b4b0c52f49a4bef52cd56adf7f80fc6d3b5859b80beab3311731399128e8"
+    },
+    "punctilious.neighbor": {
+      "filename": "punctilious.neighbor.mp3",
+      "textHash": "37ef15a63ea5a41db9b21dfdb78c4656327ef2f12c0399d8c8e2d193ee45e660"
+    },
+    "punctilious.review": {
+      "filename": "punctilious.review.mp3",
+      "textHash": "02209e8856a945f698dd32f3dac22ce670c6fb2f06c97d51558bb09f35416a5f"
+    },
+    "punctilious.scene": {
+      "filename": "punctilious.scene.mp3",
+      "textHash": "b6f467b0b37001115d4c2d065df92152f92e35475b77c5f73cde6e8acaf7d92a"
+    },
+    "punctilious.word": {
+      "filename": "punctilious.word.mp3",
+      "textHash": "1005be4b7d1e3896df102253dba63399f8297c8d95aa8282d2ab65e82102bf5f"
+    },
+    "qualm.definition": {
+      "filename": "qualm.definition.mp3",
+      "textHash": "bc09d952e95d43f19f7855f8e9d948408deea7083ee13a7baece060a9dcc6f3c"
+    },
+    "qualm.neighbor": {
+      "filename": "qualm.neighbor.mp3",
+      "textHash": "bfbf2bf922493a9f5e9d6975a39271bd476ae1c18caa05768f208fc3d009c63c"
+    },
+    "qualm.review": {
+      "filename": "qualm.review.mp3",
+      "textHash": "347bdf609082677c53f22b38bf8e8a6aa8122cf8cc20e06424d2c46d23a50465"
+    },
+    "qualm.scene": {
+      "filename": "qualm.scene.mp3",
+      "textHash": "7afc6fb67263c4822ef01fd78c7e29292aadd6b5e14bafcb0051f147fd59b845"
+    },
+    "qualm.word": {
+      "filename": "qualm.word.mp3",
+      "textHash": "cd4a603cbe2978f4038cc1f03aa817be2019d183db461c5dd47e2157d5fbb683"
+    },
+    "rankle.definition": {
+      "filename": "rankle.definition.mp3",
+      "textHash": "57cd1581b401f736cdc63afce6ef8078e0f5b3f57d41da5995d46a2a85be8a14"
+    },
+    "rankle.neighbor": {
+      "filename": "rankle.neighbor.mp3",
+      "textHash": "49627df573750e7db696be0ba184db398721d1f098cd083dd3f139b83e39d757"
+    },
+    "rankle.review": {
+      "filename": "rankle.review.mp3",
+      "textHash": "8e1cea182fa5b9774c7e43dc28686b2b924bfe9e0e01c34c3677e51eb723a36b"
+    },
+    "rankle.scene": {
+      "filename": "rankle.scene.mp3",
+      "textHash": "7f66626966a4094f3d282be5c62afe1f51a68c9b942b17d943595e5dd1443570"
+    },
+    "rankle.word": {
+      "filename": "rankle.word.mp3",
+      "textHash": "31ed80e53f699322ac7abcc4fbefca35f4144e04bbdf058e1fb64ea1ec0f6a52"
+    },
+    "reticent.definition": {
+      "filename": "reticent.definition.mp3",
+      "textHash": "8a822e71a5b732eb23e67334e07c2bfd7465e0709f1bc30559fdd1ef22fbd8f9"
+    },
+    "reticent.neighbor": {
+      "filename": "reticent.neighbor.mp3",
+      "textHash": "2374660d8a7a4e9b14df0bfdffa2d49986e2111bd11ee503947310094c01780f"
+    },
+    "reticent.review": {
+      "filename": "reticent.review.mp3",
+      "textHash": "99bac80326b540b097f60e7f44dfda821f4cc4fdf51940a6cb69c44b9bfc55f7"
+    },
+    "reticent.scene": {
+      "filename": "reticent.scene.mp3",
+      "textHash": "f43bc7a4e50af09e972ae287d206b2895d11628a0da0672128cc438e63103def"
+    },
+    "reticent.word": {
+      "filename": "reticent.word.mp3",
+      "textHash": "b1736ccda6aa8e29f0791a23d44c2dc549c2766a71d04337b5f7c42c7d91f6e3"
+    },
+    "reverie.definition": {
+      "filename": "reverie.definition.mp3",
+      "textHash": "d6e49dd573b3fb8a5d054d04e96d81f0cc959912f85619dbe278a12ff9b2c084"
+    },
+    "reverie.neighbor": {
+      "filename": "reverie.neighbor.mp3",
+      "textHash": "f7f52ed2d737733f12be2d2a427878fb46cc4483ae913dad139dca993411270a"
+    },
+    "reverie.review": {
+      "filename": "reverie.review.mp3",
+      "textHash": "13289ad626c5faac2438233e153ad43f28eeda41e21966365905fad3c1c44319"
+    },
+    "reverie.scene": {
+      "filename": "reverie.scene.mp3",
+      "textHash": "527894e701c0040c6fff434825b4894bc35d70af66f18c4b6d4202d85e8d6472"
+    },
+    "reverie.word": {
+      "filename": "reverie.word.mp3",
+      "textHash": "a33a4c13f391735c2d58865d384f1a23405b114fd2e776f264e5b6ea62d9a87d"
+    },
+    "specious.definition": {
+      "filename": "specious.definition.mp3",
+      "textHash": "bf2b84a306a529a783f216ba9e08f00a023194a32a379b12805d1df68e95580a"
+    },
+    "specious.neighbor": {
+      "filename": "specious.neighbor.mp3",
+      "textHash": "fbe2f95ea31dc4cc30534645a3e86d5a711b73ea5c5ae0f75bb5f2a34dae901d"
+    },
+    "specious.review": {
+      "filename": "specious.review.mp3",
+      "textHash": "1d3d27f0c300ee5cd97e15b24f98d12b55f61f969a1dc31610400a5a4995aacb"
+    },
+    "specious.scene": {
+      "filename": "specious.scene.mp3",
+      "textHash": "e62be095ec8b2e837a586bd8bf3c7392da7cd51a8ff46094ea9d1a3152383ad4"
+    },
+    "specious.word": {
+      "filename": "specious.word.mp3",
+      "textHash": "4df93714644fbff9a825267c0afea9a7bb48e055964e93f928a0017f2c5fdffd"
+    },
+    "squall.definition": {
+      "filename": "squall.definition.mp3",
+      "textHash": "d64759b4818c8b37ca676896e74eb2b8ea17f6d47b4abda9f43dd048add3cd08"
+    },
+    "squall.neighbor": {
+      "filename": "squall.neighbor.mp3",
+      "textHash": "6a42f7af8e98d92a6538c6cf6bebfc9987390cf119486c11d9217d1c02e805dc"
+    },
+    "squall.review": {
+      "filename": "squall.review.mp3",
+      "textHash": "24bb8c3cd747ddfcab0635a11bfce459d05c4d0da756e10e204f26d10321bcf1"
+    },
+    "squall.scene": {
+      "filename": "squall.scene.mp3",
+      "textHash": "eec610653693e87abbf8cc1bc397912d6c2c31753b7199faa5d6318df54910b3"
+    },
+    "squall.word": {
+      "filename": "squall.word.mp3",
+      "textHash": "dbc6e3a9ab5e4c094b8ca3169bac4e298110b9865cb5ed6d503f7e1df90ba1d6"
+    },
+    "sultry.definition": {
+      "filename": "sultry.definition.mp3",
+      "textHash": "ad6b05dba6a23cd07b73e5e6654fbb2647d8a8ee37477002f5cb5df9ad895886"
+    },
+    "sultry.neighbor": {
+      "filename": "sultry.neighbor.mp3",
+      "textHash": "c5fcdd5e7443e531048c38091722ddd22340a2e986133bf3de0ebcafa9b95204"
+    },
+    "sultry.review": {
+      "filename": "sultry.review.mp3",
+      "textHash": "9292dbaa7bfb897db4dc09b21117ea661b670028c4fc13a89a0608ef715696dd"
+    },
+    "sultry.scene": {
+      "filename": "sultry.scene.mp3",
+      "textHash": "31cacfb7119f3f4083a270623e173197dbbfa6326b975a880dabad85c6c098f0"
+    },
+    "sultry.word": {
+      "filename": "sultry.word.mp3",
+      "textHash": "38fb15f0052b2f9c7056ac7e983d8c14669515371c0dafb34eaa82c8a5cc3e80"
+    },
+    "taciturn.definition": {
+      "filename": "taciturn.definition.mp3",
+      "textHash": "82dd57a6d7fe66bea671ee4d0a6ba42be8e6b2c0c6cbcf41363a3d13f6f94a76"
+    },
+    "taciturn.neighbor": {
+      "filename": "taciturn.neighbor.mp3",
+      "textHash": "bc0265ecf9c6e0cfbfd50bbdc7ff65f72fda6cfc0f5c9b0882ccd843e237608e"
+    },
+    "taciturn.review": {
+      "filename": "taciturn.review.mp3",
+      "textHash": "3a8a09c46e842273f17c5786e42e85684265e08352ed28054d42f0ea5a5c997b"
+    },
+    "taciturn.scene": {
+      "filename": "taciturn.scene.mp3",
+      "textHash": "1483c735dda944e058a9e0b14deb44eb0fd82c082cc2cf0836bc3214cb1e1a78"
+    },
+    "taciturn.word": {
+      "filename": "taciturn.word.mp3",
+      "textHash": "37491584d54c6a31da4df851ec4d4f203525565f6a3411d00f7a05e3974f1f79"
+    },
+    "umbrage.definition": {
+      "filename": "umbrage.definition.mp3",
+      "textHash": "154de9c3714f194439bfc550eada35c727f65f4f133df616ba210058ac17ac24"
+    },
+    "umbrage.neighbor": {
+      "filename": "umbrage.neighbor.mp3",
+      "textHash": "e158a775313efc05aa4a07b10870dbb122efd21f75f6d15d8e8fe0ac24ee1982"
+    },
+    "umbrage.review": {
+      "filename": "umbrage.review.mp3",
+      "textHash": "5774bf21b493368ec354a4235e30e9ec1339818095330e940177c2f94b3c3300"
+    },
+    "umbrage.scene": {
+      "filename": "umbrage.scene.mp3",
+      "textHash": "a73d4e2660c5c2afc04f69ab2979ac4ecf1b71ff039e7c6932afb818ec21e458"
+    },
+    "umbrage.word": {
+      "filename": "umbrage.word.mp3",
+      "textHash": "510bf1ceaed979e419ccb333bcf5af19025702dd107fc85d5615f0922cce2e09"
+    },
+    "unctuous.definition": {
+      "filename": "unctuous.definition.mp3",
+      "textHash": "ebc593df616c793dfa88674276ba921829279570842d619f87075a4e70593005"
+    },
+    "unctuous.neighbor": {
+      "filename": "unctuous.neighbor.mp3",
+      "textHash": "19d8618690961ad838acdb778e442d2fa8f1996059082aaf30892ac7e24aba3f"
+    },
+    "unctuous.review": {
+      "filename": "unctuous.review.mp3",
+      "textHash": "a1c6dbaed3ecb2275f8f32bcd097334d0804f76cc713fcb35ab277805adae6ee"
+    },
+    "unctuous.scene": {
+      "filename": "unctuous.scene.mp3",
+      "textHash": "9036530c41d9d678d5a351568cbb12887c0351159f088f2d9ab2211f5a73f148"
+    },
+    "unctuous.word": {
+      "filename": "unctuous.word.mp3",
+      "textHash": "3899c27cb8c9f6118d3fcf2050269469eb40a7ecc932cc5c23dba6edc96baa3a"
+    },
+    "vapid.definition": {
+      "filename": "vapid.definition.mp3",
+      "textHash": "bcf9806056a1e46a8583930bb3afa69b6a10ec926edc7779f05aa6dbe52b0e2e"
+    },
+    "vapid.neighbor": {
+      "filename": "vapid.neighbor.mp3",
+      "textHash": "f241ca179d5d3862115683bed85128fcc3b4d7e6c515e39581a0840f82e7c2d6"
+    },
+    "vapid.review": {
+      "filename": "vapid.review.mp3",
+      "textHash": "caa1b99dd83bdb1a24ee2a509c8ad71cf24b56cc919824f66329bab498f1e4ce"
+    },
+    "vapid.scene": {
+      "filename": "vapid.scene.mp3",
+      "textHash": "d7c80227d459428e3d1bab1b26393ba8120e37878b8332db071ecc86d20be669"
+    },
+    "vapid.word": {
+      "filename": "vapid.word.mp3",
+      "textHash": "f5bfb1629a9a4b62307ddabb378f46c49d5192cc2f23e869408fb0620680127b"
+    },
+    "vertiginous.definition": {
+      "filename": "vertiginous.definition.mp3",
+      "textHash": "a27aa0231174780a8d20279c99095d00630c31cabd823947b50cd4d3099df835"
+    },
+    "vertiginous.neighbor": {
+      "filename": "vertiginous.neighbor.mp3",
+      "textHash": "4985d5f8db1ec8f3be6be6de08173ee3e8e3b68244f134b3a29f4bc4757ed3ce"
+    },
+    "vertiginous.review": {
+      "filename": "vertiginous.review.mp3",
+      "textHash": "885033dd4adaf468e133a927b265209a155dda6df4a5603cfa7dd13b691baeea"
+    },
+    "vertiginous.scene": {
+      "filename": "vertiginous.scene.mp3",
+      "textHash": "a7ec695bb0c9a74f8848987abecdb57c85374628b68b4340e1d8fda139c24429"
+    },
+    "vertiginous.word": {
+      "filename": "vertiginous.word.mp3",
+      "textHash": "4732e4a8dd7592c5a0aa96eb7a94f0c0a43bc2b65bbc8b437db90a8eb4e95427"
+    }
+  },
+  "model": "gpt-4o-mini-tts",
+  "provider": "openai-tts",
+  "voice": "sage"
+}

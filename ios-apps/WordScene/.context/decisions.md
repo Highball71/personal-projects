@@ -24,7 +24,7 @@
 ## Audio provider decisions (David, 2026-09-05)
 - **Seed audio is generated once and bundled**, not synthesized on-device and not fetched from the API at runtime: main-track content is fixed, so `scripts/generate_bundled_audio.py` renders every asset (scene, word, definition, neighbour line, review scene — main track only) with OpenAI TTS (gpt-4o-mini-tts) into `Resources/audio/` + `audio-manifest.json`, keyed by text hash so edited scenes stop matching automatically. AudioStore serves bundle-first.
 - **AVSpeech remains the fallback for user scenes only** (and interim seed content until the bundle is generated). The factory still returns the AVSpeech generator; `OpenAITTSGenerator` implements the same seam for tooling/server use.
-- **Voice**: probe delivered (ash / sage / onyx); David picks — see open questions.
+- **Voice: sage** (David, 2026-09-05). Probe ranking: sage > ash > onyx. Full main-track set generated with `--voice sage` and bundled in Resources/audio/.
 
 ## Phase-0 curation decisions (Claude, delegated under #8)
 - **9 domain ladders**: states-of-mind, wounded-pride, social-manner, ways-of-speaking, argument-and-evasion, effort-and-care, bodily-sensations, weather-and-light, blandness. 46 main words; ladders of 3–7, ordered broadest→narrowest via `ladderRank`.

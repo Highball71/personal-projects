@@ -55,3 +55,11 @@ Simulator MCP: xcode-select fix worked — the old error is gone; attach now wai
 Panel demo earlier: full spoken loop verified live on simulator (equivocate lesson, staged reveal, 12 assets generated in ~1s). Then OPENAI_API_KEY became available (via ~/.zshrc — key never printed).
 - **Voice probe delivered**: ~/Desktop/WordScene-voice-probe/{ash,sage,onyx}/{equivocate,obfuscate,insipid}.wav — full lesson beat per file with real gaps; README included. Awaiting David's pick (open question #2). scripts/voice_probe.py in repo.
 - **Bundled-audio architecture shipped** (voice-agnostic): `OpenAITTSGenerator` conforms to the SpeechAudioGenerator seam (used by tooling, not on-device — no key ships in the app); `scripts/generate_bundled_audio.py` renders all main-track assets to Resources/audio/ + audio-manifest.json (resumable, prunes stale, text-hashed); AudioStore now serves bundle-first with text-hash guard, falling through to on-device AVSpeech — which after generation only ever runs for user scenes. No behavior change until the script output is committed.
+
+### 2026-09-05 (close) — Sage voice bundled (branch wordscene-sage-audio)
+David picked **sage** (probe ranking: sage > ash > onyx). Full batch generated with `generate_bundled_audio.py --voice sage`: 230 MP3s + audio-manifest.json, 62 MB, all text hashes verified against words.json — AudioStore serves every main-track asset from the bundle now; AVSpeech remains only for user scenes. Build clean, 230 MP3s + manifest confirmed inside the .app, launches on simulator.
+Note: bundle adds ~62 MB to app size (OpenAI MP3s at 24kHz). If that ever matters, re-encoding to ~48kbps AAC would roughly third it — not done, not asked.
+Regeneration after seed edits: `OPENAI_API_KEY=... python3 scripts/generate_bundled_audio.py --voice sage` (only changed assets re-render, stale ones pruned).
+
+## Session close (2026-09-05)
+Phases 1–2 complete and shipped with bundled sage audio end to end. Remaining for next session(s): David's listen-through of the sage lesson on device; phase 3 (scene→word finder, sideshow shelf, second word pack); sideshow words have no bundled audio (excluded by design — extend assets_for() when the shelf ships).
