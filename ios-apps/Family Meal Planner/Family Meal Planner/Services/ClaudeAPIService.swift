@@ -16,7 +16,7 @@ enum ClaudeAPIService {
     // MARK: - Configuration
 
     /// Claude model for vision-based recipe extraction
-    static let modelID = "claude-sonnet-4-20250514"
+    static let modelID = "claude-sonnet-5"
     static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     static let maxTokens = 2048
 

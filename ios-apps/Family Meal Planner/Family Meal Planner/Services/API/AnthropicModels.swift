@@ -7,7 +7,7 @@
 import Foundation
 
 nonisolated enum AnthropicModels {
-    static let defaultModelID = "claude-sonnet-4-20250514"
+    static let defaultModelID = "claude-sonnet-5"
     static let apiVersion = "2023-06-01"
     static let maxTokens = 2048
 }
