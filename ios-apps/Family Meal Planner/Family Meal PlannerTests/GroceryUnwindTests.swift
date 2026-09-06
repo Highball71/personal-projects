@@ -38,10 +38,18 @@ final class FakePostgRESTStore: @unchecked Sendable {
     /// meal delete instead of stranding groceries.
     var failGETTables: Set<String> = []
 
+    /// Table names whose DELETE requests silently affect zero rows —
+    /// exactly what PostgREST does when RLS hides the target rows:
+    /// HTTP success, empty representation, nothing deleted. Used to
+    /// test that removal paths VERIFY their deletes instead of
+    /// reporting success.
+    var rlsDeleteBlockedTables: Set<String> = []
+
     func reset() {
         lock.lock(); defer { lock.unlock() }
         tables = ["meal_plans": [], "grocery_items": [], "grocery_contributions": []]
         failGETTables = []
+        rlsDeleteBlockedTables = []
     }
 
     func rows(in table: String) -> [[String: Any]] {
@@ -125,6 +133,9 @@ final class FakePostgRESTStore: @unchecked Sendable {
             return wantsRepresentation ? (200, Self.encode(updated)) : (204, Data())
 
         case "DELETE":
+            if rlsDeleteBlockedTables.contains(table) {
+                return wantsRepresentation ? (200, Self.encode([])) : (204, Data())
+            }
             let deleted = all.filter { Self.matches($0, filters) }
             all.removeAll { Self.matches($0, filters) }
             tables[table] = all

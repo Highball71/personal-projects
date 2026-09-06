@@ -337,35 +337,69 @@ final class MealPlanService: ObservableObject {
     // MARK: - Remove Single Meal
 
     /// Remove one specific meal plan entry and undo its grocery contributions.
+    ///
+    /// Order matters (same shape as clearMealsWithGroceries):
+    ///   1. SNAPSHOT the contributions — the DB cascade destroys them
+    ///      the instant the meal_plans row is deleted.
+    ///   2. Delete WITH .select() verification. Without it, an
+    ///      RLS-blocked delete affects zero rows yet returns success —
+    ///      the UI would report the meal removed while the server
+    ///      still has it (and the old code had already stripped its
+    ///      groceries by then). Zero deleted rows is a surfaced error.
+    ///   3. Only then settle groceries, from the snapshot.
     func removeMeal(_ planID: UUID, groceryService: GroceryService) async -> Bool {
         Logger.supabase.info("removeMeal: planID=\(planID.uuidString)")
 
-        // 1. Undo grocery contributions for this specific meal
-        _ = await groceryService.removeContributions(forMealPlan: planID)
+        // 1. Snapshot contributions while the meal plan still exists.
+        guard let snapshot = await groceryService.fetchContributions(forMealPlans: [planID]) else {
+            errorMessage = "Couldn't remove that meal. Please try again."
+            return false
+        }
 
-        // 2. Delete the meal plan row
+        // 2. Delete the meal plan row, verified.
         do {
-            try await supabase
+            let deleted: [MealPlanRow] = try await supabase
                 .from("meal_plans")
                 .delete()
                 .eq("id", value: planID.uuidString)
+                .select()
                 .execute()
+                .value
 
+            guard !deleted.isEmpty else {
+                Logger.supabase.error("removeMeal: server deleted 0 rows for planID=\(planID.uuidString) (RLS blocked, or already gone)")
+                errorMessage = "Couldn't remove that meal from the plan."
+                return false
+            }
             Logger.supabase.info("removeMeal: deleted")
-            return true
         } catch {
             Logger.supabase.error("removeMeal: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return false
         }
+
+        // 3. Settle groceries for the confirmed-deleted meal.
+        _ = await groceryService.settleContributions(snapshot)
+        return true
     }
 
     // MARK: - Scheduling Check
 
-    /// Returns true if the recipe is currently assigned to any meal plan
-    /// in this household. Used to block deletion of in-use recipes.
+    /// Returns true if the recipe is assigned to any LIVE meal plan
+    /// entry — dated today or later — in this household. Used to block
+    /// deletion of in-use recipes.
+    ///
+    /// Past entries deliberately do NOT block: past days are read-only
+    /// in the week view, so the user has no way to remove them — a
+    /// guard counting them locks the recipe forever (the build-119
+    /// Shepherd's Pie bug). The schema has no archived/soft-delete
+    /// state; date < today is the only "past" a meal plan entry has.
+    /// Deleting a recipe leaves past entries as recipe-less history
+    /// rows (meal_plans.recipe_id is ON DELETE SET NULL).
+    ///
     /// Fails closed (returns true) on error to prevent unsafe deletion.
-    func isRecipeScheduled(_ recipeID: UUID) async -> Bool {
+    /// `today` is injectable for tests.
+    func isRecipeScheduled(_ recipeID: UUID, asOf today: Date = Date()) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
 
         do {
@@ -374,6 +408,7 @@ final class MealPlanService: ObservableObject {
                 .select()
                 .eq("household_id", value: householdID.uuidString)
                 .eq("recipe_id", value: recipeID.uuidString)
+                .gte("date", value: Self.isoDate(from: today))
                 .limit(1)
                 .execute()
                 .value
@@ -384,6 +419,44 @@ final class MealPlanService: ObservableObject {
             // Fail closed: assume scheduled to prevent unsafe deletion
             return true
         }
+    }
+
+    /// Remove every live (today-or-later) meal plan entry for a recipe,
+    /// settling each meal's grocery contributions — the "Remove from
+    /// meal plan and delete" path, so the user isn't bounced to the
+    /// week view to hunt entries down before a delete can go through.
+    /// Past entries are left alone (they don't block deletion).
+    func removeScheduledMeals(
+        for recipeID: UUID,
+        groceryService: GroceryService,
+        asOf today: Date = Date()
+    ) async -> Bool {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID else { return false }
+
+        let rows: [MealPlanRow]
+        do {
+            rows = try await supabase
+                .from("meal_plans")
+                .select()
+                .eq("household_id", value: householdID.uuidString)
+                .eq("recipe_id", value: recipeID.uuidString)
+                .gte("date", value: Self.isoDate(from: today))
+                .execute()
+                .value
+        } catch {
+            Logger.supabase.error("removeScheduledMeals: fetch failed — \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        Logger.supabase.info("removeScheduledMeals: removing \(rows.count) live entr\(rows.count == 1 ? "y" : "ies") for recipe \(recipeID.uuidString)")
+        for row in rows {
+            guard await removeMeal(row.id, groceryService: groceryService) else {
+                // removeMeal already set errorMessage.
+                return false
+            }
+        }
+        return true
     }
 
     // MARK: - Clear Day / Slot

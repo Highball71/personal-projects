@@ -74,14 +74,20 @@ final class GroceryService: ObservableObject {
         await addItemsInternal(items, mealPlanID: mealPlanID)
     }
 
-    /// Add grocery items with simple dedup.
+    /// Add grocery items with pantry-item dedup (rules in GroceryMerge).
     ///
-    /// Dedup rules (Phase 2 — minimal):
-    ///   1. Within the incoming batch, combine rows with the same
-    ///      (trimmed/lowercased name, trimmed/lowercased unit).
-    ///   2. For each unique batch item, look up an *unchecked* row in
-    ///      the DB with the same (name, unit). If found, UPDATE its
-    ///      quantity by adding the new amount. Otherwise, INSERT new.
+    /// Dedup rules:
+    ///   1. Within the incoming batch, combine rows whose NORMALIZED
+    ///      names match (case/whitespace folded + explicit alias
+    ///      table). Unit is NOT part of the key — "2 tbsp olive oil"
+    ///      and "1/4 cup olive oil" are the same pantry item.
+    ///   2. For each unique batch item, look up an *unchecked* DB row
+    ///      with the same normalized name. If found, convert the
+    ///      incoming amount into the ROW's unit (unit families in
+    ///      GroceryMerge) and UPDATE the summed quantity; when the
+    ///      units are incompatible, append the incoming amount to the
+    ///      row's note instead ("1 piece + 2 tbsp") — one row either
+    ///      way. Otherwise, INSERT new.
     ///   3. Checked items are treated as "already bought" and never
     ///      merged into — a new purchase creates a fresh unchecked row.
     ///
@@ -103,7 +109,7 @@ final class GroceryService: ObservableObject {
         // Note the per-key quantities so we can record contributions
         // that reflect what THIS batch contributed (not the merged
         // quantity across the whole grocery list).
-        let mergedBatch = mergeBatch(inserts)
+        let mergedBatch = GroceryMerge.mergeInserts(inserts)
         Logger.supabase.info("addItems: batch dedup \(inserts.count) → \(mergedBatch.count) (mealPlan=\(mealPlanID?.uuidString ?? "nil"))")
 
         isLoading = true
@@ -119,11 +125,11 @@ final class GroceryService: ObservableObject {
                 .execute()
                 .value
 
-            // Map unchecked items by dedup key. If legacy duplicates exist,
-            // keep the first one encountered.
+            // Map unchecked items by normalized pantry name. If legacy
+            // duplicates exist, keep the first one encountered.
             var uncheckedByKey: [String: SupabaseGroceryItem] = [:]
             for item in current where !item.isChecked {
-                let key = Self.dedupeKey(name: item.name, unit: item.unit)
+                let key = GroceryMerge.normalizeName(item.name)
                 if uncheckedByKey[key] == nil {
                     uncheckedByKey[key] = item
                 }
@@ -131,33 +137,66 @@ final class GroceryService: ObservableObject {
 
             // Step 3: split each batch item into update or insert. Also
             // remember the (groceryItemID, contributed quantity) pairs so
-            // we can record contributions after.
+            // we can record contributions after. Contributions are in
+            // the ROW's unit (the incoming amount is converted first),
+            // so settleContributions subtracts consistent numbers.
             var toInsert: [GroceryItemInsert] = []
             /// (grocery_item.id, contributed_quantity) — used to build
             /// contribution rows AFTER grocery items exist.
             var contributions: [(groceryItemID: UUID, quantity: Double)] = []
-            var toUpdate: [(id: UUID, newQuantity: Double)] = []
+            /// Exactly one of quantity/note is set per update: the
+            /// numeric-merge path updates quantity only (identical to
+            /// the pre-015 request, safe before the migration), the
+            /// incompatible-unit path updates note only.
+            var toUpdate: [(id: UUID, quantity: Double?, note: String?)] = []
 
             for item in mergedBatch {
-                let key = Self.dedupeKey(name: item.name, unit: item.unit)
-                if let existing = uncheckedByKey[key] {
-                    let newQty = existing.quantity + item.quantity
-                    toUpdate.append((id: existing.id, newQuantity: newQty))
-                    contributions.append((groceryItemID: existing.id, quantity: item.quantity))
-                    Logger.supabase.info("addItems: merge \"\(item.name)\" \(existing.quantity) + \(item.quantity) = \(newQty) [\(item.unit)]")
-                } else {
+                let key = GroceryMerge.normalizeName(item.name)
+                guard let existing = uncheckedByKey[key] else {
                     toInsert.append(item)
                     Logger.supabase.info("addItems: new \"\(item.name)\" \(item.quantity) \(item.unit)")
+                    continue
+                }
+
+                let incoming = GroceryMerge.Amount(quantity: item.quantity, unit: item.unit)
+                if let converted = GroceryMerge.convertedForRow(existingUnit: existing.unit, incoming: incoming) {
+                    let newQty = existing.quantity + converted
+                    toUpdate.append((id: existing.id, quantity: newQty, note: nil))
+                    contributions.append((groceryItemID: existing.id, quantity: converted))
+                    Logger.supabase.info("addItems: merge \"\(item.name)\" \(existing.quantity) + \(converted) = \(newQty) [\(existing.unit)]")
+                } else {
+                    // Incompatible units: one row, both amounts. The
+                    // extra amount lives in the note TEXT, not the row
+                    // quantity, so its contribution is 0 — the unwind
+                    // must never subtract what was never added
+                    // numerically. (Removing that meal later leaves
+                    // the note text behind; informational only.)
+                    var newNote = GroceryMerge.appendedNote(existing.note, adding: GroceryMerge.amountText(incoming))
+                    if let itemNote = item.note, !itemNote.isEmpty {
+                        newNote = GroceryMerge.appendedNote(newNote, adding: itemNote)
+                    }
+                    toUpdate.append((id: existing.id, quantity: nil, note: newNote))
+                    contributions.append((groceryItemID: existing.id, quantity: 0))
+                    Logger.supabase.info("addItems: incompatible units for \"\(item.name)\" — noted \"\(newNote)\" on the \(existing.unit) row")
                 }
             }
 
             // Step 4: apply updates (one request per merged item)
             for update in toUpdate {
-                try await supabase
-                    .from("grocery_items")
-                    .update(["quantity": update.newQuantity])
-                    .eq("id", value: update.id.uuidString)
-                    .execute()
+                if let quantity = update.quantity {
+                    try await supabase
+                        .from("grocery_items")
+                        .update(["quantity": quantity])
+                        .eq("id", value: update.id.uuidString)
+                        .execute()
+                }
+                if let note = update.note {
+                    try await supabase
+                        .from("grocery_items")
+                        .update(["note": note])
+                        .eq("id", value: update.id.uuidString)
+                        .execute()
+                }
             }
 
             // Step 5: bulk insert new items, capture returned rows so we
@@ -208,32 +247,11 @@ final class GroceryService: ObservableObject {
 
     // MARK: - Remove contributions
 
-    /// Undo a meal plan's contributions to the grocery list.
-    /// For each contribution row linking to this meal plan:
-    ///   - Subtract the contribution's quantity from the grocery item.
-    ///   - If the result is effectively zero, delete the grocery item
-    ///     entirely (which cascades the contribution).
-    ///   - Otherwise, update the grocery item's quantity and delete
-    ///     the contribution row.
-    ///
-    /// Safe to call on a meal plan that has no contributions (no-op).
-    /// Does not touch items added via the manual path (no contributions).
-    ///
-    /// IMPORTANT: this only works while the meal_plans row still
-    /// exists — grocery_contributions.meal_plan_id is ON DELETE
-    /// CASCADE (migration 005), so once the meal plan is deleted the
-    /// contribution rows are gone and this finds nothing. Callers
-    /// that delete the meal plan first must snapshot the rows with
-    /// `fetchContributions(forMealPlans:)` and settle from the
-    /// snapshot via `settleContributions(_:)` instead.
-    func removeContributions(forMealPlan mealPlanID: UUID) async -> Bool {
-        Logger.supabase.info("removeContributions: meal plan \(mealPlanID.uuidString)")
-
-        guard let contributions = await fetchContributions(forMealPlans: [mealPlanID]) else {
-            return false
-        }
-        return await settleContributions(contributions)
-    }
+    // (removeContributions(forMealPlan:) is gone: its only caller,
+    // removeMeal, settled groceries BEFORE the delete — so an
+    // RLS-blocked delete could silently keep the meal while the
+    // groceries were already stripped. removeMeal now snapshots,
+    // verifies the delete, then settles, like clearMealsWithGroceries.)
 
     /// Read the contribution rows for a set of meal plans.
     ///
@@ -338,41 +356,6 @@ final class GroceryService: ObservableObject {
             errorMessage = error.localizedDescription
             return false
         }
-    }
-
-    // MARK: - Dedup helpers
-
-    /// Combine incoming items that share a dedup key. Preserves the
-    /// first spelling and unit encountered.
-    private func mergeBatch(_ inserts: [GroceryItemInsert]) -> [GroceryItemInsert] {
-        var mergedByKey: [String: GroceryItemInsert] = [:]
-        var orderedKeys: [String] = []
-
-        for item in inserts {
-            let key = Self.dedupeKey(name: item.name, unit: item.unit)
-            if let existing = mergedByKey[key] {
-                mergedByKey[key] = GroceryItemInsert(
-                    householdID: existing.householdID,
-                    name: existing.name,
-                    quantity: existing.quantity + item.quantity,
-                    unit: existing.unit
-                )
-            } else {
-                mergedByKey[key] = item
-                orderedKeys.append(key)
-            }
-        }
-
-        return orderedKeys.compactMap { mergedByKey[$0] }
-    }
-
-    /// Key used to decide whether two items represent the same thing.
-    /// Trimmed + lowercased on both name and unit. Exact match only —
-    /// no synonym handling, no unit conversion.
-    private static func dedupeKey(name: String, unit: String) -> String {
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let cleanUnit = unit.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return "\(cleanName)|\(cleanUnit)"
     }
 
     // MARK: - Update

@@ -465,6 +465,16 @@ struct SupabaseRecipeDetailView: View {
     /// The right-column quantity for an ingredient with the current
     /// scale factor applied — "1 1/2 lb", "to taste", "3".
     private func quantityText(_ ingredient: RecipeIngredientRow) -> String {
+        let base = baseQuantityText(ingredient)
+        // Printed quantity text that has no (quantity, unit) home —
+        // package sizes, ranges (migration 015's note column).
+        if let note = ingredient.note, !note.isEmpty {
+            return "\(base) (\(note))"
+        }
+        return base
+    }
+
+    private func baseQuantityText(_ ingredient: RecipeIngredientRow) -> String {
         let unit = IngredientUnit(rawValue: ingredient.unit)
 
         if unit == .toTaste { return "to taste" }

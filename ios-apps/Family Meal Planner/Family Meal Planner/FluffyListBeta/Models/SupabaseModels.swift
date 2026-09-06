@@ -192,9 +192,13 @@ struct RecipeIngredientRow: Codable, Identifiable {
     let quantity: Double
     let unit: String
     let sortOrder: Int
+    /// Printed quantity text with no (quantity, unit) home —
+    /// parenthetical package sizes, quantity ranges (migration 015).
+    /// Optional so rows decode fine before the migration is applied.
+    var note: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, name, quantity, unit
+        case id, name, quantity, unit, note
         case recipeID = "recipe_id"
         case sortOrder = "sort_order"
     }
@@ -206,9 +210,12 @@ struct RecipeIngredientInsert: Codable {
     let quantity: Double
     let unit: String
     let sortOrder: Int
+    /// Synthesized Codable omits the key when nil, so inserts stay
+    /// compatible with a database that hasn't applied migration 015.
+    var note: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case name, quantity, unit
+        case name, quantity, unit, note
         case recipeID = "recipe_id"
         case sortOrder = "sort_order"
     }
@@ -285,9 +292,13 @@ struct SupabaseGroceryItem: Codable, Identifiable, Equatable {
     let unit: String
     let isChecked: Bool
     let createdAt: Date
+    /// Extra amounts that couldn't merge numerically into
+    /// (quantity, unit) — displayed as "1 piece + 2 tbsp"
+    /// (migration 015; nil before it's applied).
+    let note: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, quantity, unit
+        case id, name, quantity, unit, note
         case householdID = "household_id"
         case isChecked = "is_checked"
         case createdAt = "created_at"
@@ -302,6 +313,7 @@ struct SupabaseGroceryItem: Codable, Identifiable, Equatable {
         unit = (try? c.decode(String.self, forKey: .unit)) ?? "piece"
         isChecked = (try? c.decode(Bool.self, forKey: .isChecked)) ?? false
         createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? Date()
+        note = try? c.decode(String.self, forKey: .note)
     }
 }
 
@@ -310,9 +322,12 @@ struct GroceryItemInsert: Codable {
     let name: String
     let quantity: Double
     let unit: String
+    /// Synthesized Codable omits the key when nil, so inserts stay
+    /// compatible with a database that hasn't applied migration 015.
+    var note: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case name, quantity, unit
+        case name, quantity, unit, note
         case householdID = "household_id"
     }
 }
