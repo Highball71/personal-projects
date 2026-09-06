@@ -333,3 +333,15 @@ The Codex round-2 review ("Photo review round 2/Review.md" beside the round-1 ev
 - **New tests (9):** `Round2RegressionTests` (7 — P12/P13 raw responses decode+convert; P11 packages keep bag/can units from the live response shape; P13 package from the unit shape; container parser bounds; null decode; joinedNotes rules), `Round2GroceryFlowTests` (2 — planned P04 snapshot carries the range note to groceries; sectioned olive oil merges across sections and recipes). Updated: `QuantityRangeConversionTests` (P10 note now "For the Chicken: " prefixed), `BetaFormConversionReplayTests` (section-leak assertions).
 - **Parked — continuity:** the review discussion's "leftover / remaining half-pound" idea (tracking the unused remainder when a recipe consumes part of a package) is deliberately NOT implemented — see the round-2 review materials in `Documents/Codex/2026-09-05/…/outputs/Photo review round 2/`.
 - **Order of operations to 121:** (1) **Codex round-3 replay** — only P12, P13 (null-amount recipes) and P11, P13 (container shapes) need live calls; the other cases can be re-scored offline from the round-2 JSON. (2) David's device pass (deleted-recipe label + the round-2 items on device). (3) Merge → build 121.
+
+---
+
+## 2026-09-06 — build 121 uploaded; Codex photo-import rounds CLOSED
+
+- **Build 121 archived + uploaded 2026-09-06 from the Home iMac.** Ships the full photo-import accuracy arc: deleted-recipe history label, verbatim-fraction prompt, 1,568 px resize, null/container parsing, ingredient notes to groceries, sections out of names. Branch `deleted-recipe-label-and-fraction-prompt` merged to main (`4949249`). **NEXT BUILD = 122.**
+- **Codex photo-import review rounds 1–3 are CLOSED.** Round 3: **10/10 imports succeeded**, ~$0.12 in live calls. Device passes all complete.
+
+## Parked
+
+- **Size/slice wording polish** (small/medium/slices falling back to "piece") — flagged in Codex round 3; see `~/Documents/Codex/2026-09-05/referenced-chatgpt-conversation-this-is-an/outputs/Photo review round 3/Review.md`.
+- **Continuity/leftover feature** ("remaining half-pound" tracking — the unused remainder when a recipe consumes part of a package) — see the round-2 review materials in `Documents/Codex/2026-09-05/…/outputs/Photo review round 2/`.
