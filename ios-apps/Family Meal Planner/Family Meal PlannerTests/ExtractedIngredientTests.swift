@@ -18,38 +18,43 @@ final class ExtractedIngredientTests: XCTestCase {
         ExtractedIngredient(name: name, amount: amount, unit: unit)
     }
 
-    // MARK: - quantityDouble
+    // MARK: - parsedQuantity
 
     func testQuantityInteger() {
-        XCTAssertEqual(makeIngredient(amount: "2").quantityDouble, 2.0)
+        XCTAssertEqual(makeIngredient(amount: "2").parsedQuantity, .exact(2.0))
     }
 
     func testQuantityDecimal() {
-        XCTAssertEqual(makeIngredient(amount: "1.5").quantityDouble, 1.5)
+        XCTAssertEqual(makeIngredient(amount: "1.5").parsedQuantity, .exact(1.5))
     }
 
     func testQuantitySimpleFraction() {
-        XCTAssertEqual(makeIngredient(amount: "1/2").quantityDouble, 0.5)
+        XCTAssertEqual(makeIngredient(amount: "1/2").parsedQuantity, .exact(0.5))
     }
 
     func testQuantityMixedNumber() {
-        XCTAssertEqual(makeIngredient(amount: "1 1/2").quantityDouble, 1.5)
+        XCTAssertEqual(makeIngredient(amount: "1 1/2").parsedQuantity, .exact(1.5))
     }
 
     func testQuantityThirdFraction() {
-        XCTAssertEqual(makeIngredient(amount: "1/3").quantityDouble, 1.0 / 3.0, accuracy: 0.001)
+        guard case .exact(let value) = makeIngredient(amount: "1/3").parsedQuantity else {
+            return XCTFail("Expected .exact")
+        }
+        XCTAssertEqual(value, 1.0 / 3.0, accuracy: 0.001)
     }
 
-    func testQuantityUnparseableDefaultsTo1() {
-        XCTAssertEqual(makeIngredient(amount: "some").quantityDouble, 1.0)
+    // A word like "some" and an empty amount used to silently become 1.0.
+    // They are now .unspecified so the form never invents a quantity.
+    func testQuantityUnparseableIsUnspecified() {
+        XCTAssertEqual(makeIngredient(amount: "some").parsedQuantity, .unspecified)
     }
 
-    func testQuantityEmptyDefaultsTo1() {
-        XCTAssertEqual(makeIngredient(amount: "").quantityDouble, 1.0)
+    func testQuantityEmptyIsUnspecified() {
+        XCTAssertEqual(makeIngredient(amount: "").parsedQuantity, .unspecified)
     }
 
     func testQuantityWhitespace() {
-        XCTAssertEqual(makeIngredient(amount: "  2  ").quantityDouble, 2.0)
+        XCTAssertEqual(makeIngredient(amount: "  2  ").parsedQuantity, .exact(2.0))
     }
 
     // MARK: - ingredientUnit — exact rawValue matches

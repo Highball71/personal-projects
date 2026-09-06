@@ -11,6 +11,20 @@ enum AnthropicClient {
 
     static let endpoint = URL(string: "https://fluffylist-proxy.onrender.com/v1/messages")!
 
+    /// How a request is actually sent. Production uses URLSession;
+    /// tests swap in a fake that returns canned responses so no
+    /// network request is ever made.
+    typealias Transport = (URLRequest) async throws -> (Data, URLResponse)
+
+    /// The real network transport. Kept separate so tests can restore it.
+    static let liveTransport: Transport = { request in
+        try await URLSession.shared.data(for: request)
+    }
+
+    /// The transport used by `execute`. Tests replace this; everything
+    /// runs on the main actor (the project default), so a plain var is safe.
+    static var transport: Transport = liveTransport
+
     // Proxy key — authenticates this app to the fluffylist-proxy server.
     // Injected at build time via Secrets.xcconfig → Info.plist (ProxyKey).
     // The actual Anthropic API key is stored server-side and never sent to the app.
@@ -168,7 +182,7 @@ enum AnthropicClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await transport(request)
         } catch {
             print("[DEBUG AnthropicClient] Network request FAILED: \(error)")
             throw ClientError.networkError(error)

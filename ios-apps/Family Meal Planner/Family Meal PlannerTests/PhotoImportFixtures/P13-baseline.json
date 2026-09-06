@@ -1,0 +1,82 @@
+{
+  "category" : "dinner",
+  "cookTime" : "25 minutes",
+  "description" : "A quick cashew cream stands in for sour cream in this Hungarian-style dish. Be sure to use raw, unsalted cashews to make the cream.",
+  "ingredients" : [
+    {
+      "amount" : "3\/4",
+      "name" : "unsalted raw cashews",
+      "preparation" : "chopped",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1 1\/4",
+      "name" : "pork tenderloin",
+      "preparation" : "cut into 1-inch pieces",
+      "unit" : "pounds"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "black pepper",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "2",
+      "name" : "extra-virgin olive oil",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "frozen pepper stir-fry blend",
+      "unit" : "package (14.4 ounces)"
+    },
+    {
+      "amount" : "2",
+      "name" : "sweet paprika",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "dried marjoram",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "3",
+      "name" : "Whole30-compliant tomato paste",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "4",
+      "name" : "Whole30-compliant chicken broth or Chicken Bone Broth (page 280)",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "",
+      "name" : "fresh parsley",
+      "preparation" : "chopped",
+      "unit" : ""
+    }
+  ],
+  "instructions" : [
+    "For cashew cream, place the cashews in a small bowl and add boiling water to cover. Cover and let stand for 15 minutes. Drain and rinse the cashews. Combine the cashews and 1\/2 cup fresh water in a blender. Puree until smooth, 3 to 4 minutes.",
+    "Meanwhile, season the pork with the salt and black pepper. In a Dutch oven or large pot, heat the olive oil over medium-high heat. Add the pork and cook, stirring occasionally, until the pork begins to brown, about 5 minutes.",
+    "Add the pepper stir-fry, paprika, and marjoram. Continue to cook, stirring occasionally, until the peppers are softened, about 5 minutes.",
+    "Stir in the tomato paste and cook, stirring, 1 minute.",
+    "Stir in the broth and bring to a boil. Reduce the heat to medium-low and simmer for 10 minutes.",
+    "Remove from the heat. Stir in the cashew cream. Top each serving with parsley."
+  ],
+  "name" : "Quick Pork and Pepper Paprikash",
+  "prepTime" : "15 minutes",
+  "servingSize" : "4",
+  "tags" : [
+    "Hungarian",
+    "Whole30",
+    "Soups, Stews, and Noodle Bowls"
+  ],
+  "totalTime" : "40 minutes"
+}

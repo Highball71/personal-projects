@@ -1,0 +1,108 @@
+{
+  "category" : "dinner",
+  "cookTime" : "25 minutes",
+  "description" : "Roulade is the French term for a thin piece of meat rolled around a savory filling of some combination of vegetables, bread crumbs, and cheese. This Whole30 Approved roulade features a yummy stuffing of sautéed cremini mushrooms, onions, and red bell pepper flavored with garlic, oregano, basil, and lemon zest.",
+  "ingredients" : [
+    {
+      "amount" : "5",
+      "name" : "extra-virgin olive oil",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "8",
+      "name" : "cremini mushrooms",
+      "preparation" : "finely chopped",
+      "unit" : "ounces"
+    },
+    {
+      "amount" : "1",
+      "name" : "red onion",
+      "preparation" : "finely chopped",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "red bell pepper",
+      "preparation" : "finely chopped",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "4",
+      "name" : "garlic",
+      "preparation" : "minced",
+      "unit" : "cloves"
+    },
+    {
+      "amount" : "1",
+      "name" : "fresh oregano",
+      "preparation" : "chopped",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "3\/4",
+      "name" : "fresh basil",
+      "preparation" : "chopped",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1",
+      "name" : "almond flour",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "lemon zest",
+      "preparation" : "grated",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "green beans",
+      "preparation" : "trimmed",
+      "unit" : "pound"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "red pepper flakes",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1 1\/4 to 1 1\/2",
+      "name" : "beef sirloin or round steak",
+      "unit" : "pounds"
+    },
+    {
+      "amount" : "2",
+      "name" : "Whole30-compliant tomato paste",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "Beef Bone Broth (page 285) or Whole30-compliant beef broth",
+      "unit" : "cup"
+    }
+  ],
+  "instructions" : [
+    "Preheat the oven to 400°F.",
+    "Heat 1 tablespoon of the olive oil in a large skillet over medium-high heat. Add the mushrooms and cook, stirring occasionally, until lightly browned, about 3 minutes. Add 1\/2 cup of the onion and the bell pepper. Cook, stirring occasionally, until the onion is tender, 3 minutes. Add half the garlic and the oregano. Cook, stirring, for 1 minute more. Remove from the heat and stir in 1\/2 cup of the basil, the almond flour, lemon zest, and 1\/2 teaspoon of the salt. Transfer the mushroom mixture to a bowl and set aside to cool slightly. Rinse and dry the skillet.",
+    "Trim away any excess fat from the edges of the steak. Place the steak on a work surface. With the notched edge of a meat mallet, pound the steak to about 1\/4 inch thick. Spread the mushroom mixture over the steak to within 1\/2 inch of the edges. Starting on a long side, roll up the meat and tie it with 100% cotton kitchen string.",
+    "In a medium bowl, combine the green beans, 2 tablespoons of the oil, the remaining garlic, and the remaining 1\/2 teaspoon salt and toss. Spread the beans evenly on a large baking sheet. Roast for 18 to 20 minutes, until the beans are lightly browned and crisp-tender.",
+    "In the same skillet, heat the remaining 2 tablespoons olive oil over medium-high heat. Sear the meat in the hot oil and cook, turning occasionally, to sear evenly on all sides. Remove the meat from the skillet. Add the remaining 1\/2 cup onion to the skillet. Cook, stirring, until softened, about 5 minutes. Stir in the tomato paste, then whisk in the broth. Bring the broth to a boil. Return the meat to the skillet and spoon some of the sauce over the meat. Cover and reduce the heat to medium-low. Simmer gently, turning once, until the internal temperature of the roulade is 160°F, 8 to 10 minutes. Sprinkle with the remaining 1\/4 cup basil.",
+    "Transfer the roulade to a cutting board and let rest for 5 to 10 minutes. Remove the string and cut into 1\/2-inch-thick slices. Serve the meat and sauce with the green beans."
+  ],
+  "name" : "Mushroom-Stuffed Beef Roulade with Garlicky Green Beans",
+  "prepTime" : "25 minutes",
+  "servingSize" : "4",
+  "source" : "Whole30 Cookbook",
+  "tags" : [
+    "Whole30",
+    "beef",
+    "dinner"
+  ],
+  "totalTime" : "50 minutes"
+}

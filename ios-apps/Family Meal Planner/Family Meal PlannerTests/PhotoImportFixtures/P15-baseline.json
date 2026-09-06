@@ -1,0 +1,103 @@
+{
+  "category" : "dinner",
+  "cookTime" : "35 minutes",
+  "description" : "This spaghetti-squash casserole has the perfect amount of heat from jalapeños, a crunchy and salty kick from bacon, and a creamy texture contributed by a sauce made from mayo, chives, parsley, garlic powder, and dill.",
+  "ingredients" : [
+    {
+      "amount" : "1\/2",
+      "name" : "Basic Mayonnaise (page 240) or Whole30-compliant mayonnaise",
+      "section" : "For the Cream Sauce",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1",
+      "name" : "dried chives",
+      "section" : "For the Cream Sauce",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "dried parsley",
+      "section" : "For the Cream Sauce",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "garlic powder",
+      "section" : "For the Cream Sauce",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "dried dill",
+      "section" : "For the Cream Sauce",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "salt",
+      "section" : "For the Cream Sauce",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/8",
+      "name" : "black pepper",
+      "section" : "For the Cream Sauce",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "8",
+      "name" : "Whole30-compliant bacon",
+      "section" : "For the Casserole",
+      "unit" : "slices"
+    },
+    {
+      "amount" : "6",
+      "name" : "cooked spaghetti squash (from a 4-pound squash)",
+      "preparation" : "see Tip",
+      "section" : "For the Casserole",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "2",
+      "name" : "cooked chicken breast",
+      "preparation" : "shredded or chopped",
+      "section" : "For the Casserole",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "2",
+      "name" : "jalapeños",
+      "preparation" : "seeded and chopped",
+      "section" : "For the Casserole",
+      "unit" : "medium"
+    },
+    {
+      "amount" : "2",
+      "name" : "eggs",
+      "preparation" : "lightly beaten",
+      "section" : "For the Casserole",
+      "unit" : "large"
+    },
+    {
+      "amount" : "1",
+      "name" : "jalapeño",
+      "preparation" : "sliced into rings (optional)",
+      "section" : "For the Casserole",
+      "unit" : ""
+    }
+  ],
+  "instructions" : [
+    "Preheat the oven to 350°F. Lightly grease a 9 × 13-inch baking pan.",
+    "Make the cream sauce: In a medium bowl, stir together the mayonnaise, chives, parsley, garlic powder, dill, salt, and pepper. Set aside.",
+    "Make the casserole: In a large skillet, cook the bacon over medium heat until crisp, about 10 minutes. Let cool then roughly chop.",
+    "In a large bowl, stir together the cooked squash, chicken, chopped jalapeños, eggs, bacon, and cream sauce. Spoon into the baking pan; top with jalapeño rings, if desired.",
+    "Bake about 35 minutes, until heated through and bubbly around the edges (160°F)."
+  ],
+  "name" : "Jalapeño Popper Chicken Casserole",
+  "notes" : "Tip: To cook the spaghetti squash, heat the oven to 400°F. Slice the squash in half lengthwise and scoop out the seeds. Lightly drizzle with olive oil. Place the squash, cut sides down, on the baking pan and roast until tender, 45 to 50 minutes. Use a fork to scrape out the flesh.",
+  "prepTime" : "20 minutes",
+  "servingSize" : "8 to 10",
+  "source" : "The Whole30 Friends & Family",
+  "totalTime" : "55 minutes"
+}

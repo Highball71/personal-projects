@@ -1,0 +1,87 @@
+{
+  "category" : "dinner",
+  "cookTime" : "10 minutes",
+  "description" : "Pork isn't the only meat that pairs perfectly with pineapple. These skewers feature chunks of juicy pineapple and bell peppers threaded alternately with steak that has soaked up the fabulous flavors of a sweet-spicy marinade made from pineapple juice, coconut aminos, lemon juice, serrano chile, ginger, and garlic.",
+  "ingredients" : [
+    {
+      "amount" : "2",
+      "name" : "lean beef steak (sirloin, flank, strip)",
+      "preparation" : "cut into 1-inch pieces",
+      "unit" : "pounds"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "unsweetened pineapple juice",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "3",
+      "name" : "coconut aminos",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "2",
+      "name" : "fresh lemon juice",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "serrano chile pepper",
+      "preparation" : "seeded and thinly sliced",
+      "unit" : ""
+    },
+    {
+      "amount" : "2",
+      "name" : "fresh ginger",
+      "preparation" : "grated",
+      "unit" : "teaspoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "garlic",
+      "preparation" : "minced",
+      "unit" : "clove"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "black pepper",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "pineapple",
+      "preparation" : "peeled, cored, and cut into 1½-inch chunks",
+      "unit" : "small"
+    },
+    {
+      "amount" : "2",
+      "name" : "bell peppers",
+      "preparation" : "seeded and cut into 1½-inch pieces",
+      "unit" : ""
+    },
+    {
+      "amount" : "1",
+      "name" : "onion",
+      "preparation" : "cut into 8 wedges",
+      "unit" : ""
+    }
+  ],
+  "instructions" : [
+    "Place the steak in a resealable plastic bag or non-reactive bowl with a lid and add the pineapple juice, coconut aminos, lemon juice, serrano chile, ginger, garlic, salt, and black pepper. Toss the steak to coat thoroughly with the marinade. Seal the bag or cover the bowl and marinate the steak in the refrigerator for 1 to 24 hours.",
+    "If using wooden skewers, soak them in water for 30 minutes to 1 hour to prevent them from burning.",
+    "Remove the steak from the refrigerator 30 minutes before cooking. Preheat a grill to medium (350 to 375°F).",
+    "Drain the steak, reserving the marinade. Prepare the kabobs by threading the steak, pineapple, bell peppers, and onion onto the skewers, leaving a ¼-inch space between each piece. Brush the kabobs with the marinade.",
+    "Grill the kabobs over direct heat, brushing them with the marinade and turning them once or twice, for 8 to 12 minutes, until the vegetables are tender and steak is cooked to the desired doneness. Discard any remaining marinade."
+  ],
+  "name" : "Spicy Pineapple Steak Kabobs",
+  "notes" : "Tip: If fresh pineapple isn't in season, use 4 cups canned unsweetened pineapple chunks in place of the fresh pineapple. Bonus—you can use the juice from the can, too.",
+  "prepTime" : "25 minutes",
+  "servingSize" : "4",
+  "source" : "Whole30 Cookbook",
+  "totalTime" : "35 minutes plus marinating"
+}

@@ -1,0 +1,63 @@
+{
+  "category" : "dinner",
+  "cookTime" : "35 minutes",
+  "description" : "You don't have to give up your favorite bar snack just because you can't go to the bar—and this is actually a very tasty entree! Crisp-roasted cauliflower is swapped in for the raw celery and carrots in the traditional version. Serve those too, if you like. You can't get too many veggies on the Whole30!",
+  "ingredients" : [
+    {
+      "amount" : "4",
+      "name" : "cauliflower florets",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "1",
+      "name" : "extra-virgin olive oil",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/8",
+      "name" : "black pepper",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "2",
+      "name" : "Clarified Butter (page 283) or ghee",
+      "preparation" : "melted",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "2",
+      "name" : "boneless, skinless chicken breasts",
+      "unit" : ""
+    },
+    {
+      "amount" : "2",
+      "name" : "Whole30-compliant Buffalo sauce, plus more for serving if desired",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "Whole30-compliant creamy ranch dressing or Whole30 Ranch Dressing (page 282)",
+      "unit" : "cup"
+    }
+  ],
+  "instructions" : [
+    "PREHEAT the oven to 425°F. Line a large rimmed baking pan with parchment paper.",
+    "IN a large bowl, combine the cauliflower, olive oil, salt, and pepper; mix well. Spread the cauliflower on three-fourths of the pan and roast for 15 minutes.",
+    "MEANWHILE, heat 1 tablespoon of the butter in a medium skillet over medium-high heat. Add the chicken and cook, turning once, until golden brown, 5 to 6 minutes.",
+    "IN the same bowl, stir together the remaining 1 tablespoon butter and the Buffalo sauce. Add the browned chicken and coat with the sauce. Add the chicken to the pan. Continue roasting until the internal temperature of the chicken is 170°F and the cauliflower is tender and lightly browned, 20 to 25 minutes longer.",
+    "SERVE the chicken and cauliflower with the ranch dressing for dipping. If desired, drizzle the chicken with additional Buffalo sauce."
+  ],
+  "name" : "Sheet Pan Buffalo Chicken with Cauliflower",
+  "prepTime" : "10 minutes",
+  "servingSize" : "2",
+  "tags" : [
+    "Whole30",
+    "Sheet Pan Suppers"
+  ],
+  "totalTime" : "45 minutes"
+}

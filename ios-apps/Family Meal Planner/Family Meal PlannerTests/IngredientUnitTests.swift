@@ -52,7 +52,8 @@ final class IngredientUnitTests: XCTestCase {
     }
 
     func testPickerCasesCount() {
-        XCTAssertEqual(IngredientUnit.pickerCases.count, 20)
+        // 21 since .bag was added for package-size imports ("1 bag (14 ounces)")
+        XCTAssertEqual(IngredientUnit.pickerCases.count, 21)
     }
 
     func testPickerCasesStartsWithNone() {
@@ -63,8 +64,8 @@ final class IngredientUnitTests: XCTestCase {
     // MARK: - allCases
 
     func testAllCasesCount() {
-        // 20 picker cases + 1 legacy (.whole) = 21
-        XCTAssertEqual(IngredientUnit.allCases.count, 21)
+        // 21 picker cases + 1 legacy (.whole) = 22
+        XCTAssertEqual(IngredientUnit.allCases.count, 22)
     }
 
     // MARK: - Round-trip tests
