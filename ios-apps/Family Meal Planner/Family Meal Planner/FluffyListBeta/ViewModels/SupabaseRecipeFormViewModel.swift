@@ -69,7 +69,8 @@ final class SupabaseRecipeFormViewModel {
                     name: row.name,
                     quantity: row.quantity,
                     unit: IngredientUnit(rawValue: row.unit) ?? .piece,
-                    quantityText: FractionFormatter.formatAsFraction(row.quantity)
+                    quantityText: FractionFormatter.formatAsFraction(row.quantity),
+                    note: row.note
                 )
             }
         }
@@ -151,11 +152,13 @@ final class SupabaseRecipeFormViewModel {
             .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
 
         let ingredientInserts = validIngredients.enumerated().map { index, row in
-            RecipeIngredientInsert(
+            let trimmedNote = row.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return RecipeIngredientInsert(
                 name: row.name.trimmingCharacters(in: .whitespaces),
                 quantity: row.quantity,
                 unit: row.unit.rawValue,
-                sortOrder: index
+                sortOrder: index,
+                note: trimmedNote.isEmpty ? nil : trimmedNote
             )
         }
 

@@ -348,14 +348,19 @@ struct SupabaseGroceryListView: View {
     // MARK: - Quantity Formatting
 
     private func quantityText(_ item: SupabaseGroceryItem) -> String {
+        var base: String
         if item.unit == IngredientUnit.toTaste.rawValue {
-            return "to taste"
+            base = "to taste"
+        } else {
+            let qty = FractionFormatter.formatAsFraction(item.quantity)
+            base = item.unit == IngredientUnit.none.rawValue ? qty : "\(qty) \(item.unit)"
         }
-        let qty = FractionFormatter.formatAsFraction(item.quantity)
-        if item.unit == IngredientUnit.none.rawValue {
-            return qty
+        // Amounts that couldn't merge numerically (incompatible units)
+        // ride in the note — "1 piece + 2 tbsp" on one row.
+        if let note = item.note, !note.isEmpty {
+            base += " + \(note)"
         }
-        return "\(qty) \(item.unit)"
+        return base
     }
 }
 

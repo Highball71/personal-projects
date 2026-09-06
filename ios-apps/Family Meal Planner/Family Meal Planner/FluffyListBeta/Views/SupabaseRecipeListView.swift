@@ -256,9 +256,15 @@ struct SupabaseRecipeListView: View {
                 }
             }
             .alert("Recipe In Use", isPresented: $showDeleteBlockedAlert) {
-                Button("OK", role: .cancel) { recipeToDelete = nil }
+                Button("Remove from Meal Plan and Delete", role: .destructive) {
+                    if let recipe = recipeToDelete {
+                        Task { await removeFromPlanAndDelete(recipe) }
+                        recipeToDelete = nil
+                    }
+                }
+                Button("Cancel", role: .cancel) { recipeToDelete = nil }
             } message: {
-                Text("\(recipeToDelete?.name ?? "This recipe") is on your meal plan. Remove it from the meal plan first before deleting.")
+                Text("\(recipeToDelete?.name ?? "This recipe") is on your meal plan. You can remove it from the plan and delete it in one step, or cancel and review the plan first.")
             }
             .alert("Delete Recipe?", isPresented: $showDeleteConfirmAlert) {
                 Button("Delete", role: .destructive) {
@@ -763,6 +769,20 @@ struct SupabaseRecipeListView: View {
             showDeleteBlockedAlert = true
         } else {
             showDeleteConfirmAlert = true
+        }
+    }
+
+    /// The blocked alert's one-step path: take every live meal plan
+    /// entry off the plan (grocery contributions settled per meal),
+    /// then delete the recipe. Any failure surfaces in the action
+    /// error banner — never a silent partial success.
+    private func removeFromPlanAndDelete(_ recipe: RecipeRow) async {
+        guard await mealPlanService.removeScheduledMeals(for: recipe.id, groceryService: groceryService) else {
+            actionErrorMessage = "Couldn't remove \"\(recipe.name)\" from the meal plan. Nothing was deleted — please try again."
+            return
+        }
+        if !(await recipeService.deleteRecipe(recipe.id)) {
+            actionErrorMessage = "Removed \"\(recipe.name)\" from the meal plan, but couldn't delete it. Please try again."
         }
     }
 }

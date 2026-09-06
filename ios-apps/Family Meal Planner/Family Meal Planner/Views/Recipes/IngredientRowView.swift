@@ -18,6 +18,11 @@ struct IngredientFormData: Identifiable {
 
     /// Text representation of the quantity for the fraction-aware text field.
     var quantityText: String = "1"
+
+    /// Printed quantity text that has no (quantity, unit) home —
+    /// package sizes, ranges. Persisted to recipe_ingredients.note
+    /// (migration 015); carried through the form untouched.
+    var note: String? = nil
 }
 
 /// A single row in the ingredient editing form.

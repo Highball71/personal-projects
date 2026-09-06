@@ -240,7 +240,8 @@ final class RecipeService: ObservableObject {
                         name: $0.name,
                         quantity: $0.quantity,
                         unit: $0.unit,
-                        sortOrder: $0.sortOrder
+                        sortOrder: $0.sortOrder,
+                        note: $0.note
                     )
                 }
 
@@ -322,7 +323,8 @@ final class RecipeService: ObservableObject {
                         name: $0.name,
                         quantity: $0.quantity,
                         unit: $0.unit,
-                        sortOrder: $0.sortOrder
+                        sortOrder: $0.sortOrder,
+                        note: $0.note
                     )
                 }
 
