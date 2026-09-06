@@ -343,14 +343,18 @@ final class SlotSemanticsTests: XCTestCase {
         XCTAssertTrue(plan.memberMeals.isEmpty)
     }
 
-    /// Rows orphaned by a recipe delete (recipe_id NULL) are dropped,
-    /// matching the week view's existing filter.
-    func testDayPlanDropsRowsWithoutRecipe() throws {
+    /// Rows orphaned by a recipe delete (recipe_id NULL) are KEPT —
+    /// past ones render as "(recipe deleted)" history, live ones as
+    /// attention rows (MealLineState decides which; see
+    /// DeletedRecipeLineTests). Dropping them made deleted recipes
+    /// vanish from history.
+    func testDayPlanKeepsRowsWithoutRecipe() throws {
         let householdID = UUID()
         let noRecipe = try TestFixtures.mealPlanRow(
             householdID: householdID, recipeID: nil, memberID: nil, date: "2026-08-31")
 
         let plan = DayPlan.build(from: [noRecipe], members: [])
-        XCTAssertTrue(plan.isEmpty)
+        XCTAssertEqual(plan.householdMeals.count, 1)
+        XCTAssertFalse(plan.isEmpty)
     }
 }

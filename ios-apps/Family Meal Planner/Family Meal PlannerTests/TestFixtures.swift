@@ -112,11 +112,12 @@ enum TestFixtures {
 
     /// Seed a meal_plans row directly (bypassing the assign path) —
     /// for building "last week" fixtures the app couldn't create
-    /// (assigning to past dates is blocked).
+    /// (assigning to past dates is blocked). recipeID nil seeds a row
+    /// orphaned by a recipe delete (recipe_id is ON DELETE SET NULL).
     @discardableResult
     static func seedMealPlan(
         householdID: UUID,
-        recipeID: UUID,
+        recipeID: UUID?,
         memberID: UUID?,
         dateISO: String
     ) -> UUID {
@@ -124,9 +125,9 @@ enum TestFixtures {
         var row: [String: Any] = [
             "id": id.uuidString.lowercased(),
             "household_id": householdID.uuidString.lowercased(),
-            "recipe_id": recipeID.uuidString.lowercased(),
             "date": dateISO,
         ]
+        if let recipeID { row["recipe_id"] = recipeID.uuidString.lowercased() }
         if let memberID { row["member_id"] = memberID.uuidString.lowercased() }
         FakePostgRESTStore.shared.seed(table: "meal_plans", rows: [row])
         return id

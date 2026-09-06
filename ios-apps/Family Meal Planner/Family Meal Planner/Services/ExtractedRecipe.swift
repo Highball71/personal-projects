@@ -156,7 +156,7 @@ struct ExtractedRecipe: Codable {
             )
 
         case .range(_, let upper):
-            let printed = extracted.amount.trimmingCharacters(in: .whitespaces)
+            let printed = extracted.printedQuantityText.trimmingCharacters(in: .whitespaces)
             // Countish units (piece / none) read better without a unit
             // word after the range: "1-2" not "1-2 piece".
             let rangeText = (unit == .piece || unit == IngredientUnit.none)
@@ -173,7 +173,7 @@ struct ExtractedRecipe: Codable {
         case .unspecified:
             // Preserve whatever the page printed ("to taste",
             // "for garnish") — an empty amount leaves no note.
-            let printed = extracted.amount.trimmingCharacters(in: .whitespacesAndNewlines)
+            let printed = extracted.printedQuantityText.trimmingCharacters(in: .whitespacesAndNewlines)
             return IngredientFormData(
                 name: name,
                 quantity: 1,
@@ -278,14 +278,24 @@ struct ExtractedIngredient: Codable {
     /// (e.g. "sliced and divided", "softened, room temperature"). Same
     /// folding strategy as `section` — appended to the form name.
     var preparation: String? = nil
+    /// The quantity text exactly as printed on the page,
+    /// character-for-character ("1¼–1½", "3/4"). Requested from the
+    /// model since the 2026-09-06 accuracy prompt tightening; optional
+    /// so every earlier response and fixture decodes unchanged.
+    var printedAmount: String? = nil
+
+    /// The quantity text to trust: the verbatim transcription when the
+    /// model provided one, else the amount field.
+    var printedQuantityText: String { printedAmount ?? amount }
 
     /// Parse the printed amount into its shape — exact, range, or
     /// unspecified. Handles integers ("2"), decimals ("1.5"), fractions
     /// ("1/2", "1 1/2"), unicode fractions ("1¼"), and ranges joined by
     /// "to", "-", "–", or "—". An empty or unparseable amount is
-    /// .unspecified — never a made-up number.
+    /// .unspecified — never a made-up number. Prefers the verbatim
+    /// printedAmount over amount when both are present.
     var parsedQuantity: ParsedQuantity {
-        Self.parseQuantity(from: amount)
+        Self.parseQuantity(from: printedQuantityText)
     }
 
     static func parseQuantity(from text: String) -> ParsedQuantity {
