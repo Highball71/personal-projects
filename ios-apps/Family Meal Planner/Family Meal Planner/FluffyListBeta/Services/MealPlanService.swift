@@ -266,7 +266,11 @@ final class MealPlanService: ObservableObject {
                         householdID: householdID,
                         name: ing.name,
                         quantity: ing.quantity,
-                        unit: ing.unit
+                        unit: ing.unit,
+                        // Range/package/section context (migration 015)
+                        // rides along — a shopping list that says
+                        // "1 bag" without "14 ounces" is half an answer.
+                        note: ing.note
                     )
                 }
             _ = await groceryService.addItemsForMealPlan(mealPlanID: newPlanID, items: inserts)

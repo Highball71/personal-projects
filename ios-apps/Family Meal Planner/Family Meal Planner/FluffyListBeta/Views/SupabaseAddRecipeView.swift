@@ -874,7 +874,7 @@ struct SupabaseAddRecipeView: View {
             // the optional section / preparation notes.
             for (idx, ing) in extracted.ingredients.enumerated() {
                 Logger.supabase.debug(
-                    "URL import: extracted ingredient[\(idx)] name=\"\(ing.name, privacy: .public)\" amount=\"\(ing.amount, privacy: .public)\" unit=\"\(ing.unit, privacy: .public)\" section=\"\(ing.section ?? "nil", privacy: .public)\" preparation=\"\(ing.preparation ?? "nil", privacy: .public)\""
+                    "URL import: extracted ingredient[\(idx)] name=\"\(ing.name, privacy: .public)\" amount=\"\(ing.amount ?? "nil", privacy: .public)\" unit=\"\(ing.unit ?? "nil", privacy: .public)\" section=\"\(ing.section ?? "nil", privacy: .public)\" preparation=\"\(ing.preparation ?? "nil", privacy: .public)\""
                 )
             }
             #endif
@@ -967,7 +967,8 @@ struct SupabaseAddRecipeView: View {
                     householdID: householdID,
                     name: row.name.trimmingCharacters(in: .whitespaces),
                     quantity: row.quantity,
-                    unit: row.unit.rawValue
+                    unit: row.unit.rawValue,
+                    note: row.note
                 )
             }
 

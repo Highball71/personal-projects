@@ -64,8 +64,10 @@ enum RecipeImageExtractor {
           totalTime (string or null) — only if separately stated,
           ingredients (array of objects, each with):
             name (string),
-            amount (string),
-            unit (string),
+            amount (string) — when the page prints no quantity for the \
+              ingredient, return an empty string "" (never null),
+            unit (string) — empty string "" when the page prints no \
+              unit (never null),
             section (string or null) — header this ingredient sits under, \
               such as "Sauce", "Sauce (optional)", "Topping", \
               "For the marinade"; null if the recipe has a single flat list,

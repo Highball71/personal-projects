@@ -1,0 +1,116 @@
+{
+  "category" : "dinner",
+  "cookTime" : "30 minutes",
+  "description" : "A delicious concoction of dried tomatoes, fresh thyme, and garlic gets tucked under the skin of these chicken thighs before they're roasted to crispy perfection. They're served with a side of mushrooms stuffed with smoky sausage, kale, and more dried tomatoes and garlic.",
+  "ingredients" : [
+    {
+      "amount" : "2",
+      "name" : "oil-packed dried tomatoes",
+      "preparation" : "finely diced, drained",
+      "printedAmount" : "2",
+      "section" : "For the Chicken",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "extra-virgin olive oil",
+      "printedAmount" : "1",
+      "section" : "For the Chicken",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "garlic",
+      "preparation" : "minced",
+      "printedAmount" : "1",
+      "section" : "For the Chicken",
+      "unit" : "clove"
+    },
+    {
+      "amount" : "1",
+      "name" : "fresh thyme leaves",
+      "printedAmount" : "1",
+      "section" : "For the Chicken",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "coarse salt",
+      "printedAmount" : "1\/2",
+      "section" : "For the Chicken",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "black pepper",
+      "printedAmount" : "1\/4",
+      "section" : "For the Chicken",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1 1\/4 to 1 1\/2",
+      "name" : "bone-in chicken thighs",
+      "printedAmount" : "1¼ to 1½",
+      "section" : "For the Chicken",
+      "unit" : "pounds"
+    },
+    {
+      "amount" : "4",
+      "name" : "portobello mushrooms (about 1 pound total) (see Tip)",
+      "printedAmount" : "4",
+      "section" : "For the Mushrooms",
+      "unit" : "medium"
+    },
+    {
+      "amount" : "4",
+      "name" : "Whole30-compliant smoked kielbasa",
+      "preparation" : "diced",
+      "printedAmount" : "4",
+      "section" : "For the Mushrooms",
+      "unit" : "ounces"
+    },
+    {
+      "amount" : "1",
+      "name" : "fresh kale",
+      "preparation" : "chopped",
+      "printedAmount" : "1",
+      "section" : "For the Mushrooms",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "2",
+      "name" : "oil-packed dried tomatoes",
+      "preparation" : "finely diced, drained",
+      "printedAmount" : "2",
+      "section" : "For the Mushrooms",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "oil from oil-packed dried tomatoes",
+      "printedAmount" : "1",
+      "section" : "For the Mushrooms",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "2",
+      "name" : "garlic",
+      "preparation" : "minced",
+      "printedAmount" : "2",
+      "section" : "For the Mushrooms",
+      "unit" : "cloves"
+    }
+  ],
+  "instructions" : [
+    "PREHEAT the oven to 425°F. Line a large rimmed baking pan with parchment paper.",
+    "MAKE THE CHICKEN: In a small bowl, combine the dried tomatoes, olive oil, garlic, thyme, salt, and black pepper. For each thigh, run a finger under the skin to lift it off the meat, but leaving it attached along the sides. Spoon some of the thyme mixture under the skin. Place the thighs on one side of the pan. Roast for 5 minutes.",
+    "MAKE THE MUSHROOMS: Meanwhile, remove the stems and gills from the mushrooms. Use a damp paper towel to wipe the mushrooms clean. Add the mushrooms, gill sides down, to the pan. Roast until the mushrooms are just tender, 15 to 18 minutes.",
+    "MEANWHILE, in a medium bowl, combine the kielbasa, kale, tomatoes, tomato oil, and garlic. Turn the mushrooms over. Spoon the kielbasa filling into the mushrooms. Roast until the chicken is no longer pink and a thermometer inserted in the thigh registers 175°F and the mushrooms are just tender, 10 to 15 minutes longer."
+  ],
+  "name" : "Chicken Thighs with Stuffed Mushrooms",
+  "notes" : "Tip:\nUse a spoon to scrape the gills from the mushrooms.",
+  "prepTime" : "15 minutes",
+  "servingSize" : "4",
+  "source" : "Whole30 FAST&EASY",
+  "totalTime" : "45 minutes"
+}

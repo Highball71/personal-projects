@@ -161,7 +161,12 @@ final class GroceryService: ObservableObject {
                 let incoming = GroceryMerge.Amount(quantity: item.quantity, unit: item.unit)
                 if let converted = GroceryMerge.convertedForRow(existingUnit: existing.unit, incoming: incoming) {
                     let newQty = existing.quantity + converted
-                    toUpdate.append((id: existing.id, quantity: newQty, note: nil))
+                    // Ingredient notes (range/package/section context)
+                    // join the row's note — never overwritten, never
+                    // dropped; unchanged notes skip the extra PATCH.
+                    let mergedNote = GroceryMerge.joinedNotes(existing: existing.note, incoming: item.note)
+                    let noteChanged = mergedNote != nil && mergedNote != existing.note
+                    toUpdate.append((id: existing.id, quantity: newQty, note: noteChanged ? mergedNote : nil))
                     contributions.append((groceryItemID: existing.id, quantity: converted))
                     Logger.supabase.info("addItems: merge \"\(item.name)\" \(existing.quantity) + \(converted) = \(newQty) [\(existing.unit)]")
                 } else {
@@ -172,9 +177,7 @@ final class GroceryService: ObservableObject {
                     // numerically. (Removing that meal later leaves
                     // the note text behind; informational only.)
                     var newNote = GroceryMerge.appendedNote(existing.note, adding: GroceryMerge.amountText(incoming))
-                    if let itemNote = item.note, !itemNote.isEmpty {
-                        newNote = GroceryMerge.appendedNote(newNote, adding: itemNote)
-                    }
+                    newNote = GroceryMerge.joinedNotes(existing: newNote, incoming: item.note) ?? newNote
                     toUpdate.append((id: existing.id, quantity: nil, note: newNote))
                     contributions.append((groceryItemID: existing.id, quantity: 0))
                     Logger.supabase.info("addItems: incompatible units for \"\(item.name)\" — noted \"\(newNote)\" on the \(existing.unit) row")

@@ -142,32 +142,32 @@ struct ExtractedRecipe: Codable {
     }
 
     private func formRow(for extracted: ExtractedIngredient) -> IngredientFormData {
-        let (unit, packageSize) = extracted.unitAndPackageSize
-        let name = foldedIngredientName(extracted)
+        let resolved = extracted.resolvedQuantity
+        let name = cleanIngredientName(extracted)
 
-        switch extracted.parsedQuantity {
+        switch resolved.quantity {
         case .exact(let value):
             return IngredientFormData(
                 name: name,
                 quantity: value,
-                unit: unit,
+                unit: resolved.unit,
                 quantityText: FractionFormatter.formatAsFraction(value),
-                note: packageSize
+                note: composedNote(for: extracted, quantityText: resolved.packageSize)
             )
 
         case .range(_, let upper):
             let printed = extracted.printedQuantityText.trimmingCharacters(in: .whitespaces)
             // Countish units (piece / none) read better without a unit
             // word after the range: "1-2" not "1-2 piece".
-            let rangeText = (unit == .piece || unit == IngredientUnit.none)
+            let rangeText = (resolved.unit == .piece || resolved.unit == IngredientUnit.none)
                 ? printed
-                : "\(printed) \(unit.displayName)"
+                : "\(printed) \(resolved.unit.displayName)"
             return IngredientFormData(
                 name: name,
                 quantity: upper,
-                unit: unit,
+                unit: resolved.unit,
                 quantityText: printed,
-                note: joinedNote(rangeText, packageSize)
+                note: composedNote(for: extracted, quantityText: joinedFragments(rangeText, resolved.packageSize))
             )
 
         case .unspecified:
@@ -179,40 +179,59 @@ struct ExtractedRecipe: Codable {
                 quantity: 1,
                 unit: .toTaste,
                 quantityText: "",
-                note: joinedNote(printed.isEmpty ? nil : printed, packageSize)
+                note: composedNote(
+                    for: extracted,
+                    quantityText: joinedFragments(printed.isEmpty ? nil : printed, resolved.packageSize)
+                )
             )
         }
     }
 
-    /// Join up to two note fragments ("1-2 lb" + "14 ounces") with a
-    /// separator; nil when both are absent.
-    private func joinedNote(_ first: String?, _ second: String?) -> String? {
-        let parts = [first, second].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: "; ")
+    /// The ingredient name with NOTHING folded in — no section, no
+    /// preparation, no quantity text — so the grocery merge's
+    /// normalized-name key sees the same pantry item whether it came
+    /// from a scan, another section, or a hand-entered row. The one
+    /// exception: an empty extracted name promotes the preparation
+    /// text so the row doesn't render blank (Claude occasionally does
+    /// this with loosely structured recipes).
+    private func cleanIngredientName(_ ingredient: ExtractedIngredient) -> String {
+        let baseName = ingredient.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if baseName.isEmpty,
+           let prep = ingredient.preparation?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !prep.isEmpty {
+            return prep
+        }
+        return baseName
     }
 
-    private func foldedIngredientName(_ ingredient: ExtractedIngredient) -> String {
-        var pieces: [String] = []
-        if let section = ingredient.section?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !section.isEmpty {
-            pieces.append("[\(section)]")
+    /// The form row's note: quantity-derived text (printed range,
+    /// package size, unparseable printed amount) plus the preparation
+    /// note, "; "-joined, all behind a "Section: " prefix when the
+    /// ingredient sat under a section header. Section and preparation
+    /// used to be folded into the NAME, which split identical pantry
+    /// items into separate grocery rows.
+    private func composedNote(for ingredient: ExtractedIngredient, quantityText: String?) -> String? {
+        var prep = ingredient.preparation?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Skip preparation the model duplicated into the empty-name
+        // fallback — it would read twice.
+        if ingredient.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            prep = nil
         }
-        let baseName = ingredient.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let prep = ingredient.preparation?.trimmingCharacters(in: .whitespacesAndNewlines)
-        // If the extractor produced an empty `name` but did produce a
-        // preparation note (Claude occasionally does this with loosely
-        // structured recipes), promote the preparation into the name
-        // slot so the row doesn't render blank. Without this guard
-        // URL-imported ingredients could land in the form with only a
-        // unit pill visible.
-        if baseName.isEmpty, let prep, !prep.isEmpty {
-            pieces.append(prep)
-        } else if let prep, !prep.isEmpty {
-            pieces.append("\(baseName), \(prep)")
-        } else {
-            pieces.append(baseName)
+        let body = joinedFragments(quantityText, prep)
+
+        guard let section = ingredient.section?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !section.isEmpty else {
+            return body
         }
-        return pieces.joined(separator: " ")
+        guard let body else { return section }
+        return "\(section): \(body)"
+    }
+
+    /// Join up to two note fragments ("1-2 lb" + "14 ounces") with a
+    /// separator; nil when both are absent.
+    private func joinedFragments(_ first: String?, _ second: String?) -> String? {
+        let parts = [first, second].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "; ")
     }
 
     /// Parse a time string like "30 minutes", "1 hour", "1 hour 30 minutes" into minutes.
@@ -263,8 +282,13 @@ enum ParsedQuantity: Equatable {
 /// A single ingredient as extracted by Claude.
 struct ExtractedIngredient: Codable {
     let name: String
-    let amount: String
-    let unit: String
+    // amount and unit are optional `var`s: the prompt asks for empty
+    // strings when the page prints no quantity, but the model returns
+    // JSON null often enough (round-2 P12 sesame oil, P13 parsley)
+    // that a required String aborted otherwise complete recipes. Null,
+    // missing, and "" all mean the same thing: unspecified.
+    var amount: String? = nil
+    var unit: String? = nil
     // `var` so Codable's synthesized decoder will populate these from
     // JSON — `let foo: T? = nil` would silently skip them. See note
     // on ExtractedRecipe's optional fields above.
@@ -285,17 +309,91 @@ struct ExtractedIngredient: Codable {
     var printedAmount: String? = nil
 
     /// The quantity text to trust: the verbatim transcription when the
-    /// model provided one, else the amount field.
-    var printedQuantityText: String { printedAmount ?? amount }
+    /// model provided one, else the amount field. Empty when the page
+    /// printed no quantity (or the model returned null).
+    var printedQuantityText: String {
+        if let printedAmount, !printedAmount.isEmpty { return printedAmount }
+        return amount ?? ""
+    }
 
     /// Parse the printed amount into its shape — exact, range, or
     /// unspecified. Handles integers ("2"), decimals ("1.5"), fractions
     /// ("1/2", "1 1/2"), unicode fractions ("1¼"), and ranges joined by
-    /// "to", "-", "–", or "—". An empty or unparseable amount is
+    /// "to", "-", "–", or "—". An empty, null, or unparseable amount is
     /// .unspecified — never a made-up number. Prefers the verbatim
     /// printedAmount over amount when both are present.
     var parsedQuantity: ParsedQuantity {
-        Self.parseQuantity(from: printedQuantityText)
+        resolvedQuantity.quantity
+    }
+
+    /// The consolidated quantity picture: shape, display unit, and any
+    /// package size, resolved across amount/unit/printedAmount.
+    ///
+    /// The subtlety is container expressions. The model returns them in
+    /// either place:
+    ///   - unit: "package (14.4 ounces)", amount "1"  (round-2 P13)
+    ///   - printedAmount: "1 bag (14 ounces)", with amount/unit
+    ///     holding the CONTENTS ("14" / "ounces")  (round-2 P11)
+    /// Since printedAmount wins as the parsing string, the container
+    /// parser must run on it too — otherwise "1 bag (14 ounces)" reads
+    /// as unparseable and a fully specified package silently became a
+    /// "to taste" row.
+    var resolvedQuantity: (quantity: ParsedQuantity, unit: IngredientUnit, packageSize: String?) {
+        let (unitFromUnit, sizeFromUnit) = unitAndPackageSize
+        let parseText = printedQuantityText
+
+        if let container = Self.parseContainerExpression(from: parseText) {
+            return (.exact(container.count), container.unit, container.size ?? sizeFromUnit)
+        }
+
+        // A nonempty printed string that doesn't parse must not
+        // silently unspecify a quantity the structured amount field
+        // still carries (round-2 finding: the printed text is
+        // evidence, not the only source of truth).
+        let printedParse = Self.parseQuantity(from: parseText)
+        if printedParse == .unspecified, let amount, !amount.isEmpty {
+            let fallback = Self.parseQuantity(from: amount)
+            if fallback != .unspecified {
+                return (fallback, unitFromUnit, sizeFromUnit)
+            }
+        }
+        return (printedParse, unitFromUnit, sizeFromUnit)
+    }
+
+    /// Parse a container expression like "1 bag (14 ounces)",
+    /// "2 cans (14.5 ounces)", or "1 package" into count + container
+    /// unit + optional size. Only container words (bag/can/package)
+    /// qualify — "1 1/2 pounds" must never match. Nil otherwise.
+    static func parseContainerExpression(from text: String) -> (count: Double, unit: IngredientUnit, size: String?)? {
+        var working = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !working.isEmpty else { return nil }
+
+        // Split off a trailing parenthetical size.
+        var size: String? = nil
+        if let openParen = working.firstIndex(of: "("),
+           let closeParen = working.lastIndex(of: ")"),
+           openParen < closeParen {
+            let inside = String(working[working.index(after: openParen)..<closeParen])
+                .trimmingCharacters(in: .whitespaces)
+            size = inside.isEmpty ? nil : inside
+            working = String(working[..<openParen]).trimmingCharacters(in: .whitespaces)
+        }
+
+        // What's left must be "<count> <container-word>" (count optional
+        // → 1). Find the first letter; everything before it is the count.
+        guard let firstLetter = working.firstIndex(where: { $0.isLetter }) else { return nil }
+        let countText = String(working[..<firstLetter]).trimmingCharacters(in: .whitespaces)
+        let word = String(working[firstLetter...]).trimmingCharacters(in: .whitespaces)
+
+        let containerUnits: Set<IngredientUnit> = [.bag, .can, .package]
+        let unit = ingredientUnit(fromWord: word)
+        guard containerUnits.contains(unit) else { return nil }
+
+        if countText.isEmpty { return (1, unit, size) }
+        guard let count = FractionFormatter.parseFraction(normalizeVulgarFractions(in: countText)) else {
+            return nil
+        }
+        return (count, unit, size)
     }
 
     static func parseQuantity(from text: String) -> ParsedQuantity {
@@ -354,13 +452,14 @@ struct ExtractedIngredient: Codable {
     /// size: "bag (14 ounces)" → (.bag, "14 ounces"). A unit without a
     /// parenthetical returns (unit, nil).
     var unitAndPackageSize: (unit: IngredientUnit, packageSize: String?) {
-        guard let openParen = unit.firstIndex(of: "("),
-              let closeParen = unit.lastIndex(of: ")"),
+        let unitText = unit ?? ""
+        guard let openParen = unitText.firstIndex(of: "("),
+              let closeParen = unitText.lastIndex(of: ")"),
               openParen < closeParen else {
-            return (Self.ingredientUnit(fromWord: unit), nil)
+            return (Self.ingredientUnit(fromWord: unitText), nil)
         }
-        let word = String(unit[..<openParen])
-        let size = String(unit[unit.index(after: openParen)..<closeParen])
+        let word = String(unitText[..<openParen])
+        let size = String(unitText[unitText.index(after: openParen)..<closeParen])
             .trimmingCharacters(in: .whitespaces)
         return (Self.ingredientUnit(fromWord: word), size.isEmpty ? nil : size)
     }
