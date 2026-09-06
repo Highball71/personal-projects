@@ -35,16 +35,20 @@ final class QuantityRangeConversionTests: XCTestCase {
     func testP04BeefRangeRoundTripsThroughForm() throws {
         try assertMeatRange(
             fixture: "P04-baseline",
-            nameFragment: "beef sirloin"
+            nameFragment: "beef sirloin",
+            expectedNote: "1 1/4 to 1 1/2 lb"
         )
     }
 
-    /// The P10 chicken thighs: same printed range.
+    /// The P10 chicken thighs: same printed range, and the "For the
+    /// Chicken" section header rides in the note as a prefix (it used
+    /// to be folded into the name, splitting grocery identity).
     @MainActor
     func testP10ChickenThighRangeRoundTripsThroughForm() throws {
         try assertMeatRange(
             fixture: "P10-4096-diagnostic",
-            nameFragment: "chicken thighs"
+            nameFragment: "chicken thighs",
+            expectedNote: "For the Chicken: 1 1/4 to 1 1/2 lb"
         )
     }
 
@@ -68,7 +72,7 @@ final class QuantityRangeConversionTests: XCTestCase {
     }
 
     @MainActor
-    private func assertMeatRange(fixture: String, nameFragment: String) throws {
+    private func assertMeatRange(fixture: String, nameFragment: String, expectedNote: String) throws {
         let extracted = try PhotoImportFixtures.extractedRecipe(fixture)
 
         let meatIndex = try XCTUnwrap(
@@ -88,8 +92,8 @@ final class QuantityRangeConversionTests: XCTestCase {
         XCTAssertEqual(row.unit, .pound)
         XCTAssertEqual(row.quantityText, "1 1/4 to 1 1/2",
                        "The form's quantity field shows the printed range")
-        XCTAssertEqual(row.note, "1 1/4 to 1 1/2 lb",
-                       "The printed range lives in note (recipe_ingredients.note), not the name")
+        XCTAssertEqual(row.note, expectedNote,
+                       "The printed range (with any section prefix) lives in note, not the name")
         XCTAssertFalse(row.name.contains("1 1/4"),
                        "The name stays clean so grocery merging can match it; got \(row.name)")
     }

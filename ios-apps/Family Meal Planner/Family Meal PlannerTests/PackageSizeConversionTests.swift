@@ -48,7 +48,7 @@ final class PackageSizeConversionTests: XCTestCase {
         XCTAssertFalse(can.name.contains("14.5"), "got \(can.name)")
 
         // The model-level split is exact.
-        let bagSource = try XCTUnwrap(extracted.ingredients.first { $0.unit.hasPrefix("bag") })
+        let bagSource = try XCTUnwrap(extracted.ingredients.first { ($0.unit ?? "").hasPrefix("bag") })
         XCTAssertEqual(bagSource.unitAndPackageSize.unit, .bag)
         XCTAssertEqual(bagSource.unitAndPackageSize.packageSize, "14 ounces")
     }

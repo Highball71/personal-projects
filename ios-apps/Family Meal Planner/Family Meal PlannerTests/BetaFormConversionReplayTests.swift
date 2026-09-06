@@ -41,7 +41,7 @@ final class BetaFormConversionReplayTests: XCTestCase {
                 // names legitimately contain parentheticals like
                 // "(page 285)", so the check targets amount-derived
                 // text, not every "(".)
-                let printedAmount = source.amount.trimmingCharacters(in: .whitespaces)
+                let printedAmount = source.printedQuantityText.trimmingCharacters(in: .whitespaces)
                 if isRange {
                     XCTAssertFalse(row.name.contains(printedAmount),
                                    "\(fixture): range \"\(printedAmount)\" leaked into name \"\(row.name)\"")
@@ -55,12 +55,25 @@ final class BetaFormConversionReplayTests: XCTestCase {
                                    "\(fixture): package size \"\(packageSize)\" missing from note")
                 }
 
+                // Section labels never reach the name — the old
+                // "[Sauce] onion" fold split identical pantry items
+                // into separate grocery rows. They live in note now.
+                if let section = source.section?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !section.isEmpty {
+                    XCTAssertFalse(row.name.contains("[\(section)]"),
+                                   "\(fixture): section \"\(section)\" leaked into name \"\(row.name)\"")
+                    XCTAssertFalse(row.name.hasPrefix("\(section):"),
+                                   "\(fixture): section prefix leaked into name \"\(row.name)\"")
+                    XCTAssertEqual(row.note?.contains(section), true,
+                                   "\(fixture): section \"\(section)\" missing from note")
+                }
+
                 guard isRange || packageSize != nil || missingAmount else { continue }
                 flaggedCount += 1
 
                 XCTAssertFalse(
                     row.quantity == 1 && row.unit == .piece,
-                    "\(fixture): \"\(source.name)\" (amount \"\(source.amount)\", unit \"\(source.unit)\") became 1 piece"
+                    "\(fixture): \"\(source.name)\" (amount \"\(source.amount ?? "nil")\", unit \"\(source.unit ?? "nil")\") became 1 piece"
                 )
             }
         }

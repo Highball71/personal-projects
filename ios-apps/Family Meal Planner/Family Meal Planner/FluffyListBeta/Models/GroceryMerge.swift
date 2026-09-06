@@ -132,6 +132,19 @@ enum GroceryMerge {
         return "\(existing) + \(text)"
     }
 
+    /// Combine an existing row's note with an incoming ingredient note:
+    /// "; "-joined, never overwritten, never dropped. Identical or
+    /// already-contained text isn't repeated (two meals of the same
+    /// recipe shouldn't stack "1 1/4 to 1 1/2 lb" twice).
+    static func joinedNotes(existing: String?, incoming: String?) -> String? {
+        let old = (existing ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let new = (incoming ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if new.isEmpty { return old.isEmpty ? nil : old }
+        if old.isEmpty { return new }
+        if old.contains(new) { return old }
+        return "\(old); \(new)"
+    }
+
     // MARK: - Batch merge
 
     /// Merge a batch of inserts by normalized NAME. The first item of
@@ -158,11 +171,9 @@ enum GroceryMerge {
             } else {
                 combinedNote = appendedNote(combinedNote, adding: amountText(incoming))
             }
-            // An incoming note (rare — only merge-generated so far)
-            // must never be dropped.
-            if let note = item.note, !note.isEmpty {
-                combinedNote = appendedNote(combinedNote, adding: note)
-            }
+            // An incoming ingredient note (range/package/section
+            // context) must never be dropped.
+            combinedNote = joinedNotes(existing: combinedNote, incoming: item.note)
             mergedByKey[key] = GroceryItemInsert(
                 householdID: existing.householdID,
                 name: existing.name,

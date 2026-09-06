@@ -64,13 +64,20 @@ enum RecipeImageExtractor {
           totalTime (string or null) — only if separately stated,
           ingredients (array of objects, each with):
             name (string),
-            amount (string),
-            unit (string),
+            amount (string) — when the page prints no quantity for the \
+              ingredient, return an empty string "" (never null),
+            unit (string) — empty string "" when the page prints no \
+              unit (never null),
             section (string or null) — header this ingredient sits under, \
               such as "Sauce", "Sauce (optional)", "Topping", \
               "For the marinade"; null if the recipe has a single flat list,
             preparation (string or null) — preparation note printed with \
-              the ingredient, e.g. "sliced", "softened, divided"
+              the ingredient, e.g. "sliced", "softened, divided",
+            printedAmount (string or null) — the quantity text EXACTLY \
+              as printed on the page, character-for-character, keeping \
+              unicode fractions and range wording (e.g. "1¼–1½", "3/4", \
+              "1 1/4 to 1 1/2", "to taste"); null only when the page \
+              prints no quantity at all
           instructions (array of strings),
           notes (string or null) — combined Notes / Tips / Storage / \
             Make-Ahead / Substitutions text. Preserve section labels \
@@ -82,6 +89,18 @@ enum RecipeImageExtractor {
 
         Rules:
           - Return ONLY valid JSON (no markdown, no code fences, no extra text).
+          - Transcribe printed quantities and fractions \
+            character-for-character as they appear on the page. NEVER \
+            round, simplify, convert, or reinterpret a fraction: if the \
+            page prints "1/4 cup", the amount is "1/4" — never "3/4", \
+            "0.25", or any other reading. When a fraction is small or \
+            blurry, read it again carefully before answering; do not \
+            substitute a more common-looking fraction.
+          - Keep qualifiers printed with an ingredient VERBATIM in the \
+            ingredient name or preparation — words like "unsweetened", \
+            "reduced-sodium", "packed in pineapple juice", and \
+            parenthetical qualifiers must not be dropped, shortened, \
+            or paraphrased.
           - Do NOT stop after the first complete-looking recipe body. \
             Read every image edge-to-edge for additional sections.
           - When the same content appears in more than one image \
@@ -128,7 +147,15 @@ enum RecipeImageExtractor {
     /// screen scale, which would triple the bitmap on a 3x device.
     /// Full-resolution camera captures can exceed the API's per-image
     /// size limit; OCR doesn't need more than this.
-    private static func resizedForUpload(_ image: UIImage, maxDimension: CGFloat = 1200) -> UIImage {
+    ///
+    /// 1568, not the old 1200: a two-column cookbook page at 1200 px is
+    /// ~133 DPI, putting a 5-6 pt fraction glyph at ~10 px — small
+    /// enough for "1/4" vs "3/4" misreads (the build-119 P05 case).
+    /// 1568 is the largest long edge the Anthropic API keeps without
+    /// re-downscaling server-side, so going higher buys nothing.
+    /// Cost: image input tokens scale with pixel area — ~1.7x per photo
+    /// versus 1200 (roughly 1.4k → 2.5k tokens for a typical page).
+    private static func resizedForUpload(_ image: UIImage, maxDimension: CGFloat = 1568) -> UIImage {
         let pixelWidth = image.size.width * image.scale
         let pixelHeight = image.size.height * image.scale
         let longestSide = max(pixelWidth, pixelHeight)

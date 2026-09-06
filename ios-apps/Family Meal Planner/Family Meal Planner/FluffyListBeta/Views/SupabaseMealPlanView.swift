@@ -703,56 +703,83 @@ struct SupabaseMealPlanView: View {
         }
     }
 
-    /// One tappable meal line: optional small-caps member kicker, the
-    /// recipe title, and (household meals only) the category/time
-    /// metadata line. Tap opens the recipe's detail screen — past
-    /// meals included; looking back is harmless and useful.
+    /// One meal line: optional small-caps member kicker, the recipe
+    /// title, and (household meals only) the category/time metadata
+    /// line. Tap opens the recipe's detail screen — past meals
+    /// included; looking back is harmless and useful.
+    ///
+    /// Which face the line wears comes from MealLineState: a resolved
+    /// recipe or an unresolved LIVE row is a tappable Button; a past
+    /// row whose recipe was deleted is inert history — nothing to do.
+    @ViewBuilder
     private func mealLine(
         _ plan: MealPlanRow,
         member: HouseholdMemberRow?,
         date: Date,
         isPast: Bool
     ) -> some View {
-        Button {
-            if let recipe = recipeService.recipes.first(where: { $0.id == plan.recipeID }) {
-                detailRecipeID = recipe.id
-            } else if !isPast {
-                // Recipe missing (deleted or not loaded): nothing to
-                // show, so the tap goes straight to Replace.
-                pickerContext = MealPickerContext(date: date, memberID: member?.id)
-            }
-        } label: {
+        let resolvedRecipe = recipeService.recipes.first(where: { $0.id == plan.recipeID })
+
+        switch MealLineState.forLine(
+            recipeID: plan.recipeID,
+            recipeExists: resolvedRecipe != nil,
+            isPast: isPast
+        ) {
+        case .deletedHistory:
+            // The meal happened; its recipe is gone. Quiet, muted,
+            // not tappable — this is a record, not a to-do.
             VStack(alignment: .leading, spacing: 3) {
                 if let member {
                     FluffyMetadataLine(text: member.displayName)
                 }
-                if let recipe = recipeService.recipes.first(where: { $0.id == plan.recipeID }) {
-                    Text(recipe.name)
-                        .font(.fluffyHeadline)
-                        .fluffyTracking(-0.01, at: 19)
-                        .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffyPrimary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    if member == nil {
-                        let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
-                        FluffyMetadataLine(text: total > 0
-                             ? "\(recipe.category) \u{00B7} \(total) min"
-                             : recipe.category)
-                    }
-                } else {
-                    // Plan row exists but its recipe isn't loaded
-                    // (or was deleted). Show a hint so the user can
-                    // still tap to Replace, or swipe to Remove.
-                    Text("Tap to update")
-                        .font(.fluffyHeadline)
-                        .fluffyTracking(-0.01, at: 19)
-                        .foregroundStyle(Color.fluffySecondary)
-                    FluffyMetadataLine(text: "MEAL NEEDS ATTENTION")
-                }
+                Text("(recipe deleted)")
+                    .font(.custom(FluffyFace.italic, size: 19))
+                    .fluffyTracking(-0.01, at: 19)
+                    .foregroundStyle(Color.fluffyTertiary)
             }
-            .contentShape(Rectangle())
+
+        case .recipe, .needsAttention:
+            Button {
+                if let recipe = resolvedRecipe {
+                    detailRecipeID = recipe.id
+                } else if !isPast {
+                    // Recipe missing (deleted or not loaded): nothing to
+                    // show, so the tap goes straight to Replace.
+                    pickerContext = MealPickerContext(date: date, memberID: member?.id)
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    if let member {
+                        FluffyMetadataLine(text: member.displayName)
+                    }
+                    if let recipe = resolvedRecipe {
+                        Text(recipe.name)
+                            .font(.fluffyHeadline)
+                            .fluffyTracking(-0.01, at: 19)
+                            .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffyPrimary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        if member == nil {
+                            let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
+                            FluffyMetadataLine(text: total > 0
+                                 ? "\(recipe.category) \u{00B7} \(total) min"
+                                 : recipe.category)
+                        }
+                    } else {
+                        // Plan row exists but its recipe isn't loaded
+                        // (or was deleted). Show a hint so the user can
+                        // still tap to Replace, or swipe to Remove.
+                        Text("Tap to update")
+                            .font(.fluffyHeadline)
+                            .fluffyTracking(-0.01, at: 19)
+                            .foregroundStyle(Color.fluffySecondary)
+                        FluffyMetadataLine(text: "MEAL NEEDS ATTENTION")
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 
     /// The Remove swipe: a single-meal day removes straight away

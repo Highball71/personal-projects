@@ -1,0 +1,214 @@
+{
+  "category" : "dinner",
+  "cookTime" : "1 hour",
+  "description" : "These are not your ordinary baked potatoes. Delicious potatoes baked twice with a wonderful Mexican flair, they are stuffed with a spicy cauliflower \"rice\" and taco-flavored beef and topped with guacamole and salsa.",
+  "ingredients" : [
+    {
+      "amount" : "3",
+      "name" : "large baking potatoes",
+      "printedAmount" : "3",
+      "unit" : ""
+    },
+    {
+      "amount" : "2",
+      "name" : "chili powder",
+      "printedAmount" : "2",
+      "section" : "For the Taco Mix",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "ground cumin",
+      "printedAmount" : "1",
+      "section" : "For the Taco Mix",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "2",
+      "name" : "salt",
+      "preparation" : "optional",
+      "printedAmount" : "2",
+      "section" : "For the Taco Mix",
+      "unit" : "teaspoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "black pepper",
+      "printedAmount" : "1",
+      "section" : "For the Taco Mix",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "smoked paprika",
+      "printedAmount" : "1",
+      "section" : "For the Taco Mix",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "ground coriander",
+      "printedAmount" : "1",
+      "section" : "For the Taco Mix",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "garlic powder",
+      "printedAmount" : "½",
+      "section" : "For the Taco Mix",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "red pepper flakes",
+      "printedAmount" : "½",
+      "section" : "For the Taco Mix",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1",
+      "name" : "extra-virgin olive oil",
+      "printedAmount" : "1",
+      "section" : "For the Taco Meat",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "8",
+      "name" : "lean ground beef",
+      "printedAmount" : "8",
+      "section" : "For the Taco Meat",
+      "unit" : "ounces"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "chopped onion",
+      "printedAmount" : "¼",
+      "section" : "For the Taco Meat",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "2",
+      "name" : "garlic, minced",
+      "preparation" : "minced",
+      "printedAmount" : "2",
+      "section" : "For the Taco Meat",
+      "unit" : "cloves"
+    },
+    {
+      "amount" : "3\/4",
+      "name" : "Whole30-compliant hot sauce",
+      "printedAmount" : "¾",
+      "section" : "For the Taco Meat",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/8",
+      "name" : "apple cider vinegar",
+      "printedAmount" : "⅛",
+      "section" : "For the Taco Meat",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1 1\/2",
+      "name" : "cauliflower florets",
+      "printedAmount" : "1½",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "Chicken Bone Broth (page 284) or Whole30-compliant chicken broth",
+      "printedAmount" : "½",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "canned crushed tomatoes",
+      "printedAmount" : "¼",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "chopped onion",
+      "printedAmount" : "¼",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1 1\/2",
+      "name" : "Whole30-compliant hot sauce",
+      "printedAmount" : "1½",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "teaspoons"
+    },
+    {
+      "amount" : "2",
+      "name" : "garlic, minced",
+      "preparation" : "minced",
+      "printedAmount" : "2",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "cloves"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "ground cumin",
+      "printedAmount" : "¼",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "",
+      "name" : "cayenne pepper",
+      "printedAmount" : "Pinch of",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "pinch"
+    },
+    {
+      "amount" : "1\/8",
+      "name" : "red pepper flakes",
+      "printedAmount" : "⅛",
+      "section" : "For the Cauliflower Rice",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "",
+      "name" : "Whole30-compliant salsa",
+      "section" : "To Serve",
+      "unit" : ""
+    },
+    {
+      "amount" : "",
+      "name" : "Guacamole (page 271)",
+      "section" : "To Serve",
+      "unit" : ""
+    },
+    {
+      "amount" : "",
+      "name" : "snipped fresh cilantro",
+      "section" : "To Serve",
+      "unit" : ""
+    }
+  ],
+  "instructions" : [
+    "Preheat the oven to 400°F.",
+    "Scrub the potatoes and pat them dry. Pierce the potatoes all over with a fork and wrap them individually in aluminum foil. Set them on a baking sheet and bake for 1 hour, until tender when pierced with a fork.",
+    "MAKE THE TACO MIX: While the potatoes are baking, in a small bowl, combine the chili powder, cumin, salt (if using), black pepper, paprika, coriander, garlic powder, and red pepper flakes.",
+    "MAKE THE TACO MEAT: Heat the olive oil in a large skillet over medium-high heat. Add the beef, onion, garlic, hot sauce, vinegar, and 1 tablespoon of the Taco Mix. Cook, stirring frequently, until the meat is browned, about 8 minutes. Transfer the taco meat to a bowl.",
+    "MAKE THE CAULIFLOWER RICE: Pulse the cauliflower in a food processor until it is broken down to the size of rice. Transfer the cauliflower rice to the skillet in which you cooked the meat and add the broth, tomatoes, onion, hot sauce, garlic, cumin, cayenne, and red pepper flakes. Cook over medium-high heat until the liquid cooks down and the cauliflower is tender, 10 to 15 minutes. Transfer the cauliflower rice to a bowl.",
+    "Remove the potatoes from the oven (keep the oven on) and let cool for 5 to 10 minutes. Slice each potato in half lengthwise. Using a large spoon, scoop out the center of each potato, leaving about ¼ inch of flesh around the skins. Place the potato flesh in a large bowl. Add the taco meat and cauliflower rice and stir to combine. Scoop the filling back into the potato shells and return them to the baking sheet. Bake for 10 minutes, until heated through.",
+    "Serve the potatoes topped with salsa, guacamole, and cilantro."
+  ],
+  "name" : "Mexican Twice Baked Potatoes",
+  "prepTime" : "40 minutes",
+  "servingSize" : "2",
+  "source" : "Whole30 Cookbook - from Kendra Cardoza of Paleo Paparazzi",
+  "tags" : [
+    "Whole30",
+    "Mexican",
+    "Red Meat"
+  ],
+  "totalTime" : "1 hour, 40 minutes"
+}

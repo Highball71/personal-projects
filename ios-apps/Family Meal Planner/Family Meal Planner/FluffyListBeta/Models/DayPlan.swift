@@ -32,8 +32,13 @@ struct DayPlan: Equatable {
     /// Group one day's rows for rendering.
     ///
     /// Rules:
-    ///   - Rows without a recipe (orphaned by a recipe delete) are
-    ///     dropped, matching the week view's existing filter.
+    ///   - Rows without a recipe (orphaned by a recipe delete —
+    ///     recipe_id is ON DELETE SET NULL) are KEPT, matching the
+    ///     "nothing planned is ever invisible" policy. How such a row
+    ///     renders is MealLineState's decision: past rows are quiet
+    ///     history ("(recipe deleted)"), live rows ask for attention.
+    ///     (They were dropped before 2026-09-06, which made deleted
+    ///     recipes vanish from history and hid stale live rows.)
     ///   - member_id NULL → the household group.
     ///   - member_id that doesn't match any loaded member → ALSO the
     ///     household group. This is the stale-cache window right after
@@ -50,7 +55,7 @@ struct DayPlan: Equatable {
         var plan = DayPlan()
         var byMember: [UUID: [MealPlanRow]] = [:]
 
-        for row in rows where row.recipeID != nil {
+        for row in rows {
             if let memberID = row.memberID,
                members.contains(where: { $0.id == memberID }) {
                 byMember[memberID, default: []].append(row)
@@ -69,5 +74,31 @@ struct DayPlan: Equatable {
         }
 
         return plan
+    }
+}
+
+/// How one meal line renders, given whether its recipe resolved and
+/// whether the day is past. Pure so the week view and the tests share
+/// the same rule.
+///
+/// A row whose recipe was deleted (recipe_id NULLed by the DB) is two
+/// different things depending on the date:
+///   - past: plain history. "(recipe deleted)", muted, not tappable —
+///     there is nothing for the user to do about last month's dinner.
+///   - today or future: a plan slot that still needs a real meal, so
+///     it keeps the "MEAL NEEDS ATTENTION" treatment (tap → Replace).
+/// A non-nil recipe_id that doesn't resolve locally (recipes not
+/// loaded yet, or the stale-cache window right after a delete on
+/// another device) always asks for attention — the next fetch settles
+/// what it really is.
+enum MealLineState: Equatable {
+    case recipe
+    case deletedHistory
+    case needsAttention
+
+    static func forLine(recipeID: UUID?, recipeExists: Bool, isPast: Bool) -> MealLineState {
+        if recipeExists { return .recipe }
+        if recipeID == nil && isPast { return .deletedHistory }
+        return .needsAttention
     }
 }
