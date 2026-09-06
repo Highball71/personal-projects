@@ -12,9 +12,19 @@ enum RecipeImageExtractor {
 
     enum ExtractionError: LocalizedError {
         case imageConversionFailed
+        /// The response hit the output-token limit twice (initial try
+        /// plus one retry at double the limit) — the recipe JSON was
+        /// cut off mid-stream and can never parse. Distinct from a
+        /// parse error so the user gets advice, not "incorrect format".
+        case responseTruncated
 
         var errorDescription: String? {
-            "Could not convert the photo to a format the API accepts."
+            switch self {
+            case .imageConversionFailed:
+                "Could not convert the photo to a format the API accepts."
+            case .responseTruncated:
+                "The recipe was too long to read in one pass — try fewer pages or a closer photo"
+            }
         }
     }
 
@@ -132,6 +142,26 @@ enum RecipeImageExtractor {
         return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
     }
 
+    /// Run a request, retrying once with a doubled output-token limit
+    /// when the response was cut off (stop_reason == "max_tokens").
+    /// A truncated response is incomplete JSON — it must never reach
+    /// the ordinary parser, where it would surface as a bogus
+    /// "incorrect format" error instead of the real problem.
+    private static func sendWithTruncationRetry(
+        _ send: (_ maxTokens: Int) async throws -> AnthropicResponse
+    ) async throws -> AnthropicResponse {
+        let response = try await send(AnthropicModels.maxTokens)
+        guard response.stopReason == "max_tokens" else { return response }
+
+        Logger.importPipeline.warning("Response hit the \(AnthropicModels.maxTokens, privacy: .public)-token limit — retrying with double")
+        let retried = try await send(AnthropicModels.maxTokens * 2)
+        if retried.stopReason == "max_tokens" {
+            Logger.importPipeline.error("Retry also hit max_tokens — giving up")
+            throw ExtractionError.responseTruncated
+        }
+        return retried
+    }
+
     private static func extractSingle(from image: UIImage) async throws -> ExtractedRecipe {
         Logger.importPipeline.info("Starting recipe extraction...")
 
@@ -143,12 +173,15 @@ enum RecipeImageExtractor {
         Logger.importPipeline.info("Image data size: \(imageData.count, privacy: .public) bytes")
 
         Logger.importPipeline.info("Sending request to Claude API...")
-        let response = try await AnthropicClient.sendImageMessage(
-            systemPrompt: systemPrompt,
-            userPrompt: singleImagePrompt,
-            base64Image: base64String,
-            timeout: 120
-        )
+        let response = try await sendWithTruncationRetry { maxTokens in
+            try await AnthropicClient.sendImageMessage(
+                systemPrompt: systemPrompt,
+                userPrompt: singleImagePrompt,
+                base64Image: base64String,
+                maxTokens: maxTokens,
+                timeout: 120
+            )
+        }
 
         let text = try AnthropicClient.extractText(from: response)
         #if DEBUG
@@ -181,12 +214,15 @@ enum RecipeImageExtractor {
         }
 
         Logger.importPipeline.info("Sending multi-page request to Claude API...")
-        let response = try await AnthropicClient.sendMultiImageMessage(
-            systemPrompt: systemPrompt,
-            userPrompt: multiPagePrompt,
-            imageContents: imageContents,
-            timeout: 90
-        )
+        let response = try await sendWithTruncationRetry { maxTokens in
+            try await AnthropicClient.sendMultiImageMessage(
+                systemPrompt: systemPrompt,
+                userPrompt: multiPagePrompt,
+                imageContents: imageContents,
+                maxTokens: maxTokens,
+                timeout: 90
+            )
+        }
 
         let text = try AnthropicClient.extractText(from: response)
         #if DEBUG

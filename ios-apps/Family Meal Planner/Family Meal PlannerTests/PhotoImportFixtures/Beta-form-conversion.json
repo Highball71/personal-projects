@@ -1,0 +1,886 @@
+[
+  {
+    "cook_minutes" : 10,
+    "fixture" : "P02-baseline",
+    "ingredients" : [
+      {
+        "name" : "lean beef steak (sirloin, flank, strip), cut into 1-inch pieces",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "lb"
+      },
+      {
+        "name" : "unsweetened pineapple juice",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "coconut aminos",
+        "quantity" : 3,
+        "quantity_text" : "3",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "fresh lemon juice",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "serrano chile pepper, seeded and thinly sliced",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "fresh ginger, grated",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "garlic, minced",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "clove"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "black pepper",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "pineapple, peeled, cored, and cut into 1½-inch chunks",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "bell peppers, seeded and cut into 1½-inch pieces",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "onion, cut into 8 wedges",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      }
+    ],
+    "instructions" : "1. Place the steak in a resealable plastic bag or non-reactive bowl with a lid and add the pineapple juice, coconut aminos, lemon juice, serrano chile, ginger, garlic, salt, and black pepper. Toss the steak to coat thoroughly with the marinade. Seal the bag or cover the bowl and marinate the steak in the refrigerator for 1 to 24 hours.\n2. If using wooden skewers, soak them in water for 30 minutes to 1 hour to prevent them from burning.\n3. Remove the steak from the refrigerator 30 minutes before cooking. Preheat a grill to medium (350 to 375°F).\n4. Drain the steak, reserving the marinade. Prepare the kabobs by threading the steak, pineapple, bell peppers, and onion onto the skewers, leaving a ¼-inch space between each piece. Brush the kabobs with the marinade.\n5. Grill the kabobs over direct heat, brushing them with the marinade and turning them once or twice, for 8 to 12 minutes, until the vegetables are tender and steak is cooked to the desired doneness. Discard any remaining marinade.",
+    "name" : "Spicy Pineapple Steak Kabobs",
+    "notes" : "Pork isn't the only meat that pairs perfectly with pineapple. These skewers feature chunks of juicy pineapple and bell peppers threaded alternately with steak that has soaked up the fabulous flavors of a sweet-spicy marinade made from pineapple juice, coconut aminos, lemon juice, serrano chile, ginger, and garlic.\n\nTip: If fresh pineapple isn't in season, use 4 cups canned unsweetened pineapple chunks in place of the fresh pineapple. Bonus—you can use the juice from the can, too.",
+    "prep_minutes" : 25,
+    "servings" : 4
+  },
+  {
+    "cook_minutes" : 25,
+    "fixture" : "P04-baseline",
+    "ingredients" : [
+      {
+        "name" : "extra-virgin olive oil",
+        "quantity" : 5,
+        "quantity_text" : "5",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "cremini mushrooms, finely chopped",
+        "quantity" : 8,
+        "quantity_text" : "8",
+        "unit" : "oz"
+      },
+      {
+        "name" : "red onion, finely chopped",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "cup"
+      },
+      {
+        "name" : "red bell pepper, finely chopped",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "cup"
+      },
+      {
+        "name" : "garlic, minced",
+        "quantity" : 4,
+        "quantity_text" : "4",
+        "unit" : "clove"
+      },
+      {
+        "name" : "fresh oregano, chopped",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "fresh basil, chopped",
+        "quantity" : 0.75,
+        "quantity_text" : "3\/4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "almond flour",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "lemon zest, grated",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "green beans, trimmed",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "lb"
+      },
+      {
+        "name" : "red pepper flakes",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "beef sirloin or round steak",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "lb"
+      },
+      {
+        "name" : "Whole30-compliant tomato paste",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "Beef Bone Broth (page 285) or Whole30-compliant beef broth",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "cup"
+      }
+    ],
+    "instructions" : "1. Preheat the oven to 400°F.\n2. Heat 1 tablespoon of the olive oil in a large skillet over medium-high heat. Add the mushrooms and cook, stirring occasionally, until lightly browned, about 3 minutes. Add 1\/2 cup of the onion and the bell pepper. Cook, stirring occasionally, until the onion is tender, 3 minutes. Add half the garlic and the oregano. Cook, stirring, for 1 minute more. Remove from the heat and stir in 1\/2 cup of the basil, the almond flour, lemon zest, and 1\/2 teaspoon of the salt. Transfer the mushroom mixture to a bowl and set aside to cool slightly. Rinse and dry the skillet.\n3. Trim away any excess fat from the edges of the steak. Place the steak on a work surface. With the notched edge of a meat mallet, pound the steak to about 1\/4 inch thick. Spread the mushroom mixture over the steak to within 1\/2 inch of the edges. Starting on a long side, roll up the meat and tie it with 100% cotton kitchen string.\n4. In a medium bowl, combine the green beans, 2 tablespoons of the oil, the remaining garlic, and the remaining 1\/2 teaspoon salt and toss. Spread the beans evenly on a large baking sheet. Roast for 18 to 20 minutes, until the beans are lightly browned and crisp-tender.\n5. In the same skillet, heat the remaining 2 tablespoons olive oil over medium-high heat. Sear the meat in the hot oil and cook, turning occasionally, to sear evenly on all sides. Remove the meat from the skillet. Add the remaining 1\/2 cup onion to the skillet. Cook, stirring, until softened, about 5 minutes. Stir in the tomato paste, then whisk in the broth. Bring the broth to a boil. Return the meat to the skillet and spoon some of the sauce over the meat. Cover and reduce the heat to medium-low. Simmer gently, turning once, until the internal temperature of the roulade is 160°F, 8 to 10 minutes. Sprinkle with the remaining 1\/4 cup basil.\n6. Transfer the roulade to a cutting board and let rest for 5 to 10 minutes. Remove the string and cut into 1\/2-inch-thick slices. Serve the meat and sauce with the green beans.",
+    "name" : "Mushroom-Stuffed Beef Roulade with Garlicky Green Beans",
+    "notes" : "Roulade is the French term for a thin piece of meat rolled around a savory filling of some combination of vegetables, bread crumbs, and cheese. This Whole30 Approved roulade features a yummy stuffing of sautéed cremini mushrooms, onions, and red bell pepper flavored with garlic, oregano, basil, and lemon zest.",
+    "prep_minutes" : 25,
+    "servings" : 4
+  },
+  {
+    "cook_minutes" : 60,
+    "fixture" : "P05-4096-diagnostic",
+    "ingredients" : [
+      {
+        "name" : "large baking potatoes",
+        "quantity" : 3,
+        "quantity_text" : "3",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[For the Taco Mix] chili powder",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Taco Mix] ground cumin",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Taco Mix] salt, optional",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Mix] black pepper",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Mix] smoked paprika",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Mix] ground coriander",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Mix] garlic powder",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Mix] red pepper flakes",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Meat] extra-virgin olive oil",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Meat] lean ground beef",
+        "quantity" : 8,
+        "quantity_text" : "8",
+        "unit" : "oz"
+      },
+      {
+        "name" : "[For the Taco Meat] onion, chopped",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Taco Meat] garlic, minced",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "clove"
+      },
+      {
+        "name" : "[For the Taco Meat] Whole30-compliant hot sauce",
+        "quantity" : 0.75,
+        "quantity_text" : "3\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Taco Meat] apple cider vinegar",
+        "quantity" : 0.125,
+        "quantity_text" : "1\/8",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] cauliflower florets",
+        "quantity" : 1.5,
+        "quantity_text" : "1 1\/2",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] Chicken Bone Broth (page 284) or Whole30-compliant chicken broth",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] canned crushed tomatoes",
+        "quantity" : 0.75,
+        "quantity_text" : "3\/4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] onion, chopped",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] Whole30-compliant hot sauce",
+        "quantity" : 1.5,
+        "quantity_text" : "1 1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] garlic, minced",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "clove"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] ground cumin",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] cayenne pepper",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "pinch"
+      },
+      {
+        "name" : "[For the Cauliflower Rice] red pepper flakes",
+        "quantity" : 0.125,
+        "quantity_text" : "1\/8",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[To Serve] Whole30-compliant salsa",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[To Serve] Guacamole (page 271)",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[To Serve] fresh cilantro, snipped",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      }
+    ],
+    "instructions" : "1. Preheat the oven to 400°F.\n2. Scrub the potatoes and pat them dry. Pierce the potatoes all over with a fork and wrap them individually in aluminum foil. Set them on a baking sheet and bake for 1 hour, until tender when pierced with a fork.\n3. MAKE THE TACO MIX: While the potatoes are baking, in a small bowl, combine the chili powder, cumin, salt (if using), black pepper, paprika, coriander, garlic powder, and red pepper flakes.\n4. MAKE THE TACO MEAT: Heat the olive oil in a large skillet over medium-high heat. Add the beef, onion, garlic, hot sauce, vinegar, and 1 tablespoon of the Taco Mix. Cook, stirring frequently, until the meat is browned, about 8 minutes. Transfer the taco meat to a bowl.\n5. MAKE THE CAULIFLOWER RICE: Pulse the cauliflower in a food processor until it is broken down to the size of rice. Transfer the cauliflower rice to the skillet in which you cooked the meat and add the broth, tomatoes, onion, hot sauce, garlic, cumin, cayenne, and red pepper flakes. Cook over medium-high heat until the liquid cooks down and the cauliflower is tender, 10 to 15 minutes. Transfer the cauliflower rice to a bowl.\n6. Remove the potatoes from the oven (keep the oven on) and let cool for 5 to 10 minutes. Slice each potato in half lengthwise. Using a large spoon, scoop out the center of each potato, leaving about 1\/4 inch of flesh around the skins. Place the potato flesh in a large bowl. Add the taco meat and cauliflower rice and stir to combine. Scoop the filling back into the potato shells and return them to the baking sheet. Bake for 10 minutes, until heated through.\n7. Serve the potatoes topped with salsa, guacamole, and cilantro.",
+    "name" : "Mexican Twice Baked Potatoes",
+    "notes" : "These are not your ordinary baked potatoes. Delicious potatoes baked twice with a wonderful Mexican flair, they are stuffed with a spicy cauliflower \"rice\" and taco-flavored beef and topped with guacamole and salsa.",
+    "prep_minutes" : 40,
+    "servings" : 2
+  },
+  {
+    "cook_minutes" : 25,
+    "fixture" : "P08-baseline",
+    "ingredients" : [
+      {
+        "name" : "small new potatoes, quartered",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "lb"
+      },
+      {
+        "name" : "extra-virgin olive oil",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "dried thyme",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "black pepper",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "bone-in pork loin chops, 3\/4 inch thick",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "Clarified Butter (page 283) or ghee, melted",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "Whole30-compliant barbecue sauce, plus more for serving if desired",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "cup"
+      }
+    ],
+    "instructions" : "1. PREHEAT the oven to 425°F. Line a large rimmed baking pan with parchment paper.\n2. IN a large bowl, combine the potatoes, olive oil, thyme, 1\/4 teaspoon of the salt, and 1\/8 teaspoon of the pepper. Spread the potatoes on half of the pan and roast for 10 minutes; stir.\n3. BRUSH the pork chops with the melted butter and sprinkle with the remaining 1\/4 teaspoon salt and 1\/8 teaspoon pepper. Add the chops to the pan and roast for 10 minutes. Brush both sides of the chops with the barbecue sauce. Roast until the chops' internal temperature is 145°F and the potatoes are tender and golden brown, about 5 minutes longer. Let the chops rest for 5 minutes.\n4. SERVE the chops and potatoes with additional barbecue sauce, if desired, and season to taste with salt and pepper.",
+    "name" : "Sheet Pan Barbecue Pork Chops with Potatoes",
+    "notes" : "Add a quick slaw to this meat-and-potatoes dish and you've got a complete meal. Try a packaged shredded broccoli or cabbage slaw tossed with a purchased compliant dressing or one of the following homemade dressings: Asian Citrus Dressing (page 277), Everyday Whole30 Salad Dressing (page 278), Apple-Mustard Vinaigrette (page 277), or Blender Green Goddess Dressing (page 275).",
+    "prep_minutes" : 10,
+    "servings" : 2
+  },
+  {
+    "cook_minutes" : 35,
+    "fixture" : "P09-baseline",
+    "ingredients" : [
+      {
+        "name" : "cauliflower florets",
+        "quantity" : 4,
+        "quantity_text" : "4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "extra-virgin olive oil",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "black pepper",
+        "quantity" : 0.125,
+        "quantity_text" : "1\/8",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "Clarified Butter (page 283) or ghee, melted",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "boneless, skinless chicken breasts",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "Whole30-compliant Buffalo sauce, plus more for serving if desired",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "Whole30-compliant creamy ranch dressing or Whole30 Ranch Dressing (page 282)",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "cup"
+      }
+    ],
+    "instructions" : "1. PREHEAT the oven to 425°F. Line a large rimmed baking pan with parchment paper.\n2. IN a large bowl, combine the cauliflower, olive oil, salt, and pepper; mix well. Spread the cauliflower on three-fourths of the pan and roast for 15 minutes.\n3. MEANWHILE, heat 1 tablespoon of the butter in a medium skillet over medium-high heat. Add the chicken and cook, turning once, until golden brown, 5 to 6 minutes.\n4. IN the same bowl, stir together the remaining 1 tablespoon butter and the Buffalo sauce. Add the browned chicken and coat with the sauce. Add the chicken to the pan. Continue roasting until the internal temperature of the chicken is 170°F and the cauliflower is tender and lightly browned, 20 to 25 minutes longer.\n5. SERVE the chicken and cauliflower with the ranch dressing for dipping. If desired, drizzle the chicken with additional Buffalo sauce.",
+    "name" : "Sheet Pan Buffalo Chicken with Cauliflower",
+    "notes" : "You don't have to give up your favorite bar snack just because you can't go to the bar—and this is actually a very tasty entree! Crisp-roasted cauliflower is swapped in for the raw celery and carrots in the traditional version. Serve those too, if you like. You can't get too many veggies on the Whole30!",
+    "prep_minutes" : 10,
+    "servings" : 2
+  },
+  {
+    "cook_minutes" : 30,
+    "fixture" : "P10-4096-diagnostic",
+    "ingredients" : [
+      {
+        "name" : "[For the Chicken] dried tomatoes, finely diced, drained oil-packed",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Chicken] extra-virgin olive oil",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Chicken] garlic, minced",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "clove"
+      },
+      {
+        "name" : "[For the Chicken] fresh thyme leaves",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Chicken] coarse salt",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Chicken] black pepper",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Chicken] bone-in chicken thighs",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "lb"
+      },
+      {
+        "name" : "[For the Mushrooms] portobello mushrooms, see Tip",
+        "quantity" : 4,
+        "quantity_text" : "4",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[For the Mushrooms] Whole30-compliant smoked kielbasa, diced",
+        "quantity" : 4,
+        "quantity_text" : "4",
+        "unit" : "oz"
+      },
+      {
+        "name" : "[For the Mushrooms] fresh kale, chopped",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Mushrooms] dried tomatoes, finely diced, drained oil-packed",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Mushrooms] oil from oil-packed dried tomatoes",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Mushrooms] garlic, minced",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "clove"
+      }
+    ],
+    "instructions" : "1. PREHEAT the oven to 425°F. Line a large rimmed baking pan with parchment paper.\n2. MAKE THE CHICKEN: In a small bowl, combine the dried tomatoes, olive oil, garlic, thyme, salt, and black pepper. For each thigh, run a finger under the skin to lift it off the meat, but leaving it attached along the sides. Spoon some of the thyme mixture under the skin. Place the thighs on one side of the pan. Roast for 5 minutes.\n3. MAKE THE MUSHROOMS: Meanwhile, remove the stems and gills from the mushrooms. Use a damp paper towel to wipe the mushrooms clean. Add the mushrooms, gill sides down, to the pan. Roast until the mushrooms are just tender, 15 to 18 minutes.\n4. MEANWHILE, in a medium bowl, combine the kielbasa, kale, tomatoes, tomato oil, and garlic. Turn the mushrooms over. Spoon the kielbasa filling into the mushrooms. Roast until the chicken is no longer pink and a thermometer inserted in the thigh registers 175°F and the mushrooms are just tender, 10 to 15 minutes longer.",
+    "name" : "Chicken Thighs with Stuffed Mushrooms",
+    "notes" : "A delicious concoction of dried tomatoes, fresh thyme, and garlic gets tucked under the skin of these chicken thighs before they're roasted to crispy perfection. They're served with a side of mushrooms stuffed with smoky sausage, kale, and more dried tomatoes and garlic.\n\nTip: Use a spoon to scrape the gills from the mushrooms.",
+    "prep_minutes" : 15,
+    "servings" : 4
+  },
+  {
+    "cook_minutes" : 20,
+    "fixture" : "P11-baseline",
+    "ingredients" : [
+      {
+        "name" : "beef stir-fry strips",
+        "quantity" : 1.5,
+        "quantity_text" : "1 1\/2",
+        "unit" : "lb"
+      },
+      {
+        "name" : "Whole30-compliant Italian seasoning",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "black pepper",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "olive oil",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "frozen bell pepper and onion blend",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "Whole30-compliant beef broth or Beef Bone Broth (page 280)",
+        "quantity" : 4,
+        "quantity_text" : "4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "Whole30-compliant diced tomatoes with garlic and onion",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "portobello mushrooms, gills removed (see Tip), halved and sliced",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "rutabaga, spiralized or diced",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "fresh basil leaves",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "cup"
+      }
+    ],
+    "instructions" : "1. SEASON the meat with the Italian seasoning, salt, and pepper. Heat 1 tablespoon of the olive oil over medium-high heat in a large pot. Add half of the meat and cook, stirring occasionally, until browned but still pink in the center, 2 to 3 minutes. Transfer the meat to a bowl. Add the remaining 1 tablespoon olive oil to the pot and cook the remaining meat. Transfer the meat to the bowl.\n2. ADD the frozen bell pepper and onion blend to the pot. Cook over medium heat, stirring occasionally, until tender, 3 to 4 minutes. Add the broth and tomatoes and bring to a boil.\n3. ADD the mushrooms and rutabaga noodles and bring to a low boil. Cook until the mushrooms and rutabaga are just tender, 6 to 7 minutes. Return the meat to the pot, stir in the basil, and serve.",
+    "name" : "Steak and Portobello Rutabaga-Noodle Bowls",
+    "notes" : "Although they're edible, the gills on portobello mushrooms can turn an entire dish black and muddy-looking. It's almost always best to remove them before cooking.\n\nTip:\nUse a spoon to scrape the gills from the mushrooms.",
+    "prep_minutes" : 15,
+    "servings" : 6
+  },
+  {
+    "cook_minutes" : 15,
+    "fixture" : "P12-baseline",
+    "ingredients" : [
+      {
+        "name" : "Clarified Butter (page 283) or ghee",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "green onions, chopped, white and green parts separated",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "fresh ginger, minced",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "ground chicken or turkey",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "lb"
+      },
+      {
+        "name" : "fresh shiitake mushrooms, sliced, stemmed",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "cup"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "Whole30-compliant chicken broth or Chicken Bone Broth (page 280)",
+        "quantity" : 3,
+        "quantity_text" : "3",
+        "unit" : "cup"
+      },
+      {
+        "name" : "coconut aminos",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "ground cumin",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "eggs",
+        "quantity" : 3,
+        "quantity_text" : "3",
+        "unit" : "piece"
+      },
+      {
+        "name" : "Toasted sesame oil",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      }
+    ],
+    "instructions" : "1. Heat the butter in a medium saucepan over medium-high heat. Add the white parts of the green onions and the ginger and cook, stirring, until fragrant, about 2 minutes. Add the ground chicken, mushrooms, and salt and cook until the chicken is no longer pink and the mushrooms are tender, 8 to 10 minutes. Add the broth, coconut aminos, and cumin, bring to a boil, then reduce the heat to a simmer.\n2. In a small bowl, whisk the eggs for 30 seconds. Holding a fork over the saucepan, slowly pour the eggs through the tines of the fork and whisk the broth gently as you pour. Let the soup stand for a few seconds to finish cooking the eggs.\n3. Top with the green parts of the green onions, drizzle with sesame oil, and serve.",
+    "name" : "Hearty Chinese Egg Drop Soup",
+    "notes" : "Egg drop soup is a super-common dish in many Asian households. Each region (and even household) has a slightly different take on the traditional soup. Some like to use chicken broth, while others use vegetable broth. I decided to make a heartier soup by adding ground chicken so that if you're hungry after work, the soup is very quick to put together and will fill you up in a hurry.",
+    "prep_minutes" : 5,
+    "servings" : 2
+  },
+  {
+    "cook_minutes" : 25,
+    "fixture" : "P13-baseline",
+    "ingredients" : [
+      {
+        "name" : "unsalted raw cashews, chopped",
+        "quantity" : 0.75,
+        "quantity_text" : "3\/4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "pork tenderloin, cut into 1-inch pieces",
+        "quantity" : 1.25,
+        "quantity_text" : "1 1\/4",
+        "unit" : "lb"
+      },
+      {
+        "name" : "salt",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "black pepper",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "extra-virgin olive oil",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "frozen pepper stir-fry blend",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      },
+      {
+        "name" : "sweet paprika",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "dried marjoram",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "Whole30-compliant tomato paste",
+        "quantity" : 3,
+        "quantity_text" : "3",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "Whole30-compliant chicken broth or Chicken Bone Broth (page 280)",
+        "quantity" : 4,
+        "quantity_text" : "4",
+        "unit" : "cup"
+      },
+      {
+        "name" : "fresh parsley, chopped",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      }
+    ],
+    "instructions" : "1. For cashew cream, place the cashews in a small bowl and add boiling water to cover. Cover and let stand for 15 minutes. Drain and rinse the cashews. Combine the cashews and 1\/2 cup fresh water in a blender. Puree until smooth, 3 to 4 minutes.\n2. Meanwhile, season the pork with the salt and black pepper. In a Dutch oven or large pot, heat the olive oil over medium-high heat. Add the pork and cook, stirring occasionally, until the pork begins to brown, about 5 minutes.\n3. Add the pepper stir-fry, paprika, and marjoram. Continue to cook, stirring occasionally, until the peppers are softened, about 5 minutes.\n4. Stir in the tomato paste and cook, stirring, 1 minute.\n5. Stir in the broth and bring to a boil. Reduce the heat to medium-low and simmer for 10 minutes.\n6. Remove from the heat. Stir in the cashew cream. Top each serving with parsley.",
+    "name" : "Quick Pork and Pepper Paprikash",
+    "notes" : "A quick cashew cream stands in for sour cream in this Hungarian-style dish. Be sure to use raw, unsalted cashews to make the cream.",
+    "prep_minutes" : 15,
+    "servings" : 4
+  },
+  {
+    "cook_minutes" : 35,
+    "fixture" : "P15-baseline",
+    "ingredients" : [
+      {
+        "name" : "[For the Cream Sauce] Basic Mayonnaise (page 240) or Whole30-compliant mayonnaise",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Cream Sauce] dried chives",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Cream Sauce] dried parsley",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tbsp"
+      },
+      {
+        "name" : "[For the Cream Sauce] garlic powder",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Cream Sauce] dried dill",
+        "quantity" : 0.5,
+        "quantity_text" : "1\/2",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Cream Sauce] salt",
+        "quantity" : 0.25,
+        "quantity_text" : "1\/4",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Cream Sauce] black pepper",
+        "quantity" : 0.125,
+        "quantity_text" : "1\/8",
+        "unit" : "tsp"
+      },
+      {
+        "name" : "[For the Casserole] Whole30-compliant bacon",
+        "quantity" : 8,
+        "quantity_text" : "8",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[For the Casserole] cooked spaghetti squash (from a 4-pound squash), see Tip",
+        "quantity" : 6,
+        "quantity_text" : "6",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Casserole] cooked chicken breast, shredded or chopped",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "cup"
+      },
+      {
+        "name" : "[For the Casserole] jalapeños, seeded and chopped",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[For the Casserole] eggs, lightly beaten",
+        "quantity" : 2,
+        "quantity_text" : "2",
+        "unit" : "piece"
+      },
+      {
+        "name" : "[For the Casserole] jalapeño, sliced into rings (optional)",
+        "quantity" : 1,
+        "quantity_text" : "1",
+        "unit" : "piece"
+      }
+    ],
+    "instructions" : "1. Preheat the oven to 350°F. Lightly grease a 9 × 13-inch baking pan.\n2. Make the cream sauce: In a medium bowl, stir together the mayonnaise, chives, parsley, garlic powder, dill, salt, and pepper. Set aside.\n3. Make the casserole: In a large skillet, cook the bacon over medium heat until crisp, about 10 minutes. Let cool then roughly chop.\n4. In a large bowl, stir together the cooked squash, chicken, chopped jalapeños, eggs, bacon, and cream sauce. Spoon into the baking pan; top with jalapeño rings, if desired.\n5. Bake about 35 minutes, until heated through and bubbly around the edges (160°F).",
+    "name" : "Jalapeño Popper Chicken Casserole",
+    "notes" : "This spaghetti-squash casserole has the perfect amount of heat from jalapeños, a crunchy and salty kick from bacon, and a creamy texture contributed by a sauce made from mayo, chives, parsley, garlic powder, and dill.\n\nTip: To cook the spaghetti squash, heat the oven to 400°F. Slice the squash in half lengthwise and scoop out the seeds. Lightly drizzle with olive oil. Place the squash, cut sides down, on the baking pan and roast until tender, 45 to 50 minutes. Use a fork to scrape out the flesh.",
+    "prep_minutes" : 20,
+    "servings" : 8
+  }
+]

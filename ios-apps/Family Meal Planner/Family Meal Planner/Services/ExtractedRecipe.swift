@@ -54,9 +54,24 @@ struct ExtractedRecipe: Codable {
         }
     }
 
+    /// The servings range when the page prints one ("8 to 10", "4-6",
+    /// "Serves 8 to 10"): (upper bound, printed text). Nil for a single
+    /// number or no servings at all. Uses the same range parser as
+    /// ingredient amounts, after skipping any leading label word.
+    var servingsRangeInfo: (upperBound: Int, printed: String)? {
+        guard let text = servingSize?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let firstDigit = text.firstIndex(where: { $0.isNumber }) else { return nil }
+        guard case .range(_, let upper) = ExtractedIngredient.parseQuantity(from: String(text[firstDigit...])),
+              upper >= 1 else { return nil }
+        return (Int(upper.rounded()), text)
+    }
+
     /// Parse servingSize string (e.g. "4", "4 servings", "4-6") into an Int.
-    /// Extracts the first number found; defaults to 4.
+    /// A printed range ("8 to 10") yields its UPPER bound — plan for the
+    /// bigger table; the printed text is preserved via servingsRangeInfo.
+    /// Otherwise extracts the first number found; defaults to 4.
     var servingsInt: Int {
+        if let range = servingsRangeInfo { return range.upperBound }
         guard let text = servingSize else { return 4 }
         // Find the first sequence of digits in the string
         let digits = text.prefix(while: { $0.isNumber || $0 == " " })
@@ -101,15 +116,79 @@ struct ExtractedRecipe: Codable {
     /// name string so the information isn't dropped on save.
     ///
     /// Display format: `[Section] Name, preparation`
+    ///
+    /// Quantities are handled by shape (see ParsedQuantity):
+    ///   - exact: the number, formatted as a cooking fraction.
+    ///   - range ("1 1/4 to 1 1/2 pounds"): the DB row persists a
+    ///     single Double + unit, so the numeric quantity is the UPPER
+    ///     bound (grocery aggregation never under-buys); the printed
+    ///     range goes to `note` ("1 1/4 to 1 1/2 lb") and the form's
+    ///     quantity text.
+    ///   - unspecified (no printed amount, e.g. a garnish): unit
+    ///     becomes .toTaste, which the form and grocery list render as
+    ///     "to taste" with no number. Never an invented "1 piece".
+    ///     If the page DID print something unparseable ("to taste",
+    ///     "for garnish"), that text is preserved in `note`.
+    ///
+    /// A parenthetical package size in the unit ("bag (14 ounces)")
+    /// keeps the container word as the unit with the size in `note`.
+    ///
+    /// The NAME stays clean — no quantity text is ever folded into it,
+    /// so the grocery merge (keyed on normalized name) can match a
+    /// scanned "olive oil" with a hand-entered one. `note` persists to
+    /// recipe_ingredients.note (migration 015).
     var ingredientFormRows: [IngredientFormData] {
-        ingredients.map { extracted in
-            IngredientFormData(
-                name: foldedIngredientName(extracted),
-                quantity: extracted.quantityDouble,
-                unit: extracted.ingredientUnit,
-                quantityText: FractionFormatter.formatAsFraction(extracted.quantityDouble)
+        ingredients.map { formRow(for: $0) }
+    }
+
+    private func formRow(for extracted: ExtractedIngredient) -> IngredientFormData {
+        let (unit, packageSize) = extracted.unitAndPackageSize
+        let name = foldedIngredientName(extracted)
+
+        switch extracted.parsedQuantity {
+        case .exact(let value):
+            return IngredientFormData(
+                name: name,
+                quantity: value,
+                unit: unit,
+                quantityText: FractionFormatter.formatAsFraction(value),
+                note: packageSize
+            )
+
+        case .range(_, let upper):
+            let printed = extracted.amount.trimmingCharacters(in: .whitespaces)
+            // Countish units (piece / none) read better without a unit
+            // word after the range: "1-2" not "1-2 piece".
+            let rangeText = (unit == .piece || unit == IngredientUnit.none)
+                ? printed
+                : "\(printed) \(unit.displayName)"
+            return IngredientFormData(
+                name: name,
+                quantity: upper,
+                unit: unit,
+                quantityText: printed,
+                note: joinedNote(rangeText, packageSize)
+            )
+
+        case .unspecified:
+            // Preserve whatever the page printed ("to taste",
+            // "for garnish") — an empty amount leaves no note.
+            let printed = extracted.amount.trimmingCharacters(in: .whitespacesAndNewlines)
+            return IngredientFormData(
+                name: name,
+                quantity: 1,
+                unit: .toTaste,
+                quantityText: "",
+                note: joinedNote(printed.isEmpty ? nil : printed, packageSize)
             )
         }
+    }
+
+    /// Join up to two note fragments ("1-2 lb" + "14 ounces") with a
+    /// separator; nil when both are absent.
+    private func joinedNote(_ first: String?, _ second: String?) -> String? {
+        let parts = [first, second].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "; ")
     }
 
     private func foldedIngredientName(_ ingredient: ExtractedIngredient) -> String {
@@ -170,6 +249,17 @@ struct ExtractedRecipe: Codable {
     }
 }
 
+/// A quantity as printed on a recipe page. Pages print exact amounts
+/// ("2", "1 1/2"), ranges ("1 1/4 to 1 1/2", "1-2", "1¼–1½"), or no
+/// amount at all (garnishes, "to taste" items). Collapsing all three
+/// into one Double silently invented "1" for ranges and garnishes, so
+/// the parser keeps the shape and lets the form conversion decide.
+enum ParsedQuantity: Equatable {
+    case exact(Double)
+    case range(Double, Double)
+    case unspecified
+}
+
 /// A single ingredient as extracted by Claude.
 struct ExtractedIngredient: Codable {
     let name: String
@@ -189,36 +279,91 @@ struct ExtractedIngredient: Codable {
     /// folding strategy as `section` — appended to the form name.
     var preparation: String? = nil
 
-    /// Parse the amount string into a Double.
-    /// Handles integers ("2"), decimals ("1.5"), and fractions ("1/2", "1 1/2").
-    var quantityDouble: Double {
-        let trimmed = amount.trimmingCharacters(in: .whitespaces)
+    /// Parse the printed amount into its shape — exact, range, or
+    /// unspecified. Handles integers ("2"), decimals ("1.5"), fractions
+    /// ("1/2", "1 1/2"), unicode fractions ("1¼"), and ranges joined by
+    /// "to", "-", "–", or "—". An empty or unparseable amount is
+    /// .unspecified — never a made-up number.
+    var parsedQuantity: ParsedQuantity {
+        Self.parseQuantity(from: amount)
+    }
 
-        // Try simple number first (e.g. "2", "1.5")
-        if let value = Double(trimmed) {
-            return value
+    static func parseQuantity(from text: String) -> ParsedQuantity {
+        let normalized = normalizeVulgarFractions(in: text)
+            .trimmingCharacters(in: .whitespaces)
+        guard !normalized.isEmpty else { return .unspecified }
+
+        // A single quantity first — this must win before range
+        // splitting so the space in "1 1/2" is never misread.
+        if let value = FractionFormatter.parseFraction(normalized) {
+            return .exact(value)
         }
 
-        // Handle mixed number + fraction like "1 1/2"
-        let parts = trimmed.split(separator: " ")
-        if parts.count == 2,
-           let whole = Double(parts[0]),
-           let fraction = parseFraction(String(parts[1])) {
-            return whole + fraction
+        // Range: two parseable quantities around a separator.
+        // Lowercased so "1 To 2" still matches " to ".
+        let lowered = normalized.lowercased()
+        for separator in [" to ", "–", "—", "-"] {
+            let parts = lowered.components(separatedBy: separator)
+            if parts.count == 2,
+               let low = FractionFormatter.parseFraction(parts[0].trimmingCharacters(in: .whitespaces)),
+               let high = FractionFormatter.parseFraction(parts[1].trimmingCharacters(in: .whitespaces)),
+               low <= high {
+                return .range(low, high)
+            }
         }
 
-        // Handle simple fraction like "1/2"
-        if let fraction = parseFraction(trimmed) {
-            return fraction
-        }
+        return .unspecified
+    }
 
-        return 1.0
+    /// Rewrite unicode vulgar fractions as ASCII ("1¼" → "1 1/4") so
+    /// the ordinary fraction parser can read them.
+    private static func normalizeVulgarFractions(in text: String) -> String {
+        let map: [Character: String] = [
+            "¼": "1/4", "½": "1/2", "¾": "3/4",
+            "⅓": "1/3", "⅔": "2/3",
+            "⅛": "1/8", "⅜": "3/8", "⅝": "5/8", "⅞": "7/8",
+            "⅕": "1/5", "⅖": "2/5", "⅗": "3/5", "⅘": "4/5",
+            "⅙": "1/6", "⅚": "5/6",
+        ]
+        var result = ""
+        for character in text {
+            if let ascii = map[character] {
+                // "1¼" needs the mixed-number space: "1 1/4".
+                if let last = result.last, last.isNumber {
+                    result.append(" ")
+                }
+                result.append(ascii)
+            } else {
+                result.append(character)
+            }
+        }
+        return result
+    }
+
+    /// The unit split into the unit word and any parenthetical package
+    /// size: "bag (14 ounces)" → (.bag, "14 ounces"). A unit without a
+    /// parenthetical returns (unit, nil).
+    var unitAndPackageSize: (unit: IngredientUnit, packageSize: String?) {
+        guard let openParen = unit.firstIndex(of: "("),
+              let closeParen = unit.lastIndex(of: ")"),
+              openParen < closeParen else {
+            return (Self.ingredientUnit(fromWord: unit), nil)
+        }
+        let word = String(unit[..<openParen])
+        let size = String(unit[unit.index(after: openParen)..<closeParen])
+            .trimmingCharacters(in: .whitespaces)
+        return (Self.ingredientUnit(fromWord: word), size.isEmpty ? nil : size)
     }
 
     /// Map the unit string to the app's IngredientUnit enum.
     /// Normalizes common API responses (e.g. "whole" → .piece, "cloves" → .clove)
-    /// before checking the rawValue or alias table.
+    /// before checking the rawValue or alias table. Any parenthetical
+    /// package size is stripped first — see `unitAndPackageSize`.
     var ingredientUnit: IngredientUnit {
+        unitAndPackageSize.unit
+    }
+
+    private static func ingredientUnit(fromWord unit: String) -> IngredientUnit {
         let normalized = unit.lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -253,6 +398,7 @@ struct ExtractedIngredient: Codable {
             "clove": .clove, "cloves": .clove,
             "can": .can, "cans": .can,
             "package": .package, "packages": .package, "pkg": .package,
+            "bag": .bag, "bags": .bag,
             "bunch": .bunch, "bunches": .bunch,
             "sprig": .sprig, "sprigs": .sprig,
             "dash": .dash, "dashes": .dash,
@@ -271,16 +417,5 @@ struct ExtractedIngredient: Codable {
         }
 
         return .piece
-    }
-
-    private func parseFraction(_ text: String) -> Double? {
-        let parts = text.split(separator: "/")
-        guard parts.count == 2,
-              let numerator = Double(parts[0]),
-              let denominator = Double(parts[1]),
-              denominator != 0 else {
-            return nil
-        }
-        return numerator / denominator
     }
 }

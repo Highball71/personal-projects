@@ -82,8 +82,17 @@ final class ExtractedRecipeTests: XCTestCase {
     }
 
     func testServingsRange() {
-        // "4-6" — the leading digits before the dash should give us 4
-        XCTAssertEqual(makeRecipe(servingSize: "4-6").servingsInt, 4)
+        // A printed range plans for the bigger table: upper bound wins,
+        // and the printed text is preserved for the form's notes.
+        let recipe = makeRecipe(servingSize: "4-6")
+        XCTAssertEqual(recipe.servingsInt, 6)
+        XCTAssertEqual(recipe.servingsRangeInfo?.printed, "4-6")
+    }
+
+    func testServingsRangeWithLabel() {
+        let recipe = makeRecipe(servingSize: "Serves 8 to 10")
+        XCTAssertEqual(recipe.servingsInt, 10)
+        XCTAssertEqual(recipe.servingsRangeInfo?.printed, "Serves 8 to 10")
     }
 
     func testServingsNilDefaults() {

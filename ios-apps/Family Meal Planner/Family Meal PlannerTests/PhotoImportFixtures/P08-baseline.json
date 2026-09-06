@@ -1,0 +1,62 @@
+{
+  "category" : "dinner",
+  "cookTime" : "25 minutes",
+  "description" : "Add a quick slaw to this meat-and-potatoes dish and you've got a complete meal. Try a packaged shredded broccoli or cabbage slaw tossed with a purchased compliant dressing or one of the following homemade dressings: Asian Citrus Dressing (page 277), Everyday Whole30 Salad Dressing (page 278), Apple-Mustard Vinaigrette (page 277), or Blender Green Goddess Dressing (page 275).",
+  "ingredients" : [
+    {
+      "amount" : "1\/2",
+      "name" : "small new potatoes",
+      "preparation" : "quartered",
+      "unit" : "pound"
+    },
+    {
+      "amount" : "1",
+      "name" : "extra-virgin olive oil",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "dried thyme",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "black pepper",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "2",
+      "name" : "bone-in pork loin chops",
+      "preparation" : "3\/4 inch thick",
+      "unit" : ""
+    },
+    {
+      "amount" : "1",
+      "name" : "Clarified Butter (page 283) or ghee",
+      "preparation" : "melted",
+      "unit" : "tablespoon"
+    },
+    {
+      "amount" : "1\/4",
+      "name" : "Whole30-compliant barbecue sauce",
+      "preparation" : "plus more for serving if desired",
+      "unit" : "cup"
+    }
+  ],
+  "instructions" : [
+    "PREHEAT the oven to 425°F. Line a large rimmed baking pan with parchment paper.",
+    "IN a large bowl, combine the potatoes, olive oil, thyme, 1\/4 teaspoon of the salt, and 1\/8 teaspoon of the pepper. Spread the potatoes on half of the pan and roast for 10 minutes; stir.",
+    "BRUSH the pork chops with the melted butter and sprinkle with the remaining 1\/4 teaspoon salt and 1\/8 teaspoon pepper. Add the chops to the pan and roast for 10 minutes. Brush both sides of the chops with the barbecue sauce. Roast until the chops' internal temperature is 145°F and the potatoes are tender and golden brown, about 5 minutes longer. Let the chops rest for 5 minutes.",
+    "SERVE the chops and potatoes with additional barbecue sauce, if desired, and season to taste with salt and pepper."
+  ],
+  "name" : "Sheet Pan Barbecue Pork Chops with Potatoes",
+  "prepTime" : "10 minutes",
+  "servingSize" : "2",
+  "source" : "Whole30 Fast & Easy",
+  "totalTime" : "35 minutes"
+}

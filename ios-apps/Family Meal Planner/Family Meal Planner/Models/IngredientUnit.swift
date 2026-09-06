@@ -32,6 +32,7 @@ enum IngredientUnit: String, Codable, CaseIterable, Identifiable {
     case clove = "clove"
     case can = "can"
     case package = "package"
+    case bag = "bag"
     case bunch = "bunch"
     case sprig = "sprig"
     case dash = "dash"
@@ -61,6 +62,7 @@ enum IngredientUnit: String, Codable, CaseIterable, Identifiable {
         case .clove: "clove"
         case .can: "can"
         case .package: "package"
+        case .bag: "bag"
         case .bunch: "bunch"
         case .sprig: "sprig"
         case .dash: "dash"
@@ -78,7 +80,7 @@ enum IngredientUnit: String, Codable, CaseIterable, Identifiable {
             .ounce, .pound,
             .fluidOunce, .milliliter, .liter,
             .gram, .kilogram,
-            .piece, .pinch, .clove, .can, .package,
+            .piece, .pinch, .clove, .can, .package, .bag,
             .bunch, .sprig, .dash, .toTaste,
         ]
     }

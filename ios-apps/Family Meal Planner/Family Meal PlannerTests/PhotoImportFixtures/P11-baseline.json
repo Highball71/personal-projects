@@ -1,0 +1,75 @@
+{
+  "category" : "dinner",
+  "cookTime" : "20 minutes",
+  "description" : "Although they're edible, the gills on portobello mushrooms can turn an entire dish black and muddy-looking. It's almost always best to remove them before cooking.",
+  "ingredients" : [
+    {
+      "amount" : "1 1\/2",
+      "name" : "beef stir-fry strips",
+      "unit" : "pounds"
+    },
+    {
+      "amount" : "2",
+      "name" : "Whole30-compliant Italian seasoning",
+      "unit" : "teaspoons"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "black pepper",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "2",
+      "name" : "olive oil",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1",
+      "name" : "frozen bell pepper and onion blend",
+      "unit" : "bag (14 ounces)"
+    },
+    {
+      "amount" : "4",
+      "name" : "Whole30-compliant beef broth or Beef Bone Broth (page 280)",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "1",
+      "name" : "Whole30-compliant diced tomatoes with garlic and onion",
+      "unit" : "can (14.5 ounces)"
+    },
+    {
+      "amount" : "2",
+      "name" : "portobello mushrooms",
+      "preparation" : "gills removed (see Tip), halved and sliced",
+      "unit" : ""
+    },
+    {
+      "amount" : "1",
+      "name" : "rutabaga",
+      "preparation" : "spiralized or diced",
+      "unit" : "medium"
+    },
+    {
+      "amount" : "1",
+      "name" : "fresh basil leaves",
+      "unit" : "cup"
+    }
+  ],
+  "instructions" : [
+    "SEASON the meat with the Italian seasoning, salt, and pepper. Heat 1 tablespoon of the olive oil over medium-high heat in a large pot. Add half of the meat and cook, stirring occasionally, until browned but still pink in the center, 2 to 3 minutes. Transfer the meat to a bowl. Add the remaining 1 tablespoon olive oil to the pot and cook the remaining meat. Transfer the meat to the bowl.",
+    "ADD the frozen bell pepper and onion blend to the pot. Cook over medium heat, stirring occasionally, until tender, 3 to 4 minutes. Add the broth and tomatoes and bring to a boil.",
+    "ADD the mushrooms and rutabaga noodles and bring to a low boil. Cook until the mushrooms and rutabaga are just tender, 6 to 7 minutes. Return the meat to the pot, stir in the basil, and serve."
+  ],
+  "name" : "Steak and Portobello Rutabaga-Noodle Bowls",
+  "notes" : "Tip:\nUse a spoon to scrape the gills from the mushrooms.",
+  "prepTime" : "15 minutes",
+  "servingSize" : "6",
+  "source" : "Soups, Stews, and Noodle Bowls (cookbook, page 163)",
+  "totalTime" : "35 minutes"
+}

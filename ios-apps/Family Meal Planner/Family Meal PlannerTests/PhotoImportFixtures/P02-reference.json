@@ -1,0 +1,84 @@
+{
+  "case": "P02",
+  "file": "IMG_9130.HEIC",
+  "verification": "Key fields visually checked against supplied photo",
+  "name": "Spicy Pineapple Steak Kabobs",
+  "servings": 4,
+  "prep_minutes": 25,
+  "cook_minutes": 10,
+  "marinating_hours_range": [
+    1,
+    24
+  ],
+  "total": "35 minutes plus marinating",
+  "ingredients": [
+    {
+      "name": "lean beef steak",
+      "amount": 2,
+      "unit": "pounds"
+    },
+    {
+      "name": "unsweetened pineapple juice",
+      "amount": 0.25,
+      "unit": "cup"
+    },
+    {
+      "name": "coconut aminos",
+      "amount": 3,
+      "unit": "tablespoons"
+    },
+    {
+      "name": "fresh lemon juice",
+      "amount": 2,
+      "unit": "tablespoons"
+    },
+    {
+      "name": "serrano chile pepper",
+      "amount": 1,
+      "unit": "whole"
+    },
+    {
+      "name": "fresh ginger",
+      "amount": 2,
+      "unit": "teaspoons"
+    },
+    {
+      "name": "garlic",
+      "amount": 1,
+      "unit": "clove"
+    },
+    {
+      "name": "salt",
+      "amount": 0.25,
+      "unit": "teaspoon"
+    },
+    {
+      "name": "black pepper",
+      "amount": 0.25,
+      "unit": "teaspoon"
+    },
+    {
+      "name": "small pineapple",
+      "amount": 1,
+      "unit": "whole"
+    },
+    {
+      "name": "bell peppers",
+      "amount": 2,
+      "unit": "whole"
+    },
+    {
+      "name": "onion",
+      "amount": 1,
+      "unit": "whole"
+    }
+  ],
+  "critical_checks": [
+    "Preserve marinade duration separately from 35-minute active total",
+    "Preserve optional wooden-skewer soaking step",
+    "Preserve steak removal from refrigerator 30 minutes before cooking",
+    "Preserve 350\u2013375\u00b0F grill range and 8\u201312 minute grilling range",
+    "Preserve tip allowing 4 cups canned unsweetened pineapple chunks",
+    "Do not invent an ingredient from the headnote reference to pork"
+  ]
+}

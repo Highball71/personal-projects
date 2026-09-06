@@ -1,0 +1,80 @@
+{
+  "category" : "dinner",
+  "cookTime" : "15 minutes",
+  "description" : "Egg drop soup is a super-common dish in many Asian households. Each region (and even household) has a slightly different take on the traditional soup. Some like to use chicken broth, while others use vegetable broth. I decided to make a heartier soup by adding ground chicken so that if you're hungry after work, the soup is very quick to put together and will fill you up in a hurry.",
+  "ingredients" : [
+    {
+      "amount" : "2",
+      "name" : "Clarified Butter (page 283) or ghee",
+      "unit" : "teaspoons"
+    },
+    {
+      "amount" : "2",
+      "name" : "green onions",
+      "preparation" : "chopped, white and green parts separated",
+      "unit" : ""
+    },
+    {
+      "amount" : "2",
+      "name" : "fresh ginger",
+      "preparation" : "minced",
+      "unit" : "teaspoons"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "ground chicken or turkey",
+      "unit" : "pound"
+    },
+    {
+      "amount" : "1",
+      "name" : "fresh shiitake mushrooms",
+      "preparation" : "sliced, stemmed",
+      "unit" : "cup"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "salt",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "3",
+      "name" : "Whole30-compliant chicken broth or Chicken Bone Broth (page 280)",
+      "unit" : "cups"
+    },
+    {
+      "amount" : "2",
+      "name" : "coconut aminos",
+      "unit" : "tablespoons"
+    },
+    {
+      "amount" : "1\/2",
+      "name" : "ground cumin",
+      "unit" : "teaspoon"
+    },
+    {
+      "amount" : "3",
+      "name" : "eggs",
+      "unit" : "large"
+    },
+    {
+      "amount" : "",
+      "name" : "Toasted sesame oil",
+      "unit" : ""
+    }
+  ],
+  "instructions" : [
+    "Heat the butter in a medium saucepan over medium-high heat. Add the white parts of the green onions and the ginger and cook, stirring, until fragrant, about 2 minutes. Add the ground chicken, mushrooms, and salt and cook until the chicken is no longer pink and the mushrooms are tender, 8 to 10 minutes. Add the broth, coconut aminos, and cumin, bring to a boil, then reduce the heat to a simmer.",
+    "In a small bowl, whisk the eggs for 30 seconds. Holding a fork over the saucepan, slowly pour the eggs through the tines of the fork and whisk the broth gently as you pour. Let the soup stand for a few seconds to finish cooking the eggs.",
+    "Top with the green parts of the green onions, drizzle with sesame oil, and serve."
+  ],
+  "name" : "Hearty Chinese Egg Drop Soup",
+  "prepTime" : "5 minutes",
+  "servingSize" : "2",
+  "source" : "Soups, Stews, and Noodle Bowls (from ChihYu Smith of I Heart Umami)",
+  "tags" : [
+    "Chinese",
+    "soup",
+    "dinner"
+  ],
+  "totalTime" : "20 minutes"
+}
