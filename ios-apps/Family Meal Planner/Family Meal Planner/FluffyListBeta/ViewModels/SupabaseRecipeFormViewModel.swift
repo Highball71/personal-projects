@@ -96,7 +96,16 @@ final class SupabaseRecipeFormViewModel {
         // are optional. When both are present, separate with a blank
         // line. Earlier the form's notes field stayed blank even when
         // the source page had a clearly labeled Notes section.
+        // A printed servings RANGE ("8 to 10") also lands here — the
+        // servings stepper holds the upper bound, and the form has no
+        // dedicated servings-note field, so the printed text goes at
+        // the top of notes instead of being silently dropped.
         notes = composedNotes(
+            servingsText: extracted.servingsRangeInfo.map { info in
+                info.printed.lowercased().contains("serve")
+                    ? info.printed
+                    : "Serves \(info.printed)"
+            },
             description: extracted.description,
             notes: extracted.notes
         )
@@ -109,8 +118,8 @@ final class SupabaseRecipeFormViewModel {
         }
     }
 
-    private func composedNotes(description: String?, notes: String?) -> String {
-        let parts: [String] = [description, notes]
+    private func composedNotes(servingsText: String? = nil, description: String?, notes: String?) -> String {
+        let parts: [String] = [servingsText, description, notes]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return parts.joined(separator: "\n\n")

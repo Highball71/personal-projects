@@ -48,6 +48,25 @@ final class QuantityRangeConversionTests: XCTestCase {
         )
     }
 
+    /// The P15 gap: "Serves 8 to 10" (extracted servingSize "8 to 10")
+    /// used to land as servings 4/8-ish lower bound with the range
+    /// dropped. Same range parser now: upper bound in the stepper,
+    /// printed text preserved at the top of the form's notes (the
+    /// model has no dedicated servings-note field).
+    @MainActor
+    func testP15ServingsRangeUpperBoundWithPrintedTextInNotes() throws {
+        let extracted = try PhotoImportFixtures.extractedRecipe("P15-baseline")
+        XCTAssertEqual(extracted.servingSize, "8 to 10", "Fixture ground truth")
+        XCTAssertEqual(extracted.servingsRangeInfo?.upperBound, 10)
+
+        let form = SupabaseRecipeFormViewModel()
+        form.populateFrom(extracted)
+        XCTAssertEqual(form.servings, 10, "Upper bound — plan for the bigger table")
+        XCTAssertTrue(form.notes.hasPrefix("Serves 8 to 10"),
+                      "Printed servings text folds into notes, not the title; got \(form.notes.prefix(40))")
+        XCTAssertFalse(form.name.contains("8 to 10"), "The title stays clean")
+    }
+
     @MainActor
     private func assertMeatRange(fixture: String, nameFragment: String) throws {
         let extracted = try PhotoImportFixtures.extractedRecipe(fixture)
@@ -69,7 +88,9 @@ final class QuantityRangeConversionTests: XCTestCase {
         XCTAssertEqual(row.unit, .pound)
         XCTAssertEqual(row.quantityText, "1 1/4 to 1 1/2",
                        "The form's quantity field shows the printed range")
-        XCTAssertTrue(row.name.contains("(1 1/4 to 1 1/2 lb)"),
-                      "The printed range rides in the name so saved recipe and grocery rows keep it; got \(row.name)")
+        XCTAssertEqual(row.note, "1 1/4 to 1 1/2 lb",
+                       "The printed range lives in note (recipe_ingredients.note), not the name")
+        XCTAssertFalse(row.name.contains("1 1/4"),
+                       "The name stays clean so grocery merging can match it; got \(row.name)")
     }
 }

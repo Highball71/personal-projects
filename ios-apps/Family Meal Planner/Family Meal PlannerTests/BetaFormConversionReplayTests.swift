@@ -33,10 +33,29 @@ final class BetaFormConversionReplayTests: XCTestCase {
             for (source, row) in zip(extracted.ingredients, form.ingredientRows) {
                 let isRange: Bool
                 if case .range = source.parsedQuantity { isRange = true } else { isRange = false }
-                let hasPackageSize = source.unitAndPackageSize.packageSize != nil
+                let packageSize = source.unitAndPackageSize.packageSize
                 let missingAmount = source.parsedQuantity == .unspecified
 
-                guard isRange || hasPackageSize || missingAmount else { continue }
+                // The name must never carry conversion-added text —
+                // ranges and package sizes live in `note` now. (Source
+                // names legitimately contain parentheticals like
+                // "(page 285)", so the check targets amount-derived
+                // text, not every "(".)
+                let printedAmount = source.amount.trimmingCharacters(in: .whitespaces)
+                if isRange {
+                    XCTAssertFalse(row.name.contains(printedAmount),
+                                   "\(fixture): range \"\(printedAmount)\" leaked into name \"\(row.name)\"")
+                    XCTAssertEqual(row.note?.contains(printedAmount), true,
+                                   "\(fixture): range \"\(printedAmount)\" missing from note")
+                }
+                if let packageSize {
+                    XCTAssertFalse(row.name.contains(packageSize),
+                                   "\(fixture): package size \"\(packageSize)\" leaked into name \"\(row.name)\"")
+                    XCTAssertEqual(row.note?.contains(packageSize), true,
+                                   "\(fixture): package size \"\(packageSize)\" missing from note")
+                }
+
+                guard isRange || packageSize != nil || missingAmount else { continue }
                 flaggedCount += 1
 
                 XCTAssertFalse(

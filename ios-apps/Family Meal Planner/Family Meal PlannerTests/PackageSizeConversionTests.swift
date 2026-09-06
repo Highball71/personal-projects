@@ -36,13 +36,16 @@ final class PackageSizeConversionTests: XCTestCase {
         let bag = try row(named: "bell pepper and onion blend", in: rows)
         XCTAssertEqual(bag.quantity, 1)
         XCTAssertEqual(bag.unit, .bag, "\"1 bag (14 ounces)\" keeps the container word")
-        XCTAssertTrue(bag.name.contains("(14 ounces)"),
-                      "The parenthetical size stays visible; got \(bag.name)")
+        XCTAssertEqual(bag.note, "14 ounces",
+                       "The parenthetical size lives in note, not the name")
+        XCTAssertFalse(bag.name.contains("14 ounces"),
+                       "The name stays clean; got \(bag.name)")
 
         let can = try row(named: "diced tomatoes", in: rows)
         XCTAssertEqual(can.quantity, 1)
         XCTAssertEqual(can.unit, .can)
-        XCTAssertTrue(can.name.contains("(14.5 ounces)"), "got \(can.name)")
+        XCTAssertEqual(can.note, "14.5 ounces")
+        XCTAssertFalse(can.name.contains("14.5"), "got \(can.name)")
 
         // The model-level split is exact.
         let bagSource = try XCTUnwrap(extracted.ingredients.first { $0.unit.hasPrefix("bag") })
@@ -56,7 +59,8 @@ final class PackageSizeConversionTests: XCTestCase {
         let package = try row(named: "pepper stir-fry blend", in: rows)
         XCTAssertEqual(package.quantity, 1)
         XCTAssertEqual(package.unit, .package, "\"1 package (14.4 ounces)\" keeps the container word")
-        XCTAssertTrue(package.name.contains("(14.4 ounces)"), "got \(package.name)")
+        XCTAssertEqual(package.note, "14.4 ounces")
+        XCTAssertFalse(package.name.contains("14.4"), "The name stays clean; got \(package.name)")
     }
 
     // MARK: - Unspecified amounts (P12 sesame oil, P13 parsley, P05 garnishes)
@@ -70,7 +74,29 @@ final class PackageSizeConversionTests: XCTestCase {
         let oil = try row(named: "sesame oil", in: rows)
         XCTAssertEqual(oil.unit, .toTaste, "Renders as \"to taste\", quantity field hidden")
         XCTAssertEqual(oil.quantityText, "", "No invented number in the form")
+        XCTAssertNil(oil.note, "The page printed no amount at all — nothing to preserve")
         XCTAssertFalse(oil.quantity == 1 && oil.unit == .piece)
+    }
+
+    /// When the page DID print an unparseable amount ("to taste",
+    /// "for garnish"), that text is preserved in note instead of
+    /// being dropped with the unspecified quantity.
+    func testPrintedUnparseableAmountPreservedInNote() {
+        let recipe = ExtractedRecipe(
+            name: "Test", category: "dinner", servingSize: "4",
+            prepTime: nil, cookTime: nil,
+            ingredients: [
+                ExtractedIngredient(name: "salt", amount: "to taste", unit: ""),
+                ExtractedIngredient(name: "cilantro", amount: "for garnish", unit: ""),
+            ],
+            instructions: ["Step"], source: nil
+        )
+        let rows = recipe.ingredientFormRows
+        XCTAssertEqual(rows[0].unit, .toTaste)
+        XCTAssertEqual(rows[0].note, "to taste")
+        XCTAssertEqual(rows[1].unit, .toTaste)
+        XCTAssertEqual(rows[1].note, "for garnish")
+        XCTAssertFalse(rows[1].name.contains("garnish"), "Name stays clean: \(rows[1].name)")
     }
 
     func testP13ParsleyIsUnspecifiedNotOnePiece() throws {

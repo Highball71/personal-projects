@@ -54,9 +54,24 @@ struct ExtractedRecipe: Codable {
         }
     }
 
+    /// The servings range when the page prints one ("8 to 10", "4-6",
+    /// "Serves 8 to 10"): (upper bound, printed text). Nil for a single
+    /// number or no servings at all. Uses the same range parser as
+    /// ingredient amounts, after skipping any leading label word.
+    var servingsRangeInfo: (upperBound: Int, printed: String)? {
+        guard let text = servingSize?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let firstDigit = text.firstIndex(where: { $0.isNumber }) else { return nil }
+        guard case .range(_, let upper) = ExtractedIngredient.parseQuantity(from: String(text[firstDigit...])),
+              upper >= 1 else { return nil }
+        return (Int(upper.rounded()), text)
+    }
+
     /// Parse servingSize string (e.g. "4", "4 servings", "4-6") into an Int.
-    /// Extracts the first number found; defaults to 4.
+    /// A printed range ("8 to 10") yields its UPPER bound — plan for the
+    /// bigger table; the printed text is preserved via servingsRangeInfo.
+    /// Otherwise extracts the first number found; defaults to 4.
     var servingsInt: Int {
+        if let range = servingsRangeInfo { return range.upperBound }
         guard let text = servingSize else { return 4 }
         // Find the first sequence of digits in the string
         let digits = text.prefix(while: { $0.isNumber || $0 == " " })
@@ -104,66 +119,76 @@ struct ExtractedRecipe: Codable {
     ///
     /// Quantities are handled by shape (see ParsedQuantity):
     ///   - exact: the number, formatted as a cooking fraction.
-    ///   - range ("1 1/4 to 1 1/2 pounds"): the DB row persists only a
+    ///   - range ("1 1/4 to 1 1/2 pounds"): the DB row persists a
     ///     single Double + unit, so the numeric quantity is the UPPER
-    ///     bound (grocery aggregation never under-buys) and the printed
-    ///     range rides in both the form's quantity text and the name —
-    ///     the name is what the saved recipe and grocery rows display.
+    ///     bound (grocery aggregation never under-buys); the printed
+    ///     range goes to `note` ("1 1/4 to 1 1/2 lb") and the form's
+    ///     quantity text.
     ///   - unspecified (no printed amount, e.g. a garnish): unit
     ///     becomes .toTaste, which the form and grocery list render as
     ///     "to taste" with no number. Never an invented "1 piece".
+    ///     If the page DID print something unparseable ("to taste",
+    ///     "for garnish"), that text is preserved in `note`.
     ///
-    /// A parenthetical package size in the unit ("bag (14 ounces)") is
-    /// kept the same way: unit = the container word, size in the name.
+    /// A parenthetical package size in the unit ("bag (14 ounces)")
+    /// keeps the container word as the unit with the size in `note`.
+    ///
+    /// The NAME stays clean — no quantity text is ever folded into it,
+    /// so the grocery merge (keyed on normalized name) can match a
+    /// scanned "olive oil" with a hand-entered one. `note` persists to
+    /// recipe_ingredients.note (migration 015).
     var ingredientFormRows: [IngredientFormData] {
         ingredients.map { formRow(for: $0) }
     }
 
     private func formRow(for extracted: ExtractedIngredient) -> IngredientFormData {
         let (unit, packageSize) = extracted.unitAndPackageSize
-        var name = foldedIngredientName(extracted)
+        let name = foldedIngredientName(extracted)
 
         switch extracted.parsedQuantity {
         case .exact(let value):
-            if let packageSize {
-                name += " (\(packageSize))"
-            }
             return IngredientFormData(
                 name: name,
                 quantity: value,
                 unit: unit,
-                quantityText: FractionFormatter.formatAsFraction(value)
+                quantityText: FractionFormatter.formatAsFraction(value),
+                note: packageSize
             )
 
         case .range(_, let upper):
             let printed = extracted.amount.trimmingCharacters(in: .whitespaces)
             // Countish units (piece / none) read better without a unit
-            // word after the range: "(1-2)" not "(1-2 piece)".
-            let suffix = (unit == .piece || unit == IngredientUnit.none)
+            // word after the range: "1-2" not "1-2 piece".
+            let rangeText = (unit == .piece || unit == IngredientUnit.none)
                 ? printed
                 : "\(printed) \(unit.displayName)"
-            name += " (\(suffix))"
-            if let packageSize {
-                name += " (\(packageSize))"
-            }
             return IngredientFormData(
                 name: name,
                 quantity: upper,
                 unit: unit,
-                quantityText: printed
+                quantityText: printed,
+                note: joinedNote(rangeText, packageSize)
             )
 
         case .unspecified:
-            if let packageSize {
-                name += " (\(packageSize))"
-            }
+            // Preserve whatever the page printed ("to taste",
+            // "for garnish") — an empty amount leaves no note.
+            let printed = extracted.amount.trimmingCharacters(in: .whitespacesAndNewlines)
             return IngredientFormData(
                 name: name,
                 quantity: 1,
                 unit: .toTaste,
-                quantityText: ""
+                quantityText: "",
+                note: joinedNote(printed.isEmpty ? nil : printed, packageSize)
             )
         }
+    }
+
+    /// Join up to two note fragments ("1-2 lb" + "14 ounces") with a
+    /// separator; nil when both are absent.
+    private func joinedNote(_ first: String?, _ second: String?) -> String? {
+        let parts = [first, second].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "; ")
     }
 
     private func foldedIngredientName(_ ingredient: ExtractedIngredient) -> String {
