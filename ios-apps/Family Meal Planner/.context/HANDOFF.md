@@ -343,5 +343,17 @@ The Codex round-2 review ("Photo review round 2/Review.md" beside the round-1 ev
 
 ## Parked
 
-- **Size/slice wording polish** (small/medium/slices falling back to "piece") — flagged in Codex round 3; see `~/Documents/Codex/2026-09-05/referenced-chatgpt-conversation-this-is-an/outputs/Photo review round 3/Review.md`.
+- ~~**Size/slice wording polish**~~ — UNPARKED 2026-09-06 evening, implemented on branch `ingredient-wording-polish` (see below).
 - **Continuity/leftover feature** ("remaining half-pound" tracking — the unused remainder when a recipe consumes part of a package) — see the round-2 review materials in `Documents/Codex/2026-09-05/…/outputs/Photo review round 2/`.
+
+---
+
+## 2026-09-06 evening — ingredient wording polish (Home iMac, autonomous, branch `ingredient-wording-polish` — NOT merged to main)
+
+The parked round-3 wording items, display layer only — prompt, parser shapes, and stored quantity/unit values untouched. **Suite: 272 tests, 0 failures** (257 + 15 new); zero new compiler warnings; no live Anthropic calls.
+
+- **Flagged by round 3 (Remaining limitations 1 + 3), with what rows used to show:** P02 "1 small pineapple" → "1 piece"; P10 "4 medium portobello mushrooms" → "4 piece"; P11 "1 medium rutabaga" → "1 piece + spiralized or diced"; P15 "8 slices bacon" → "8 piece + For the Casserole"; and notes rendered after " + " everywhere, so "1 can + 14.5 ounces" / "1 1/2 lb + 1¼ to 1½ lb" read like extra quantities.
+- **New pure `FluffyListBeta/Models/IngredientDisplay.swift`** — the ONE place row wording lives; recipe-detail and grocery rows both render through it. Rules: containers → "1 can (14.5 oz)" (count, container word, size parenthetical with app abbreviations; sizes that aren't a plain number+unit — "about 1 pound total" — stay as printed); size/slice descriptors rescued from a piece unit replace the generic label ("8 slices", "1 medium"); preparation/section/range context renders after " · " (one separator style: "Marinade · thinly sliced"), never in the quantity label or name; a note fragment that only restates the row's own quantity is suppressed on that row (stored note unchanged).
+- **One conversion addition to make the rescue possible:** when the extracted unit word is a size/slice descriptor that aliases to .piece (small/medium/large/slice/slices), `formRow` now preserves the word as a note fragment (`ExtractedIngredient.pieceDescriptor`) — note content only; quantity, unit, merge identity all unchanged. Detail-view unknown legacy units now render their raw string ("4 cups") instead of a bare number — grocery behavior, unified.
+- **New tests (15):** `IngredientDisplayTests` (8 — one per display rule, exact strings) and `WordingPolishFixtureTests` (7 — one per flagged case from the round-2 fixtures: P02 pineapple "1 small · peeled, cored, and cut into 1½-inch chunks"; P10 "4 medium · For the Mushrooms"; P11 rutabaga "1 medium · spiralized or diced"; P15 "8 slices · For the Casserole"; P11 "1 bag (14 oz)" / "1 can (14.5 oz)"; P13 "1 package (14.4 oz)"; P04 meat "1 1/2 lb · 1¼ to 1½ lb").
+- **Device pass owed on this branch:** open P11 and P04 recipe detail plus the grocery list and READ the rows — container sizes as "1 bag (14 oz)" style, meat range after " · ", rutabaga "1 medium", no " + " anywhere. **NEXT BUILD = 122 after that pass.**
