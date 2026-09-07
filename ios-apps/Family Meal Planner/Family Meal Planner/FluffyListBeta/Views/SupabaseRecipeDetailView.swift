@@ -465,29 +465,15 @@ struct SupabaseRecipeDetailView: View {
     /// The right-column quantity for an ingredient with the current
     /// scale factor applied — "1 1/2 lb", "to taste", "3".
     private func quantityText(_ ingredient: RecipeIngredientRow) -> String {
-        let base = baseQuantityText(ingredient)
-        // Printed quantity text that has no (quantity, unit) home —
-        // package sizes, ranges (migration 015's note column).
-        if let note = ingredient.note, !note.isEmpty {
-            return "\(base) (\(note))"
-        }
-        return base
-    }
-
-    private func baseQuantityText(_ ingredient: RecipeIngredientRow) -> String {
-        let unit = IngredientUnit(rawValue: ingredient.unit)
-
-        if unit == .toTaste { return "to taste" }
-
-        let scaledQty = ingredient.quantity * scaleFactor
-        let qty = FractionFormatter.formatAsFraction(scaledQty)
-
-        // Spell out the enum case so Swift doesn't think we mean
-        // Optional<IngredientUnit>.none — `unit == nil` already covers
-        // that case; the second branch is for the explicit enum case.
-        if unit == nil || unit == IngredientUnit.none { return qty }
-
-        return "\(qty) \(unit!.displayName)"
+        // One shared formatter with the grocery rows (IngredientDisplay)
+        // — container sizes as "1 can (14.5 oz)", size descriptors
+        // replacing "piece", note context after " · ".
+        IngredientDisplay.render(
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+            note: ingredient.note,
+            scale: scaleFactor
+        ).combined
     }
 
     // MARK: - Ingredient Highlighting

@@ -205,11 +205,13 @@ struct ExtractedRecipe: Codable {
     }
 
     /// The form row's note: quantity-derived text (printed range,
-    /// package size, unparseable printed amount) plus the preparation
-    /// note, "; "-joined, all behind a "Section: " prefix when the
-    /// ingredient sat under a section header. Section and preparation
-    /// used to be folded into the NAME, which split identical pantry
-    /// items into separate grocery rows.
+    /// package size, unparseable printed amount), any size/slice
+    /// descriptor word rescued from the unit ("medium", "slices" —
+    /// otherwise lost when the unit falls back to .piece), plus the
+    /// preparation note, "; "-joined, all behind a "Section: " prefix
+    /// when the ingredient sat under a section header. Section and
+    /// preparation used to be folded into the NAME, which split
+    /// identical pantry items into separate grocery rows.
     private func composedNote(for ingredient: ExtractedIngredient, quantityText: String?) -> String? {
         var prep = ingredient.preparation?.trimmingCharacters(in: .whitespacesAndNewlines)
         // Skip preparation the model duplicated into the empty-name
@@ -217,7 +219,7 @@ struct ExtractedRecipe: Codable {
         if ingredient.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             prep = nil
         }
-        let body = joinedFragments(quantityText, prep)
+        let body = joinedFragments([quantityText, ingredient.pieceDescriptor, prep])
 
         guard let section = ingredient.section?.trimmingCharacters(in: .whitespacesAndNewlines),
               !section.isEmpty else {
@@ -227,11 +229,15 @@ struct ExtractedRecipe: Codable {
         return "\(section): \(body)"
     }
 
-    /// Join up to two note fragments ("1-2 lb" + "14 ounces") with a
-    /// separator; nil when both are absent.
+    /// Join note fragments ("1-2 lb", "14 ounces", "sliced") with a
+    /// separator; nil when all are absent.
     private func joinedFragments(_ first: String?, _ second: String?) -> String? {
-        let parts = [first, second].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: "; ")
+        joinedFragments([first, second])
+    }
+
+    private func joinedFragments(_ parts: [String?]) -> String? {
+        let kept = parts.compactMap { $0 }.filter { !$0.isEmpty }
+        return kept.isEmpty ? nil : kept.joined(separator: "; ")
     }
 
     /// Parse a time string like "30 minutes", "1 hour", "1 hour 30 minutes" into minutes.
@@ -470,6 +476,25 @@ struct ExtractedIngredient: Codable {
     /// package size is stripped first — see `unitAndPackageSize`.
     var ingredientUnit: IngredientUnit {
         unitAndPackageSize.unit
+    }
+
+    /// Size/slice words that alias to .piece as a unit. When one is
+    /// the printed unit ("8 slices bacon", "1 medium rutabaga") the
+    /// word itself is worth keeping — the round-3 review flagged
+    /// small/medium/slices silently degrading to "piece".
+    static let sizeDescriptorWords: Set<String> = ["small", "medium", "large", "slice", "slices"]
+
+    /// The original unit word when it's a size/slice descriptor that
+    /// falls back to .piece — preserved into the form row's note so
+    /// display can read "8 slices" instead of "8 piece". Nil for real
+    /// units and container words.
+    var pieceDescriptor: String? {
+        var word = unit ?? ""
+        if let paren = word.firstIndex(of: "(") {
+            word = String(word[..<paren])
+        }
+        word = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return Self.sizeDescriptorWords.contains(word) ? word : nil
     }
 
     private static func ingredientUnit(fromWord unit: String) -> IngredientUnit {

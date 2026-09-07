@@ -348,19 +348,16 @@ struct SupabaseGroceryListView: View {
     // MARK: - Quantity Formatting
 
     private func quantityText(_ item: SupabaseGroceryItem) -> String {
-        var base: String
-        if item.unit == IngredientUnit.toTaste.rawValue {
-            base = "to taste"
-        } else {
-            let qty = FractionFormatter.formatAsFraction(item.quantity)
-            base = item.unit == IngredientUnit.none.rawValue ? qty : "\(qty) \(item.unit)"
-        }
-        // Amounts that couldn't merge numerically (incompatible units)
-        // ride in the note — "1 piece + 2 tbsp" on one row.
-        if let note = item.note, !note.isEmpty {
-            base += " + \(note)"
-        }
-        return base
+        // One shared formatter with the recipe-detail rows — container
+        // sizes render as "1 can (14.5 oz)", size descriptors replace
+        // "piece" ("8 slices"), and remaining note context follows
+        // after " · " instead of the old " + " that read like an
+        // extra quantity.
+        IngredientDisplay.render(
+            quantity: item.quantity,
+            unit: item.unit,
+            note: item.note
+        ).combined
     }
 }
 
