@@ -1,16 +1,25 @@
 -- 016_membership_and_integrity_hardening.sql
 --
 -- Codex ("Astra") security review 2026-09-13. Two membership gaps and
--- three cross-table integrity rules. Safe to run multiple times
--- (DROP IF EXISTS + OR REPLACE + conditional index creation).
+-- three cross-table integrity rules. Reconciled 2026-09-14 against the
+-- LIVE pg_policies grid from `papuusfhtojthtnbsdvs` (pasted in the PR)
+-- — policy names below are the live names, which drifted from the repo
+-- (e.g. the open INSERT is "Users can join households", not 001's
+-- "Users can insert themselves").
 --
--- 1. MEMBERSHIP GAP — direct self-insert. "Users can insert themselves"
---    (001) let any authenticated user INSERT a membership for themselves
---    given only a household_id — join-code bypass. Membership is now
---    gained only through SECURITY DEFINER functions:
---    join_household_by_code (011) and the new create_household, which
---    inserts the households row and the owner's head-cook membership
---    together.
+-- NOT idempotent, on purpose: every DROP names its exact live policy
+-- with no IF EXISTS — if a name is wrong, the migration must fail
+-- loudly rather than leave the old permissive policy standing.
+-- Permissive policies OR together, so a new tighter policy beside an
+-- old open one changes nothing; the old one has to go.
+--
+-- 1. MEMBERSHIP GAP — direct self-insert. "Users can join households"
+--    (WITH CHECK auth.uid() = user_id) let any authenticated user
+--    INSERT a membership for themselves given only a household_id —
+--    join-code bypass. Membership is now gained only through SECURITY
+--    DEFINER functions: join_household_by_code (011) and the new
+--    create_household, which inserts the households row and the
+--    owner's head-cook membership together.
 --
 --    COMPATIBILITY SHIM (drop in a later migration once builds < 123
 --    are gone from TestFlight): shipped builds still do direct inserts —
@@ -25,30 +34,42 @@
 --         create flow's bootstrap; you can only own your own household,
 --         so no cross-tenant reach).
 --    Neither arm allows joining an arbitrary household_id, which is the
---    hole Astra found. The households INSERT policy (011) stays for the
---    same reason — shipped create needs it; it was never the gap.
+--    hole Astra found. The households policies (011) are untouched —
+--    shipped create needs the owner INSERT policy; it was never the gap.
 --
--- 2. MEMBERSHIP GAP — UPDATE can move a row. The UPDATE policies
---    (001/011/014) pin user_id (or NULL) but not household_id, so a
+-- 2. MEMBERSHIP GAP — UPDATE can move a row. The live UPDATE policies
+--    ("Members can update their own membership", "Members can update
+--    profile members") pin user_id (or NULL) but not household_id, so a
 --    member could re-point a membership row at another household.
 --    WITH CHECK cannot reference OLD, so this is a BEFORE UPDATE
 --    trigger that raises if either column changes (the trigger route,
---    not the policy route). It also hardens the 014 profile-member
---    policy the same way for free.
+--    not the policy route). The trigger deliberately covers PROFILE
+--    member rows too (user_id IS NULL): nothing in the app ever moves
+--    a member between households — updateMember writes only
+--    display_name and dietary_preferences — and a profile member
+--    hopping households would drag its meals across tenants via the
+--    013 composite FK.
 --
 -- 3. INTEGRITY (preventive — zero bad rows live today):
 --    - recipe_ratings: one rating per (recipe, account); rater must be
---      a member of the recipe's household AND rate as themselves.
---      (No app code writes this table today — legacy CoreData only —
---      so tightening is free.)
+--      a CURRENT member of the recipe's household and rate as
+--      themselves. The live INSERT policy ("Users can rate recipes")
+--      had NO membership check at all — any authenticated user could
+--      rate any recipe_id — and the live UPDATE skipped membership (a
+--      departed member could keep editing). No app code writes this
+--      table today (legacy CoreData only), so tightening is free.
 --    - meal_plans: recipe_id, when set, must belong to the plan's own
---      household (NULL allowed — ON DELETE SET NULL).
+--      household (NULL allowed — ON DELETE SET NULL). The live table
+--      carries DUPLICATE INSERT policies ("Members can insert meal
+--      plans" + "Users can insert meal plans") — both are dropped, one
+--      replacement created. The duplicate SELECT pair ("Members can
+--      read meal plans" + "Users can view meal plans") is left alone:
+--      read paths are outside this brief's scope.
 --    - grocery_contributions: the linked meal_plan and grocery_item
 --      must belong to the same household. (The table has no
 --      household_id column; the item's household is the anchor.)
 --    is_household_member(uuid) already exists (001, hardened in 011:
---    SECURITY DEFINER, STABLE-equivalent, pinned search_path) — reused,
---    not recreated.
+--    SECURITY DEFINER, pinned search_path) — reused, not recreated.
 --
 -- The app tolerates this migration being unapplied: build 122 and
 -- earlier use only the direct-insert paths, which keep working through
@@ -97,9 +118,8 @@ grant execute on function public.create_household(text, text) to authenticated;
 --     install the compatibility shim described in the header.
 -- ============================================================
 
-drop policy if exists "Users can insert themselves" on public.household_members;
+drop policy "Users can join households" on public.household_members;
 
-drop policy if exists "Self-insert only into own or joined household" on public.household_members;
 create policy "Self-insert only into own or joined household"
   on public.household_members
   for insert to authenticated
@@ -117,7 +137,8 @@ create policy "Self-insert only into own or joined household"
   );
 
 -- ============================================================
--- 2. household_members: membership rows never move.
+-- 2. household_members: membership rows never move — account members
+--    AND profile members (user_id IS NULL) alike; see header.
 -- ============================================================
 
 create or replace function public.forbid_membership_move()
@@ -133,8 +154,6 @@ begin
 end;
 $$;
 
-drop trigger if exists forbid_membership_move_trigger on public.household_members;
-
 create trigger forbid_membership_move_trigger
   before update on public.household_members
   for each row
@@ -144,19 +163,21 @@ create trigger forbid_membership_move_trigger
 -- 3a. recipe_ratings: one rating per account per recipe (partial —
 --     rater_user_id is nullable and NULL rows are name-keyed by the
 --     001 unique(recipe_id, rater_name)); writes must be as yourself
---     and as a member of the recipe's household.
+--     and as a current member of the recipe's household. Like the
+--     live "Users can rate recipes", the new INSERT does not accept
+--     NULL rater_user_id.
 -- ============================================================
 
 create unique index if not exists recipe_ratings_one_per_user
   on public.recipe_ratings (recipe_id, rater_user_id)
   where rater_user_id is not null;
 
-drop policy if exists "Members can insert ratings" on public.recipe_ratings;
+drop policy "Users can rate recipes" on public.recipe_ratings;
 create policy "Members can insert ratings"
   on public.recipe_ratings
   for insert to authenticated
   with check (
-    (rater_user_id is null or rater_user_id = auth.uid())
+    rater_user_id = auth.uid()
     and exists (
       select 1 from public.recipes r
       where r.id = recipe_ratings.recipe_id
@@ -164,12 +185,7 @@ create policy "Members can insert ratings"
     )
   );
 
--- 001's blanket member UPDATE let any member rewrite anyone's rating;
--- 011's own-rating UPDATE skipped the membership check (a departed
--- member could keep editing). One policy replaces both: your own
--- rating, while you are a member.
-drop policy if exists "Members can update ratings" on public.recipe_ratings;
-drop policy if exists "Users can update their own rating" on public.recipe_ratings;
+drop policy "Users can update their own rating" on public.recipe_ratings;
 create policy "Users can update their own rating"
   on public.recipe_ratings
   for update to authenticated
@@ -193,9 +209,11 @@ create policy "Users can update their own rating"
 -- ============================================================
 -- 3b. meal_plans: a plan's recipe must live in the plan's household.
 --     NULL recipe_id stays legal (deleted recipes: ON DELETE SET NULL).
+--     Both duplicate live INSERT policies go; one replacement.
 -- ============================================================
 
-drop policy if exists "Members can insert meal plans" on public.meal_plans;
+drop policy "Members can insert meal plans" on public.meal_plans;
+drop policy "Users can insert meal plans" on public.meal_plans;
 create policy "Members can insert meal plans"
   on public.meal_plans
   for insert to authenticated
@@ -211,7 +229,7 @@ create policy "Members can insert meal plans"
     )
   );
 
-drop policy if exists "Members can update meal plans" on public.meal_plans;
+drop policy "Members can update meal plans" on public.meal_plans;
 create policy "Members can update meal plans"
   on public.meal_plans
   for update to authenticated
@@ -234,7 +252,7 @@ create policy "Members can update meal plans"
 --     existing policies key membership off).
 -- ============================================================
 
-drop policy if exists "Members can insert contributions" on public.grocery_contributions;
+drop policy "Members can insert contributions" on public.grocery_contributions;
 create policy "Members can insert contributions"
   on public.grocery_contributions
   for insert to authenticated
@@ -249,7 +267,7 @@ create policy "Members can insert contributions"
     )
   );
 
-drop policy if exists "Members can update contributions" on public.grocery_contributions;
+drop policy "Members can update contributions" on public.grocery_contributions;
 create policy "Members can update contributions"
   on public.grocery_contributions
   for update to authenticated
