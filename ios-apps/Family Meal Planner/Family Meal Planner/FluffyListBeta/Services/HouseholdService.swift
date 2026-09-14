@@ -45,42 +45,22 @@ final class HouseholdService: ObservableObject {
                 return true
             }
 
-            // ── DEBUG: households INSERT ──
-            let householdPayload = HouseholdInsert(name: name, ownerID: userID)
-            print("🟡 [HouseholdService] INSERT households payload: name=\(householdPayload.name), owner_id=\(householdPayload.ownerID)")
+            // Both rows — the household and the owner's head-cook
+            // membership — are inserted together by the SECURITY DEFINER
+            // create_household RPC (migration 016). The old two-insert
+            // client path is closed by RLS: gaining membership now only
+            // happens through create_household and join_household_by_code.
+            print("🟡 [HouseholdService] RPC create_household: name=\(name), display_name=\(memberDisplayName)")
 
-            let rows: [HouseholdRow] = try await supabase
-                .from("households")
-                .insert(householdPayload)
-                .select()
+            let newHousehold: HouseholdRow = try await supabase
+                .rpc(
+                    "create_household",
+                    params: ["p_name": name, "p_display_name": memberDisplayName]
+                )
                 .execute()
                 .value
 
-            print("🟢 [HouseholdService] households INSERT succeeded, got \(rows.count) row(s)")
-
-            guard let newHousehold = rows.first else {
-                errorMessage = "Household was not created."
-                isLoading = false
-                return false
-            }
-
-            print("🟢 [HouseholdService] household id=\(newHousehold.id), join_code=\(newHousehold.joinCode ?? "none")")
-
-            // ── DEBUG: household_members INSERT ──
-            let memberPayload = HouseholdMemberInsert(
-                householdID: newHousehold.id,
-                userID: userID,
-                displayName: memberDisplayName,
-                isHeadCook: true
-            )
-            print("🟡 [HouseholdService] INSERT household_members payload: household_id=\(memberPayload.householdID), user_id=\(memberPayload.userID?.uuidString ?? "NULL"), display_name=\(memberPayload.displayName), is_head_cook=\(memberPayload.isHeadCook)")
-
-            try await supabase
-                .from("household_members")
-                .insert(memberPayload)
-                .execute()
-
-            print("🟢 [HouseholdService] household_members INSERT succeeded")
+            print("🟢 [HouseholdService] create_household succeeded: id=\(newHousehold.id), join_code=\(newHousehold.joinCode ?? "none")")
 
             household = newHousehold
             SupabaseManager.shared.setCurrentHousehold(newHousehold.id)
