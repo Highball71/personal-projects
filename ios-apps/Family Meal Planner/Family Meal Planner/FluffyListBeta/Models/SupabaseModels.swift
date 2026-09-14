@@ -29,15 +29,8 @@ struct HouseholdRow: Codable, Identifiable {
     }
 }
 
-struct HouseholdInsert: Codable {
-    let name: String
-    let ownerID: UUID
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case ownerID = "owner_id"
-    }
-}
+// HouseholdInsert was removed with migration 016: households are
+// created only through the create_household RPC now.
 
 // MARK: - Household Members
 
