@@ -186,14 +186,22 @@ final class SupabaseRecipeFormViewModel {
         let success: Bool
 
         if let editID = recipeID {
-            // Upload new image first if we have one (we already know the recipe ID).
+            // Upload new image first if we have one (we already know the
+            // recipe ID). A failed upload aborts the whole save before
+            // anything is written — reporting success while silently
+            // dropping the photo is exactly the bug this fixes. The
+            // picked image stays in the form so Save can be retried.
             var pathForUpdate = imagePath
             if let newImage = sourceImage {
-                if let uploaded = await recipeService.uploadRecipeImage(newImage, recipeID: editID) {
-                    pathForUpdate = uploaded
-                    sourceImagePath = uploaded
-                    sourceImage = nil
+                guard let uploaded = await recipeService.uploadRecipeImage(newImage, recipeID: editID) else {
+                    Logger.supabase.error("SupabaseRecipeFormVM: photo upload failed — aborting save")
+                    saveError = "Couldn't upload the photo, so the recipe wasn't saved. Please try again."
+                    isSaving = false
+                    return false
                 }
+                pathForUpdate = uploaded
+                sourceImagePath = uploaded
+                sourceImage = nil
             }
 
             // If image was removed, also delete from storage.
@@ -234,12 +242,22 @@ final class SupabaseRecipeFormViewModel {
                 recipeID = result.id
                 Logger.supabase.info("SupabaseRecipeFormVM: transitioned to edit mode id=\(result.id.uuidString)")
 
-                // Now upload the image if one was picked and update the recipe with the path.
+                // Now upload the image if one was picked and update the
+                // recipe with the path. The recipe row already exists at
+                // this point, so a photo failure can't abort the save —
+                // instead the save reports FAILURE with an honest message,
+                // and because recipeID is now set (and the picked image is
+                // kept), tapping Save again retries through the edit path.
                 if let newImage = sourceImage {
-                    if let uploaded = await recipeService.uploadRecipeImage(newImage, recipeID: result.id) {
+                    if let uploaded = await recipeService.uploadRecipeImage(newImage, recipeID: result.id),
+                       await recipeService.setSourceImagePath(uploaded, recipeID: result.id) {
                         sourceImagePath = uploaded
                         sourceImage = nil
-                        await recipeService.setSourceImagePath(uploaded, recipeID: result.id)
+                    } else {
+                        Logger.supabase.error("SupabaseRecipeFormVM: recipe created but photo upload failed")
+                        saveError = "The recipe was saved, but the photo didn't upload. Tap Save to try the photo again."
+                        isSaving = false
+                        return false
                     }
                 }
             }

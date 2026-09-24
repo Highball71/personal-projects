@@ -28,7 +28,22 @@ struct SupabaseRecipeDetailView: View {
     @EnvironmentObject private var householdService: HouseholdService
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    let recipe: RecipeRow
+    /// The row this screen was pushed with — a value snapshot, frozen
+    /// at push time. Kept only as a fallback; rendering reads `recipe`.
+    private let initialRecipe: RecipeRow
+
+    init(recipe: RecipeRow) {
+        self.initialRecipe = recipe
+    }
+
+    /// The LIVE row, read from the service by id on every render, so a
+    /// change that refreshes `recipeService.recipes` (a photo upload,
+    /// an edit, a favorite toggle) appears on this screen immediately.
+    /// Falls back to the pushed-in snapshot when the row isn't in the
+    /// list (still loading, or deleted while this screen is open).
+    private var recipe: RecipeRow {
+        recipeService.recipes.first { $0.id == initialRecipe.id } ?? initialRecipe
+    }
 
     /// All layout decisions for this screen, keyed off the size class
     /// alone — see RecipeDetailLayout. Compact values are the old
@@ -582,11 +597,20 @@ struct SupabaseRecipeDetailView: View {
         isUploadingHomemade = true
         defer { isUploadingHomemade = false }
 
+        // Both steps must succeed before "Photo added" can show. A
+        // failure surfaces in the error banner — the old code returned
+        // silently here, which is exactly the "picked a photo and
+        // nothing happened" bug.
         guard let path = await recipeService.uploadHomemadeImage(image, recipeID: recipe.id) else {
+            actionErrorMessage = "Couldn't save your photo. Please try again."
             return
         }
 
-        await recipeService.setHomemadeImagePath(path, recipeID: recipe.id)
+        guard await recipeService.setHomemadeImagePath(path, recipeID: recipe.id) else {
+            actionErrorMessage = "Couldn't save your photo. Please try again."
+            return
+        }
+
         await recipeService.fetchRecipes()
         withAnimation { toastMessage = "Photo added" }
     }

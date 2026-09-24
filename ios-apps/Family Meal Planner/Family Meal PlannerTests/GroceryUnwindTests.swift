@@ -45,11 +45,30 @@ final class FakePostgRESTStore: @unchecked Sendable {
     /// reporting success.
     var rlsDeleteBlockedTables: Set<String> = []
 
+    /// Uploaded storage objects keyed by "<bucket>/<path>", holding the
+    /// raw request body as received. Presence is what tests assert on —
+    /// the app never reads objects back through the SDK (display goes
+    /// through public URLs).
+    private var storageObjects: [String: Data] = [:]
+
+    /// When true, storage uploads fail with HTTP 403 — what a missing
+    /// bucket or an RLS-blocked storage.objects INSERT looks like from
+    /// the client. Used to test that a failed photo upload is surfaced
+    /// instead of silently swallowed.
+    var storageUploadBlocked = false
+
     func reset() {
         lock.lock(); defer { lock.unlock() }
         tables = ["meal_plans": [], "grocery_items": [], "grocery_contributions": []]
         failGETTables = []
         rlsDeleteBlockedTables = []
+        storageObjects = [:]
+        storageUploadBlocked = false
+    }
+
+    func storageObject(at key: String) -> Data? {
+        lock.lock(); defer { lock.unlock() }
+        return storageObjects[key]
     }
 
     func rows(in table: String) -> [[String: Any]] {
@@ -72,9 +91,30 @@ final class FakePostgRESTStore: @unchecked Sendable {
               let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         else { return (400, Data("{}".utf8)) }
 
-        // Anything that isn't a PostgREST call (auth refresh, storage,
-        // …) gets a 404 so it fails fast without touching the network.
         let pathParts = comps.path.split(separator: "/").map(String.init)
+
+        // Storage uploads (POST/PUT storage/v1/object/<bucket>/<path…>)
+        // get a minimal emulation: record the object and answer with the
+        // shape the SDK decodes ({Key, Id}), or 403 when
+        // storageUploadBlocked — what a missing bucket or an RLS-blocked
+        // storage.objects INSERT looks like from the client.
+        if pathParts.count > 3, pathParts[0] == "storage", pathParts[1] == "v1", pathParts[2] == "object" {
+            let method = request.httpMethod?.uppercased() ?? "GET"
+            guard method == "POST" || method == "PUT" else {
+                return (404, Data("{}".utf8))
+            }
+            lock.lock(); defer { lock.unlock() }
+            if storageUploadBlocked {
+                return (403, Data(#"{"statusCode":"403","error":"Unauthorized","message":"new row violates row-level security policy"}"#.utf8))
+            }
+            let key = pathParts[3...].joined(separator: "/")
+            storageObjects[key] = body ?? Data()
+            let response = #"{"Key":"\#(key)","Id":"\#(UUID().uuidString.lowercased())"}"#
+            return (200, Data(response.utf8))
+        }
+
+        // Anything else that isn't a PostgREST call (auth refresh, …)
+        // gets a 404 so it fails fast without touching the network.
         guard pathParts.count >= 3, pathParts[0] == "rest", pathParts[1] == "v1" else {
             return (404, Data("{}".utf8))
         }
