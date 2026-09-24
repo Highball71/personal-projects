@@ -416,6 +416,22 @@ final class RecipeService: ObservableObject {
 
     // MARK: - Image Upload
 
+    /// Resize a card image so it is at most `maxWidth` wide, preserving
+    /// aspect ratio. The renderer scale is pinned to 1 so the limit is
+    /// true pixels — the default renderer scale is the screen scale,
+    /// which used to triple the bitmap on a 3x device (the old "card
+    /// photos upload at ~3600px" quirk). Shared by both upload paths;
+    /// internal so the pixel-true behavior stays under test.
+    static func resizedForCardUpload(_ image: UIImage, maxWidth: CGFloat = 1200) -> UIImage {
+        guard image.size.width > maxWidth else { return image }
+        let scale = maxWidth / image.size.width
+        let newSize = CGSize(width: maxWidth, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+    }
+
     /// Resize an image to max 1200px wide, compress as JPEG, upload to
     /// Supabase Storage, and return the storage path. Returns nil on failure.
     func uploadRecipeImage(_ image: UIImage, recipeID: UUID) async -> String? {
@@ -424,17 +440,7 @@ final class RecipeService: ObservableObject {
             return nil
         }
 
-        // Resize to max 1200px wide, preserving aspect ratio.
-        let maxWidth: CGFloat = 1200
-        let resized: UIImage
-        if image.size.width > maxWidth {
-            let scale = maxWidth / image.size.width
-            let newSize = CGSize(width: maxWidth, height: image.size.height * scale)
-            let renderer = UIGraphicsImageRenderer(size: newSize)
-            resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
-        } else {
-            resized = image
-        }
+        let resized = Self.resizedForCardUpload(image)
 
         guard let data = resized.jpegData(compressionQuality: 0.8) else {
             Logger.supabase.error("uploadRecipeImage: JPEG compression failed")
@@ -469,16 +475,7 @@ final class RecipeService: ObservableObject {
             return nil
         }
 
-        let maxWidth: CGFloat = 1200
-        let resized: UIImage
-        if image.size.width > maxWidth {
-            let scale = maxWidth / image.size.width
-            let newSize = CGSize(width: maxWidth, height: image.size.height * scale)
-            let renderer = UIGraphicsImageRenderer(size: newSize)
-            resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
-        } else {
-            resized = image
-        }
+        let resized = Self.resizedForCardUpload(image)
 
         guard let data = resized.jpegData(compressionQuality: 0.8) else {
             Logger.supabase.error("uploadHomemadeImage: JPEG compression failed")
@@ -505,31 +502,54 @@ final class RecipeService: ObservableObject {
         }
     }
 
-    /// Set the homemade_image_path on a recipe row.
-    func setHomemadeImagePath(_ path: String, recipeID: UUID) async {
+    /// Set the homemade_image_path on a recipe row. Updates with
+    /// `.select()` so the server returns the rows it actually touched —
+    /// PostgREST reports success on 0 rows when RLS hides the target,
+    /// which would otherwise strand the uploaded photo with no row
+    /// pointing at it (same silent-no-op trap as deleteRecipe).
+    /// Returns true only when the row was verifiably updated.
+    func setHomemadeImagePath(_ path: String, recipeID: UUID) async -> Bool {
         do {
-            try await supabase
+            let updated: [RecipeRow] = try await supabase
                 .from("recipes")
                 .update(["homemade_image_path": path])
                 .eq("id", value: recipeID.uuidString)
+                .select()
                 .execute()
+                .value
+            guard !updated.isEmpty else {
+                Logger.supabase.error("setHomemadeImagePath: 0 rows updated for recipe \(recipeID.uuidString) (likely RLS blocked the UPDATE or the row is gone)")
+                return false
+            }
             Logger.supabase.info("setHomemadeImagePath: set on recipe \(recipeID.uuidString)")
+            return true
         } catch {
             Logger.supabase.error("setHomemadeImagePath: failed — \(error.localizedDescription)")
+            return false
         }
     }
 
-    /// Lightweight update to set just the source_image_path on a recipe row.
-    func setSourceImagePath(_ path: String, recipeID: UUID) async {
+    /// Lightweight update to set just the source_image_path on a recipe
+    /// row. Verified the same way as setHomemadeImagePath: 0 updated
+    /// rows is a failure, not a success.
+    func setSourceImagePath(_ path: String, recipeID: UUID) async -> Bool {
         do {
-            try await supabase
+            let updated: [RecipeRow] = try await supabase
                 .from("recipes")
                 .update(["source_image_path": path])
                 .eq("id", value: recipeID.uuidString)
+                .select()
                 .execute()
+                .value
+            guard !updated.isEmpty else {
+                Logger.supabase.error("setSourceImagePath: 0 rows updated for recipe \(recipeID.uuidString) (likely RLS blocked the UPDATE or the row is gone)")
+                return false
+            }
             Logger.supabase.info("setSourceImagePath: set on recipe \(recipeID.uuidString)")
+            return true
         } catch {
             Logger.supabase.error("setSourceImagePath: failed — \(error.localizedDescription)")
+            return false
         }
     }
 
