@@ -21,6 +21,9 @@ struct FluffyRecipeRowLabel: View {
     /// Non-nil in seasonal contexts, where the match is the point.
     var seasonalScore: SeasonalMatch.Score? = nil
     var showsLeaf: Bool = false
+    /// "Also uses cabbage, cilantro" — the picker's week-overlap
+    /// badge (WeekOverlap). Observational only; nil hides the line.
+    var overlapText: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -44,6 +47,11 @@ struct FluffyRecipeRowLabel: View {
                     text: SeasonalMatch.matchText(for: seasonalScore),
                     color: .fluffyInk2
                 )
+            }
+            // "ALSO USES CABBAGE, CILANTRO" — beneath the seasonal
+            // line when both apply.
+            if let overlapText {
+                FluffyMetadataLine(text: overlapText, color: .fluffyInk2)
             }
         }
     }

@@ -2,27 +2,28 @@
 
 **Read this first.** Concise current state. Detailed trail lives in `.context/STUDIO_LOG/` and `SESSION_LOG.md`.
 
-Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
+"Where things stand" is the current state. The dated entries further down are a chronological log — build numbers and "device pass owed" lines in them were true when written; later entries supersede them.
+
+Last updated: 2026-10-21 (week-overlap-badge rebased onto main, MacBook Air)
 
 ---
 
 ## Where things stand
 
-**"The Press" overhaul is DONE and LIVE.** Compiled, device-verified, fast-forwarded to main, and **build 110 was archived + uploaded 8/16** (commit `9fd8e64`); it reached TestFlight "Testing". Five external testers added; public link `https://testflight.apple.com/join/h6qxWgE1`. (Earlier revisions of this file said "NOT yet compiled" — that was stale; the post-merge session never pushed doc updates.)
+**main = `e3727ad`.** Every feature branch through `photo-attach-fixes` is merged (Press overhaul, per-person meals, seasonal, week nav, iPad phase 1, empty-week + region prompt, recipe-delete guard + grocery merge, photo-import accuracy arc, ingredient wording polish, photo-attach fixes). `e3727ad` adds the Xcode 27 project upgrade and the build-123 note.
 
-**Tester feedback arrived** (Kristin, via Copy Me That habits) and was triaged 2026-08-27:
-- **"Copy last week" — IMPLEMENTED this session, authored off-Mac, NEEDS BUILD + DEVICE PASS.** One commit touching `MealPlanService.swift` + `SupabaseMealPlanView.swift`. Rules David decided: days already planned are **kept** (never overwritten); past days skipped **silently**. All copies go through `addMealWithGroceries` so grocery contributions carry over. Verification checklist in ACTIVE_TASK.md.
-- **Per-person meals — APPROVED, Phase 1 CODE DONE (2026-08-27).** David answered all four open decisions (Option 1 nullable user_id; groceries identical; one meal per (day, member); keyword dietary matching for v1) — stamped into `FEATURE_PER_PERSON_MEALS.md`. Phase 1 implemented: `supabase/migrations/013_member_meals.sql` (nullable user_id, dietary_preferences[], meal_plans.member_id, composite FK **ON DELETE NO ACTION** + member-delete cleanup trigger — deliberately NOT SET NULL, see doc) plus `MealPlanRow`/`MealPlanInsert` decode changes. Ships dark; sim build + all 125 tests pass.
-- **⚠️ Migration 013 is NOT YET APPLIED to `papuusfhtojthtnbsdvs`.** The Supabase MCP + CLI on this machine are authenticated to a different account (only sees "Placatto"). David: re-auth the Supabase connector (or `supabase login` as the FluffyList account), then apply `013_member_meals.sql`. Until then the app is fully compatible with the un-migrated DB (member_id decode is tolerant; insert omits nil).
-- Still untriaged from Kristin's list: pantry-scan recipe suggestions, community recipe section.
+**Build 123 shipped 2026-09-24** (photo-attach fixes; migrations 018 + 019 applied to production). **NEXT BUILD NUMBER: 124.** TestFlight: five external testers; public link `https://testflight.apple.com/join/h6qxWgE1`.
 
-**NEXT BUILD NUMBER: 111.** (110 is uploaded and live on TestFlight.)
+**Open branches (not merged):**
+- **`week-overlap-badge`** — Ingredient Chaining Phase 1: observational "ALSO USES CABBAGE, CILANTRO" line in the recipe picker. Built and rebased onto `e3727ad`; **289 tests, 0 failures** (272 + 8 `PhotoAttachTests` from main + 9 `WeekOverlapTests`), zero warnings. **Device pass owed — checklist in ACTIVE_TASK.md.** David merges after. Details in the 2026-10-21 entry at the bottom.
+- **`rls-membership-hardening`** — PR #2, migration 016. Unmerged; slated for a build after 123.
+
+**Open decisions:** whether the app needs the 001 `meal_suggestions` table that is missing on V2 (likely drop it with the legacy CloudKit stack — see the 2026-09-24 evening entry). Still untriaged from Kristin's tester list: pantry-scan recipe suggestions, community recipe section.
 
 ---
 
 ## Known issues / deferred (do not fix without a decision)
 
-- **`RecipeService.uploadRecipeImage` 3x renderer-scale quirk:** card photos upload at ~3600px. Harmless; fix for consistency someday.
 - **Legacy CoreData+CloudKit V1 sync stack** still initializes each launch ("Change Token Expired" log noise). Dead machinery; removal candidate.
 - **POLISH items from the first-hour review remain by design** — dead settings toggles, "Step 1 of 3" indicator, raw onboarding errors. The **dietary-preferences unkept promise now has a design home**: `FEATURE_PER_PERSON_MEALS.md` (per-member prefs, phase 2).
 - **Join-by-code household flow still untested with a second Apple ID.** Test before inviting anyone to a shared household.
@@ -186,7 +187,7 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
-## 2026-09-03 — Week navigation (MacBook, autonomous, branch `week-nav` — NOT merged to main)
+## 2026-09-03 — Week navigation (MacBook, autonomous, branch `week-nav` — merged to main)
 
 - **Week navigation CODE DONE on branch `week-nav`** (pushed to origin; merge after its device pass, per the task instruction not to merge). The week view can now show any week from 4 back to 2 forward of the current one: chevron arrows in a nav row under the masthead (disabled at the bounds) plus a horizontal swipe anywhere on the view; a "This week" text link appears between the arrows whenever the displayed week isn't the current one. **Suite: 181 tests, 0 failures** (174 + 6 `WeekNavigationTests` + 1 new `CopyWeekTests`); sim build + launch verified on iPhone 17 (fresh install, process alive — sign-in screen, so the visual pass is on-device).
 - **New pure model `Models/WeekNavigation.swift`** (WeekSummary-style, injectable today/calendar): bounds are measured from the CURRENT week so the window never drifts; exposes `previousWeekStart`/`nextWeekStart` (nil at a bound — arrows and swipe both just "go if it exists"), `isPastWeek`, `copySourceWeekStart` (displayed − 7), and the masthead title per offset ("This Week", "Last Week", "Next Week", "In Two Weeks", "Two/Three/Four Weeks Ago").
@@ -200,7 +201,7 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
-## 2026-09-03 evening — remove-flicker fix + warning cleanup (MacBook, autonomous, branch `remove-flicker` — NOT merged to main)
+## 2026-09-03 evening — remove-flicker fix + warning cleanup (MacBook, autonomous, branch `remove-flicker` — merged to main)
 
 - **The swipe-remove flicker is FIXED** (the "known cosmetic" from the 113 device pass) **on branch `remove-flicker`** (pushed; merge after a device look). Remove, Clear the Whole Day, AND Replace/add are now optimistic: the week map is edited locally FIRST — the row animates out (or swaps) with `withAnimation(.easeInOut 0.25)` before the server round trip — then a **quiet reconcile** re-reads the week with a new `fetchPlans(weekStart:quiet:)` mode that never touches isLoading (and suppresses errorMessage on a failed reconcile — local state already shows the confirmed result). No more full `reloadWeek` after mutations, so the rest of the week never redraws. On a failed server delete the snapshot restores the exact rows with the same animation and the existing error banner shows. No visual changes otherwise; Press styling untouched.
 - **New service surface (MealPlanService):** `removeLocalPlan(_:dateISO:)` / `removeLocalDay(dateISO:)` (both return the date's previous rows for restore), `replaceLocalSlot(with:)` (swaps only its own (date, member) slot's rows), `restoreLocalPlans(_:dateISO:)`. Replace builds the local row from the id `addMealWithGroceries` returns — `MealPlanRow` gained an explicit memberwise init (its custom `init(from:)` had suppressed the synthesized one).
@@ -212,7 +213,7 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
-## 2026-09-03 night — iPad phase 1: cookbook on a stand (MacBook, autonomous, branch `ipad-support` — NOT merged to main)
+## 2026-09-03 night — iPad phase 1: cookbook on a stand (MacBook, autonomous, branch `ipad-support` — merged to main)
 
 - **iPad phase 1 CODE DONE on branch `ipad-support`** (pushed; merge after the iPad device pass). Recipe Detail adapts to the REGULAR horizontal size class: taller photo (345pt vs 230) across the top, then the title over two ruled columns — ingredients fixed at 300pt on the left, method (with notes + source) on the right behind a vertical hairline (FluffyRule turned 90°), capped at 680pt (≈65 characters at the 21pt body — the line-measure rule) — the whole block capped at 1080pt and centered so 11" landscape doesn't stretch edge to edge. Press type scales UP, same faces: title 36→44, body 17→21, quantities 14→17, step numerals 28→34 in a 42pt column. The "Add to the week" filled button caps at 560pt centered on regular (a pane-wide persimmon bar is a banner, not a button). **The iPad destination needed no project change** — TARGETED_DEVICE_FAMILY was already "1,2" with all four iPad orientations declared; it had just never been exercised.
 - **Everything is size-class driven** — `Models/RecipeDetailLayout.swift`, a WeekSummary-style pure struct holding every layout decision (columns, type scale, caps), keyed ONLY off `isRegular` (from `horizontalSizeClass == .regular`; nil ⇒ compact). No device checks anywhere, so an iPad slide-over at compact width correctly gets the phone layout. **The compact values ARE the phone's historical constants and a test pins each one** — if `testCompactValuesAreTheHistoricalPhoneConstants` ever fails, the iPhone rendering changed, which phase 1 forbids. The compact content branch is the old VStack verbatim.
@@ -234,7 +235,7 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
-## 2026-09-04 — Seasonal visibility (autonomous, branch `seasonal-visibility` — NOT merged to main)
+## 2026-09-04 — Seasonal visibility (autonomous, branch `seasonal-visibility` — merged to main)
 
 - **Seasonal visibility CODE DONE on branch `seasonal-visibility`** (do not merge until its device pass, per the task instruction). Seasonal suggestions now appear BEFORE a day is picked, in two places; build number untouched (117 uploaded). **Suite: 200 tests, 0 failures** (192 + 8 new `SeasonalStripTests`); sim build with zero warnings; install + launch verified on iPhone 17 AND iPad Pro 11" sims (process alive; sign-in screen only — no account on sims).
 - **1. Recipes tab shelf:** a collapsible "In season now" section at the top of the browse (after search + chips, above the hero), reusing the picker's exact computation (`SeasonalMatch.inSeasonNow`, cap 8, current month) and the picker's row content. The row content was extracted into **`Design/FluffyRecipeRowLabel.swift`** (name + leaf, category, "IN SEASON · …" match line) and the picker's `recipeRow` now composes it — the picker, the shelf, and the strip all draw the same rows. Shelf rows navigate to recipe detail and carry the tab's usual context menu. Collapse state lives in a session-scoped static (`SeasonalShelfSession.isCollapsed`) — survives view recreation, resets next launch on purpose. Hidden when dormant (region unset / no matches).
@@ -251,7 +252,7 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
-## 2026-09-04 later — empty-week retirement + region prompt (autonomous, branch `empty-week-and-region` — NOT merged to main)
+## 2026-09-04 later — empty-week retirement + region prompt (autonomous, branch `empty-week-and-region` — merged to main)
 
 - **Both queued items CODE DONE on branch `empty-week-and-region`** (do not merge until a device pass). Build number untouched (118 uploaded). **Suite: 212 tests, 0 failures** (200 + 6 `WeekFooterTests` + 6 `StateRegionMapTests`); zero compiler warnings; install + launch verified on iPhone 17 AND iPad Pro 11" sims (sign-in screen only).
 - **1. The "wide open" empty-week state is GONE.** An empty week now renders exactly like any partially planned week: seven ruled day rows, every open slot tappable, nothing special-cased. Deleted with it: the frying-pan art + "Your week is wide open." copy, the standalone "Browse recipes"/"Add a custom meal" links (both reachable from day rows / the picker), the "Popular in your kitchen" suggested list, `isWeekEmpty`, `suggestedRecipes`, and the view's `showingAddRecipe` sheet.
@@ -274,7 +275,7 @@ Last updated: 2026-08-27 (per-person meals Phase 1 session, on-Mac)
 
 ---
 
-## 2026-09-06 — recipe-delete guard + grocery merge (Home iMac, autonomous, branch `grocery-merge-and-recipe-delete` — NOT merged to main)
+## 2026-09-06 — recipe-delete guard + grocery merge (Home iMac, autonomous, branch `grocery-merge-and-recipe-delete` — merged to main)
 
 Two bugs from the 2026-09-06 Costco trip on build 119, fixed on branch `grocery-merge-and-recipe-delete` (pushed; David merges after the device pass). Build number untouched. **Suite: 224 tests, 0 failures** (212 + 12 new); zero new compiler warnings; no live Anthropic/proxy calls (nothing here touches that path); Supabase MCP was read-only AND signed into the Placatto-only account, so the Shepherd's Pie rows were not inspected — the SELECT for David is in the session summary.
 
@@ -295,7 +296,7 @@ Two bugs from the 2026-09-06 Costco trip on build 119, fixed on branch `grocery-
 
 ---
 
-## 2026-09-06 — photo-import fixes (Home iMac, autonomous, branch `photo-import-fixes` — NOT merged to main)
+## 2026-09-06 — photo-import fixes (Home iMac, autonomous, branch `photo-import-fixes` — merged to main)
 
 - **All three confirmed defects from the 2026-09-06 photo-import test report (build 119) are FIXED on branch `photo-import-fixes`.** David merges after the device pass. Build number untouched — **NEXT BUILD = 120.** **Suite: 224 tests, 0 failures** (212 + 12 new); zero new compiler warnings; all verification offline against saved fixtures (fake transport — no Anthropic/proxy calls were made this session).
 - **Fix 1 — truncated responses:** `AnthropicModels.maxTokens` 2048 → 8192 (P05 needed 2,403 output tokens). `RecipeImageExtractor` now checks `stop_reason`: on `max_tokens` it retries ONCE at double the limit (16,384) instead of handing cut-off JSON to the parser; a second truncation throws `ExtractionError.responseTruncated`, which surfaces as "The recipe was too long to read in one pass — try fewer pages or a closer photo" (not the generic parse-failure message). `AnthropicClient` gained an injectable `transport` (production = URLSession; tests = canned responses). **Extended thinking is NOT enabled in the app's requests** (no `thinking` param is sent) — P10's 639 thinking tokens came from the diagnostic harness, nothing to change; the raised limit is pure JSON budget.
@@ -313,7 +314,7 @@ Two bugs from the 2026-09-06 Costco trip on build 119, fixed on branch `grocery-
 
 ---
 
-## 2026-09-06 evening — deleted-recipe history label + extraction-accuracy prompt (Home iMac, autonomous, branch `deleted-recipe-label-and-fraction-prompt` — NOT merged to main)
+## 2026-09-06 evening — deleted-recipe history label + extraction-accuracy prompt (Home iMac, autonomous, branch `deleted-recipe-label-and-fraction-prompt` — merged to main)
 
 Two small items on build 120's main; build number untouched. **Suite: 248 tests, 0 failures** (240 + 8 new); zero new compiler warnings; no live Anthropic calls (the prompt change gets scored by a separate Codex accuracy re-review).
 
@@ -348,7 +349,7 @@ The Codex round-2 review ("Photo review round 2/Review.md" beside the round-1 ev
 
 ---
 
-## 2026-09-06 evening — ingredient wording polish (Home iMac, autonomous, branch `ingredient-wording-polish` — NOT merged to main)
+## 2026-09-06 evening — ingredient wording polish (Home iMac, autonomous, branch `ingredient-wording-polish` — merged to main)
 
 The parked round-3 wording items, display layer only — prompt, parser shapes, and stored quantity/unit values untouched. **Suite: 272 tests, 0 failures** (257 + 15 new); zero new compiler warnings; no live Anthropic calls.
 
@@ -356,13 +357,13 @@ The parked round-3 wording items, display layer only — prompt, parser shapes, 
 - **New pure `FluffyListBeta/Models/IngredientDisplay.swift`** — the ONE place row wording lives; recipe-detail and grocery rows both render through it. Rules: containers → "1 can (14.5 oz)" (count, container word, size parenthetical with app abbreviations; sizes that aren't a plain number+unit — "about 1 pound total" — stay as printed); size/slice descriptors rescued from a piece unit replace the generic label ("8 slices", "1 medium"); preparation/section/range context renders after " · " (one separator style: "Marinade · thinly sliced"), never in the quantity label or name; a note fragment that only restates the row's own quantity is suppressed on that row (stored note unchanged).
 - **One conversion addition to make the rescue possible:** when the extracted unit word is a size/slice descriptor that aliases to .piece (small/medium/large/slice/slices), `formRow` now preserves the word as a note fragment (`ExtractedIngredient.pieceDescriptor`) — note content only; quantity, unit, merge identity all unchanged. Detail-view unknown legacy units now render their raw string ("4 cups") instead of a bare number — grocery behavior, unified.
 - **New tests (15):** `IngredientDisplayTests` (8 — one per display rule, exact strings) and `WordingPolishFixtureTests` (7 — one per flagged case from the round-2 fixtures: P02 pineapple "1 small · peeled, cored, and cut into 1½-inch chunks"; P10 "4 medium · For the Mushrooms"; P11 rutabaga "1 medium · spiralized or diced"; P15 "8 slices · For the Casserole"; P11 "1 bag (14 oz)" / "1 can (14.5 oz)"; P13 "1 package (14.4 oz)"; P04 meat "1 1/2 lb · 1¼ to 1½ lb").
-- **Device pass owed on this branch:** open P11 and P04 recipe detail plus the grocery list and READ the rows — container sizes as "1 bag (14 oz)" style, meat range after " · ", rutabaga "1 medium", no " + " anywhere. **NEXT BUILD = 122 after that pass.**
+- **Device pass owed on this branch:** open P11 and P04 recipe detail plus the grocery list and READ the rows — container sizes as "1 bag (14 oz)" style, meat range after " · ", rutabaga "1 medium", no " + " anywhere. (Merged to main as `9278089`.)
 
 ---
 
-## 2026-09-24 — photo-attach silent-failure fixes (MacBook, branch `photo-attach-fixes` — NOT merged to main)
+## 2026-09-24 — photo-attach silent-failure fixes (MacBook, branch `photo-attach-fixes` — merged to main as `f45cc7a`)
 
-David's ruling on the manual photo-attach trace (picker opens, image picked, nothing happens): items 1–3 + the scale pin, app-side only. Build number untouched. **Suite: 280 tests, 0 failures** (272 + 8 new `PhotoAttachTests`); zero compiler warnings (the two log "warning" lines are the known appintentsmetadataprocessor noise). Push only — **David merges after his device pass.**
+David's ruling on the manual photo-attach trace (picker opens, image picked, nothing happens): items 1–3 + the scale pin, app-side only. Build number untouched. **Suite: 280 tests, 0 failures** (272 + 8 new `PhotoAttachTests`); zero compiler warnings (the two log "warning" lines are the known appintentsmetadataprocessor noise). Device pass PASSED and merged 2026-09-24 (see the evening entry below).
 
 - **Background (from the trace):** the scan path never touches Supabase Storage (base64 → proxy → text-only recipe), so "scan works" never validated the `recipe-images` bucket. The manual paths swallowed every failure: `uploadRecipeImage`/`uploadHomemadeImage` returned nil into `guard … else { return }` with no UI, the form even reported a successful save with the photo dropped, and the detail view held a value-snapshot `RecipeRow` so even a successful homemade upload never appeared in place.
 - **1. Failures surface now.** Recipe Detail's "Made this?" flow puts "Couldn't save your photo. Please try again." in the existing `FluffyErrorBanner` (`actionErrorMessage`) on either a failed upload or a failed path write. The form aborts an edit-mode save before anything is written when the upload fails ("Couldn't upload the photo, so the recipe wasn't saved."), keeping the picked image for retry. On the create path the row already exists when the upload runs, so the save reports FAILURE with "The recipe was saved, but the photo didn't upload. Tap Save to try the photo again." — the form has transitioned to edit mode with the image kept, so Save literally retries (upload is upsert-safe), pinned by test.
@@ -371,18 +372,33 @@ David's ruling on the manual photo-attach trace (picker opens, image picked, not
 - **4. 3600px quirk closed.** Both upload resizers now share `RecipeService.resizedForCardUpload` with `UIGraphicsImageRendererFormat.scale = 1` — "max 1200" finally means pixels (the long-standing "card photos upload at ~3600px" known issue). Threshold semantics unchanged.
 - **Test infra:** `FakePostgRESTStore` now emulates the storage upload endpoint (`storage/v1/object/<bucket>/<path>` POST/PUT → object recorded, `{Key, Id}` response; `storageUploadBlocked` = 403, what a missing bucket/blocked `storage.objects` INSERT looks like). `PhotoAttachTests` (8): pixel-true resize + pass-through; homemade upload lands at the path convention and the row write verifies; blocked upload → nil; both setters fail on 0 rows; edit save aborts cleanly (row untouched, image kept); create save reports photo failure then the retry completes end to end; create-with-photo happy path.
 - **Root cause CONFIRMED (2026-09-24, David's dashboard check): `papuusfhtojthtnbsdvs` has NO storage buckets at all** — `recipe-images` was hand-made in V1 and never recreated after the V1→V2 move (no migration owned it). Every manual photo attach since the move has failed at the upload and been swallowed.
-- **⚠️ Migration `018_recipe_images_storage.sql` written, NOT applied — David runs it in the dashboard SQL editor** (016 = RLS hardening PR #2, 017 reserved for the join-RPC follow-up). Public bucket (matches the `/object/public/` read path), 5 MB limit, image MIME types only; four storage.objects policies (SELECT/INSERT/UPDATE/DELETE, authenticated) scoping the first path segment to the caller's household via `public.is_household_member`; INSERT + UPDATE together cover the app's `upsert: true`. Idempotent (bucket ON CONFLICT DO UPDATE; drop-before-create policies). `018_verify.sql` beside it shows the bucket row + final policy list (read-only, safe anytime).
-- **Device pass owed on this branch (after David applies 018):** attach a card photo in the edit form and a "Made this?" photo in Recipe Detail against prod — both should appear immediately; any remaining failure now names itself in the error banner/save error instead of doing nothing.
+- **Migration `018_recipe_images_storage.sql` — APPLIED to production 2026-09-24** (016 = RLS hardening PR #2, 017 reserved for the join-RPC follow-up). Public bucket (matches the `/object/public/` read path), 5 MB limit, image MIME types only; four storage.objects policies (SELECT/INSERT/UPDATE/DELETE, authenticated) scoping the first path segment to the caller's household via `public.is_household_member`; INSERT + UPDATE together cover the app's `upsert: true`. Idempotent (bucket ON CONFLICT DO UPDATE; drop-before-create policies). `018_verify.sql` beside it shows the bucket row + final policy list (read-only, safe anytime).
+- **Device pass PASSED 2026-09-24:** card photo in the edit form and "Made this?" photo in Recipe Detail both appear immediately against prod.
 
 ### 2026-09-24 later — SECOND drift layer: migration 007 never ran on V2 (same branch)
 
 - **David's dashboard check: `recipes.homemade_image_path` does NOT exist on V2 (42703).** Migration 007 (the two image-path columns) was applied to V1 and never re-run after the V1→V2 move — a second, independent leg of the same failure: no bucket (018's territory) AND no column to write the path into. Reads never noticed (RecipeRow decodes both paths with `try?`), inserts never noticed (nil keys omitted), and the upload failed before the path write could 42703.
-- **⚠️ `019_reapply_recipe_image_columns.sql` written, NOT applied — David runs it in the dashboard alongside 018.** Exactly what 007 adds (`source_image_path`, `homemade_image_path`, both nullable text), ADD COLUMN IF NOT EXISTS, verify SELECT at the bottom. No-op wherever 007 did run.
+- **`019_reapply_recipe_image_columns.sql` — APPLIED to production 2026-09-24 alongside 018.** Exactly what 007 adds (`source_image_path`, `homemade_image_path`, both nullable text), ADD COLUMN IF NOT EXISTS, verify SELECT at the bottom. No-op wherever 007 did run.
 - **`supabase/scripts/v2_migration_drift_check.sql`** — read-only, one row per signature object of every repo migration 001–015 (tables, columns, policies, functions, triggers, indexes, FK delete rules, constraint ABSENCE for 006/011), derived from the migration files, `ok = false` floats to the top. Run it on V2 to find any OTHER missing migration in one pass; 009 is data-only so its row (no duplicate name groups) is informational — the known "Whole30 Egg Roll in a Bowl" duplicate suggests it will read false. Storage is 018's job, checked by `018_verify.sql`.
-- Open question the drift check answers: whether `source_image_path` is also missing (whole of 007 skipped) or only `homemade_image_path` (partial hand-apply on V1's dashboard era). 008 is provably applied on V2 (every recipe insert sends `notes`), so the gap is not simply "everything after 006".
+- (The drift check has since run — result in the evening entry below.)
 
 ### 2026-09-24 evening — device pass PASSED; merged to main; root cause CLOSED
 
 - **Root cause, final:** the silent photo attach was TWO layers of V1→V2 drift — the `recipe-images` storage bucket was never recreated on V2, AND migration 007 (the `recipes` image-path columns) was never applied there. **Fixed by 018 + 019, both applied to production 2026-09-24.** Device pass on `photo-attach-fixes` passed: photos attach and appear immediately in both places (edit-form card photo and Recipe Detail "Made this?").
-- `photo-attach-fixes` **merged to main** (f45cc7a). **CURRENT_PROJECT_VERSION set to 123 — next archive is build 123.** The RLS hardening (PR #2, migration 016) now ships in **124**, not 123.
+- `photo-attach-fixes` **merged to main** (f45cc7a). **Build 123 shipped 2026-09-24. NEXT BUILD = 124.** The RLS hardening (PR #2, migration 016, branch `rls-membership-hardening`) is still unmerged and was bumped past 123.
+- **Xcode 27 project upgrade** (LastUpgradeCheck/LastUpgradeVersion 2700, DEVELOPMENT_TEAM moved to project level, STRING_CATALOG_GENERATE_SYMBOLS) committed to main as `e3727ad` together with this note.
 - **Drift check result: exactly one other gap — the 001 `meal_suggestions` table is missing on V2.** Noted OPEN: whether the app uses it. First look this session: a repo-wide grep finds `MealSuggestion` only in the dead LegacyCloudKit Core Data stack (the known removal candidate); no Supabase code references the `meal_suggestions` table. So the likely resolution is "drop it from the schema's canon alongside the legacy stack removal" rather than recreate it — David decides.
+
+---
+
+## 2026-10-21 — week-overlap-badge: built, needs David's device pass (MacBook Air, branch `week-overlap-badge` — NOT merged to main)
+
+Ingredient Chaining Phase 1 prototype. **Wording is OBSERVATIONAL ONLY** (David, 2026-10-21): the picker says a recipe shares perishable ingredients with meals already planned this week — no claim about what's bought or on hand, grocery list untouched. **Suite: 281 tests, 0 failures** (272 + 9 new `WeekOverlapTests`); zero compiler warnings on a clean build. No schema change, no service change, build number untouched.
+
+- **New `Models/PerishableIngredients.swift`** — bundled keyword list (89 entries: canonical display name + keyword variants, optional `excluding` phrases), seeded from GroceryCategory's produce/protein/dairy lists (read, not lifted). Staples excluded: oil, salt, pepper, garlic, onion/shallot, spices, flour, sugar, vinegar, canned/dried goods, rice, pasta, broth — **plus butter and eggs** (fridge staples; they'd badge nearly every recipe). Usually-dried herbs (thyme, rosemary, sage, dill) count only in clearly fresh forms. A `shelfStableWords` set (broth, stock, canned, dried, frozen, paste, sauce, powder, coconut…) makes an ingredient contribute nothing — "chicken broth" is broth, not chicken. Unknown names are not perishable (under-claim, never over-claim).
+- **New `Models/WeekOverlap.swift`** — pure. Basket = perishables of every recipe planned in the week (household + member meals, all seven days); a candidate NOT planned this week gets `hits ∩ basket`, alphabetical, capped at 3. Matching on ingredient NAMES only (`ingredientsByRecipeID`), never note/quantity/unit, via `SeasonalMatch.tokens` + `SeasonalMatch.sequence` (the latter made internal + nonisolated; behavior unchanged, its 10 tests green). `badgeText` → "Also uses cabbage, cilantro".
+- **`FluffyRecipeRowLabel`** — `overlapText: String? = nil`; second `FluffyMetadataLine` (.fluffyInk2) beneath the seasonal line. Other callers (Recipes shelf, empty-week strip) pass nothing → unchanged.
+- **`RecipePickerSheet`** — `weekRecipeIDs: Set<UUID> = []`, `overlaps` computed via WeekOverlap, passed to every `recipeRow` call ("Your pick", "In season now", "All Recipes"). Call site: `plannedRecipeIDs(inWeekContaining: context.date)` — `plansByDate` for the seven ISO dates from `DateHelper.startOfWeek(containing:)`, `compactMap(\.recipeID)`. onPick / addMeal / addMealWithGroceries / GroceryService untouched; nothing reordered or hidden.
+- **Device pass owed (checklist in ACTIVE_TASK.md).** Push only — David merges after.
+- **Rebased 2026-10-21 onto main `e3727ad`** (photo-attach merge + Xcode 27 upgrade + build 123), so the branch now carries both. **Suite after the rebase: 289 tests, 0 failures** (the 281 above + main's 8 `PhotoAttachTests`), zero warnings on a clean build. The MacBook's stale 09-24 edits are no longer stashed — they are main's `e3727ad`.
+- **Machine note (MacBook Air):** Xcode 27.1 ran its first-launch component install (admin prompt) on 2026-10-21 before the simulators would start.

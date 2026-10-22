@@ -1,14 +1,20 @@
 # ACTIVE_TASK.md — FluffyList
 
-**Session Focus:** (2026-09-04 later — Claude Code, autonomous) **Empty-week retirement + one-time region prompt**, on branch `empty-week-and-region` (NOT merged to main — merge after its device pass).
+**Session Focus:** (2026-10-21 — Claude Code, MacBook Air) **Week Overlap badge in the recipe picker** (Ingredient Chaining Phase 1, observational only), on branch `week-overlap-badge` (NOT merged to main — David merges after his device pass). Details in HANDOFF, 2026-10-21 entry.
 
-1. **"Wide open" state deleted.** An empty week renders like any week: seven day rows, open slots tappable. The seasonal strip + "Copy last week" moved into a planning footer below the day rows — visible iff any slot (household OR member) is open on a today-or-later day and the week isn't past (new pure `Models/WeekFooter.swift` — the old `hasOpenFutureDay` breadth, restored on David's instruction after a first cut counted only open household nights; past weeks keep PASSED rows, no footer). Also deleted: "Popular in your kitchen", standalone Browse/Add links, `showingAddRecipe`.
-2. **Region prompt.** New `Views/SeasonalRegionPrompt.swift` stands wherever a seasonal surface would render with no region set (tab shelf, picker section via `inList: true`, week footer): Press ruled card — region Menu (same `seasonalRegion` key as Settings) + "Use my location" + "Not now" (persists via `seasonalRegionPromptDismissed`, leaves a one-line Menu link). Location: `Utilities/RegionLocator.swift` — when-in-use once, one reduced-accuracy fix, **MKReverseGeocodingRequest** (CLGeocoder is deprecated at the real deployment target, iOS 26.2), state parsed from `cityWithContext`, `Models/StateRegionMap.swift` (50+DC; HI deliberately unmapped → manual). All failures fall back to the manual menu. Usage-description key added to both configs.
+**Suite: 289 tests, 0 failures** (272 + 8 `PhotoAttachTests` from main + 9 `WeekOverlapTests`), after the rebase onto main `e3727ad`. Zero warnings.
 
-**Suite: 212 tests, 0 failures** (200 + 6 `WeekFooterTests` + 6 `StateRegionMapTests`). Zero warnings. Launch verified on iPhone 17 + iPad Pro 11" sims.
+### Device-pass checklist (David)
+
+- [ ] Plan 2–3 recipes this week → open the picker on another day → the "ALSO USES …" line appears only on recipes sharing perishables with them.
+- [ ] No badge on recipes already planned this week.
+- [ ] A staple-only overlap (oil, salt, garlic, onion…) shows nothing.
+- [ ] The badge composes with the seasonal leaf / "IN SEASON" line and the dietary hint without clipping on iPhone.
+- [ ] Adding a badged recipe behaves exactly as before on the grocery list.
 
 ## Next up
 
+0. **Device pass of `week-overlap-badge`** (checklist above), then merge.
 1. **Device pass of empty-week + region prompt** (checklist in HANDOFF, 2026-09-04 later entry — includes the on-device location flow), then merge `empty-week-and-region` to main.
 2. **iPad phase 2** (when David says go): week view, recipe list, grocery list on regular width.
 3. Announcement email for the 113/116 rollout.

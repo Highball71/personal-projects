@@ -227,6 +227,7 @@ struct SupabaseMealPlanView: View {
                     // month boundary into a different harvest period.
                     seasonalMonth: Calendar.current.component(.month, from: context.date),
                     preselectedRecipeID: context.preselectedRecipeID,
+                    weekRecipeIDs: plannedRecipeIDs(inWeekContaining: context.date),
                     onPick: { recipe, memberID in
                         pickerContext = nil
                         Task { await addMeal(recipe, to: context.date, for: memberID) }
@@ -926,6 +927,18 @@ struct SupabaseMealPlanView: View {
             .filter { $0.recipeID != nil }
     }
 
+    /// Recipe IDs planned anywhere in the week containing `date` —
+    /// household and member meals, all seven days — for the picker's
+    /// week-overlap badge. Rows with no recipe (deleted recipes) are
+    /// skipped.
+    private func plannedRecipeIDs(inWeekContaining date: Date) -> Set<UUID> {
+        let days = DateHelper.weekDays(startingFrom: DateHelper.startOfWeek(containing: date))
+        return Set(days.flatMap { day in
+            (mealPlanService.plansByDate[MealPlanService.isoDate(from: day)] ?? [])
+                .compactMap(\.recipeID)
+        })
+    }
+
     /// Title shown above the Remove confirmation dialog —
     /// "Pasta Primavera" or "Pasta Primavera — for Maya".
     private var mealActionTitle: String {
@@ -1120,6 +1133,10 @@ struct RecipePickerSheet: View {
     /// full sheet stays underneath (the pick may appear again in the
     /// seasonal and All Recipes sections; nothing is ever hidden).
     var preselectedRecipeID: UUID? = nil
+    /// Every recipe planned in the week being planned (household and
+    /// member meals, all seven days) — drives the observational "ALSO
+    /// USES CABBAGE" badge. Empty = no badges.
+    var weekRecipeIDs: Set<UUID> = []
     let onPick: (RecipeRow, UUID?) -> Void
     let onCancel: () -> Void
 
@@ -1157,6 +1174,17 @@ struct RecipePickerSheet: View {
         )
     }
 
+    /// Ingredient Chaining Phase 1: perishables each recipe shares
+    /// with meals already planned this week. Recipe-to-recipe only —
+    /// says nothing about what's bought, never reads groceries.
+    private var overlaps: [UUID: [String]] {
+        WeekOverlap.overlaps(
+            weekRecipeIDs: weekRecipeIDs,
+            ingredientsByRecipeID: ingredientsByRecipeID,
+            candidates: recipes
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -1176,6 +1204,7 @@ struct RecipePickerSheet: View {
                 } else {
                     let picks = seasonalPicks
                     let leafIDs = seasonalIDs
+                    let overlapNames = overlaps
                     List {
                         if !members.isEmpty {
                             Section("Who is this meal for?") {
@@ -1195,7 +1224,8 @@ struct RecipePickerSheet: View {
                                 recipeRow(
                                     preselected,
                                     seasonalScore: picks.first { $0.recipe.id == preselected.id }?.score,
-                                    showsLeaf: leafIDs.contains(preselected.id)
+                                    showsLeaf: leafIDs.contains(preselected.id),
+                                    overlapText: overlapNames[preselected.id].map(WeekOverlap.badgeText)
                                 )
                             }
                         }
@@ -1214,7 +1244,12 @@ struct RecipePickerSheet: View {
                         } else if !picks.isEmpty {
                             Section("In season now") {
                                 ForEach(picks, id: \.recipe.id) { pick in
-                                    recipeRow(pick.recipe, seasonalScore: pick.score, showsLeaf: true)
+                                    recipeRow(
+                                        pick.recipe,
+                                        seasonalScore: pick.score,
+                                        showsLeaf: true,
+                                        overlapText: overlapNames[pick.recipe.id].map(WeekOverlap.badgeText)
+                                    )
                                 }
                             }
                         }
@@ -1250,7 +1285,8 @@ struct RecipePickerSheet: View {
                                 recipeRow(
                                     recipe,
                                     seasonalScore: nil,
-                                    showsLeaf: leafIDs.contains(recipe.id)
+                                    showsLeaf: leafIDs.contains(recipe.id),
+                                    overlapText: overlapNames[recipe.id].map(WeekOverlap.badgeText)
                                 )
                             }
                         }
@@ -1276,20 +1312,23 @@ struct RecipePickerSheet: View {
     private func recipeRow(
         _ recipe: RecipeRow,
         seasonalScore: SeasonalMatch.Score?,
-        showsLeaf: Bool
+        showsLeaf: Bool,
+        overlapText: String?
     ) -> some View {
         Button {
             onPick(recipe, selectedMemberID)
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    // Name + leaf, category, and the seasonal match
-                    // line — the shared label the Recipes tab's shelf
-                    // and the empty-week strip also draw.
+                    // Name + leaf, category, the seasonal match line,
+                    // and the week-overlap line — the shared label the
+                    // Recipes tab's shelf and the empty-week strip also
+                    // draw (they pass no overlap).
                     FluffyRecipeRowLabel(
                         recipe: recipe,
                         seasonalScore: seasonalScore,
-                        showsLeaf: showsLeaf
+                        showsLeaf: showsLeaf,
+                        overlapText: overlapText
                     )
                     // Keyword-only dietary hint — a gentle flag, never
                     // a block. A selected person gets their own check;

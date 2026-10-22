@@ -102,6 +102,16 @@ Record of architectural decisions and constraints that should not be re-litigate
 
 ---
 
+## Decision: Week Overlap Badge Is Observational
+**Date:** 2026-10-21
+**Status:** Locked in (Ingredient Chaining Phase 1)
+**Why:**
+- Week overlap badge is observational (recipe-to-recipe). It does not read grocery state.
+- The picker's "ALSO USES CABBAGE, CILANTRO" line only says a recipe shares perishable ingredient names with meals already planned this week — no claim about what's bought or on hand, and the grocery list is untouched.
+- 'Uses what you're buying' deferred to a surplus/inventory decision (Ingredient Chaining Phase 2).
+
+---
+
 ## What NOT to Change
 - **SwiftUI must stay** (rewriting in UIKit would set back 2+ months)
 - **Proxy must be kept** (API key can't live on device)

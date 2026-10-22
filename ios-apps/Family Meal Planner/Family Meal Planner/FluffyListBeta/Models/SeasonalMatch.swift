@@ -89,8 +89,9 @@ enum SeasonalMatch {
 
     /// Whether a produce keyword's token sequence appears contiguously
     /// in a token list — "sweet corn" matches "fresh sweet corn" but
-    /// "corn" never matches "cornstarch".
-    private static func sequence(_ needle: [String], appearsIn haystack: [String]) -> Bool {
+    /// "corn" never matches "cornstarch". Internal and nonisolated so
+    /// WeekOverlap matches perishables with the exact same rule.
+    nonisolated static func sequence(_ needle: [String], appearsIn haystack: [String]) -> Bool {
         guard !needle.isEmpty, needle.count <= haystack.count else { return false }
         for start in 0...(haystack.count - needle.count) {
             if Array(haystack[start..<(start + needle.count)]) == needle { return true }
