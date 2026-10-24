@@ -1054,6 +1054,18 @@ struct SupabaseAddRecipeView: View {
                 extractionError = "Got a response but couldn't parse the recipe. Please try again."
             }
             showingExtractionError = true
+        } catch RecipeImageExtractor.ExtractionError.contentFiltered {
+            // The content filter blocked this page twice. The message
+            // promises the photo is saved with the recipe, so attach the
+            // first scanned page as the card photo (unless the user already
+            // picked one); it uploads when they save the hand-entered recipe.
+            Logger.supabase.error("Photo import blocked by content filter after retry")
+            if viewModel.sourceImage == nil, viewModel.sourceImagePath == nil, let firstPage = images.first {
+                viewModel.sourceImage = firstPage
+                viewModel.sourceImageRemoved = false
+            }
+            extractionError = RecipeImageExtractor.ExtractionError.contentFiltered.localizedDescription
+            showingExtractionError = true
         } catch {
             // Same cancellation guard as above for errors that don't
             // come wrapped in ClientError (e.g. CancellationError).

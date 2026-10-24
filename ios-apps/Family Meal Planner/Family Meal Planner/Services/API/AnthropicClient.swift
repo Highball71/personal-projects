@@ -52,6 +52,16 @@ enum AnthropicClient {
                 "The API returned an empty response."
             }
         }
+
+        /// True when Anthropic refused to return output because it tripped
+        /// the content filter — a 400 invalid_request_error whose message
+        /// reads "Output blocked by content filtering policy". On cookbook
+        /// pages this usually means the method text would have been copied
+        /// verbatim, so callers can retry asking for paraphrased steps.
+        var isContentFilterBlock: Bool {
+            guard case .httpError(let statusCode, let message) = self else { return false }
+            return statusCode == 400 && message.lowercased().contains("content filtering")
+        }
     }
 
     // MARK: - Public

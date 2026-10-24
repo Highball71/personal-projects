@@ -17,6 +17,10 @@ enum RecipeImageExtractor {
         /// cut off mid-stream and can never parse. Distinct from a
         /// parse error so the user gets advice, not "incorrect format".
         case responseTruncated
+        /// The API's content filter blocked the output twice (initial try
+        /// plus one retry asking for paraphrased steps). The page can't be
+        /// read automatically; the user adds it by hand with the photo.
+        case contentFiltered
 
         var errorDescription: String? {
             switch self {
@@ -24,6 +28,8 @@ enum RecipeImageExtractor {
                 "Could not convert the photo to a format the API accepts."
             case .responseTruncated:
                 "The recipe was too long to read in one pass — try fewer pages or a closer photo"
+            case .contentFiltered:
+                "This page couldn't be read automatically. Add it by hand — the photo is saved with the recipe."
             }
         }
     }
@@ -124,6 +130,20 @@ enum RecipeImageExtractor {
         \(schemaInstructions)
         """
 
+    /// Appended to the user prompt on the one retry after a content-filter
+    /// block. The filter trips when the output would copy a page's method
+    /// text verbatim, so this asks for the steps in Claude's own words
+    /// while keeping the facts (ingredients, quantities, title, servings)
+    /// exact. Exposed (non-private) so tests can check the retry sent it.
+    static let contentFilterRetryInstruction = """
+        IMPORTANT — rules for this attempt (they override any conflicting \
+        rule above):
+          - Ingredients, quantities, and units exactly as printed.
+          - Keep the recipe title and servings exactly as printed.
+          - Write the instructions as concise steps in your own words. \
+            Do NOT copy the printed method text.
+        """
+
     // MARK: - Public
 
     /// Extract recipe data from one or more photos of cookbook pages.
@@ -189,6 +209,29 @@ enum RecipeImageExtractor {
         return retried
     }
 
+    /// Run a request, retrying once with the same image(s) and
+    /// `contentFilterRetryInstruction` appended when Anthropic blocked
+    /// the output by content filtering. A second block becomes
+    /// `.contentFiltered` so the user sees a clear next step instead of
+    /// "Server error (400)". Any other error passes through unchanged.
+    private static func sendWithContentFilterRetry(
+        userPrompt: String,
+        _ send: (_ userPrompt: String) async throws -> AnthropicResponse
+    ) async throws -> AnthropicResponse {
+        do {
+            return try await send(userPrompt)
+        } catch let error as AnthropicClient.ClientError where error.isContentFilterBlock {
+            Logger.importPipeline.warning("Output blocked by content filter — retrying with paraphrased-steps instruction")
+        }
+
+        do {
+            return try await send(userPrompt + "\n\n" + contentFilterRetryInstruction)
+        } catch let error as AnthropicClient.ClientError where error.isContentFilterBlock {
+            Logger.importPipeline.error("Retry also blocked by content filter — giving up")
+            throw ExtractionError.contentFiltered
+        }
+    }
+
     private static func extractSingle(from image: UIImage) async throws -> ExtractedRecipe {
         Logger.importPipeline.info("Starting recipe extraction...")
 
@@ -200,14 +243,16 @@ enum RecipeImageExtractor {
         Logger.importPipeline.info("Image data size: \(imageData.count, privacy: .public) bytes")
 
         Logger.importPipeline.info("Sending request to Claude API...")
-        let response = try await sendWithTruncationRetry { maxTokens in
-            try await AnthropicClient.sendImageMessage(
-                systemPrompt: systemPrompt,
-                userPrompt: singleImagePrompt,
-                base64Image: base64String,
-                maxTokens: maxTokens,
-                timeout: 120
-            )
+        let response = try await sendWithContentFilterRetry(userPrompt: singleImagePrompt) { prompt in
+            try await sendWithTruncationRetry { maxTokens in
+                try await AnthropicClient.sendImageMessage(
+                    systemPrompt: systemPrompt,
+                    userPrompt: prompt,
+                    base64Image: base64String,
+                    maxTokens: maxTokens,
+                    timeout: 120
+                )
+            }
         }
 
         let text = try AnthropicClient.extractText(from: response)
@@ -241,14 +286,16 @@ enum RecipeImageExtractor {
         }
 
         Logger.importPipeline.info("Sending multi-page request to Claude API...")
-        let response = try await sendWithTruncationRetry { maxTokens in
-            try await AnthropicClient.sendMultiImageMessage(
-                systemPrompt: systemPrompt,
-                userPrompt: multiPagePrompt,
-                imageContents: imageContents,
-                maxTokens: maxTokens,
-                timeout: 90
-            )
+        let response = try await sendWithContentFilterRetry(userPrompt: multiPagePrompt) { prompt in
+            try await sendWithTruncationRetry { maxTokens in
+                try await AnthropicClient.sendMultiImageMessage(
+                    systemPrompt: systemPrompt,
+                    userPrompt: prompt,
+                    imageContents: imageContents,
+                    maxTokens: maxTokens,
+                    timeout: 90
+                )
+            }
         }
 
         let text = try AnthropicClient.extractText(from: response)
