@@ -32,6 +32,10 @@ final class SupabaseRecipeFormViewModel {
     var sourceImagePath: String?
     /// True if the user explicitly removed the image.
     var sourceImageRemoved = false
+    /// True while `sourceImage` is a scanned cookbook page the app attached
+    /// on its own (not a photo the user picked). Lets `switchToUpdate`
+    /// drop it rather than overwrite an existing recipe's photo.
+    private(set) var sourceImageIsScannedPage = false
 
     // Save state
     var isSaving: Bool = false
@@ -138,6 +142,32 @@ final class SupabaseRecipeFormViewModel {
         if notes.isEmpty { notes = existing.notes }
         if sourceImagePath == nil { sourceImagePath = existing.sourceImagePath }
         if sourceDetail.isEmpty { sourceDetail = existing.sourceDetail ?? "" }
+        // The existing recipe already has a photo — keep it, and don't
+        // let the auto-attached scan page replace it on save.
+        if sourceImageIsScannedPage, existing.sourceImagePath != nil {
+            sourceImage = nil
+            sourceImageIsScannedPage = false
+        }
+    }
+
+    // MARK: - Scanned page photo
+
+    /// Attach the first scanned cookbook page as the recipe photo, but only
+    /// when the recipe has no photo yet (none picked, none stored). Called
+    /// after a photo import, whether extraction succeeded or not, so the
+    /// page is saved with the recipe.
+    func attachScannedPageIfNoPhoto(_ pages: [UIImage]) {
+        guard sourceImage == nil, sourceImagePath == nil, let firstPage = pages.first else { return }
+        sourceImage = firstPage
+        sourceImageRemoved = false
+        sourceImageIsScannedPage = true
+    }
+
+    /// Set a photo the user picked themselves (card-photo flow).
+    func setPickedPhoto(_ image: UIImage) {
+        sourceImage = image
+        sourceImageRemoved = false
+        sourceImageIsScannedPage = false
     }
 
     // MARK: - Validation

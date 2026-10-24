@@ -237,8 +237,7 @@ struct SupabaseAddRecipeView: View {
                 Task {
                     if let data = try? await newItem.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
-                        viewModel.sourceImage = image
-                        viewModel.sourceImageRemoved = false
+                        viewModel.setPickedPhoto(image)
                     }
                     selectedPhotoItem = nil
                 }
@@ -998,6 +997,7 @@ struct SupabaseAddRecipeView: View {
             Logger.supabase.info("Photo import: got \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
 
             viewModel.populateFrom(extracted, sourceType: .photo)
+            viewModel.attachScannedPageIfNoPhoto(images)
 
             // Duplicate guard for the extraction flow. We do an
             // authoritative DB lookup BEFORE save, because the silent
@@ -1057,13 +1057,10 @@ struct SupabaseAddRecipeView: View {
         } catch RecipeImageExtractor.ExtractionError.contentFiltered {
             // The content filter blocked this page twice. The message
             // promises the photo is saved with the recipe, so attach the
-            // first scanned page as the card photo (unless the user already
-            // picked one); it uploads when they save the hand-entered recipe.
+            // first scanned page (unless a photo is already set); it
+            // uploads when they save the hand-entered recipe.
             Logger.supabase.error("Photo import blocked by content filter after retry")
-            if viewModel.sourceImage == nil, viewModel.sourceImagePath == nil, let firstPage = images.first {
-                viewModel.sourceImage = firstPage
-                viewModel.sourceImageRemoved = false
-            }
+            viewModel.attachScannedPageIfNoPhoto(images)
             extractionError = RecipeImageExtractor.ExtractionError.contentFiltered.localizedDescription
             showingExtractionError = true
         } catch {
