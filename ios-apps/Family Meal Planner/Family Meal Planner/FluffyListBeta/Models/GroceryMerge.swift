@@ -45,11 +45,31 @@ enum GroceryMerge {
     /// alias table. This is the entire merge key — unit is NOT part of
     /// it (that's what made three olive-oil rows).
     static func normalizeName(_ name: String) -> String {
-        let collapsed = name
+        let collapsed = shoppingName(name)
             .lowercased()
             .split(whereSeparator: { $0.isWhitespace })
             .joined(separator: " ")
         return nameAliases[collapsed] ?? collapsed
+    }
+
+    /// Legacy scans embedded recipe section labels in ingredient names.
+    /// Strip only the explicit "[For …]" convention; brackets such as
+    /// "[optional]" may carry meaningful shopping information.
+    static func shoppingName(_ name: String) -> String {
+        name.replacingOccurrences(
+            of: #"^\s*\[For\s+[^\]]+\]\s*"#,
+            with: "", options: [.regularExpression, .caseInsensitive]
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Restrict heading detection to the explicit legacy "For the …"
+    /// form. Do not guess that ordinary names like "filling" are headings.
+    static func isSectionHeading(_ name: String) -> Bool {
+        let cleaned = shoppingName(name)
+        return cleaned.isEmpty || cleaned.range(
+            of: #"^For\s+the\s+[\p{L}\s&’'-]+:?$"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
     }
 
     // MARK: - Unit conversion
@@ -155,7 +175,13 @@ enum GroceryMerge {
         var mergedByKey: [String: GroceryItemInsert] = [:]
         var orderedKeys: [String] = []
 
-        for item in inserts {
+        for original in inserts {
+            guard !isSectionHeading(original.name) else { continue }
+            let item = GroceryItemInsert(
+                householdID: original.householdID,
+                name: shoppingName(original.name),
+                quantity: original.quantity, unit: original.unit, note: original.note
+            )
             let key = normalizeName(item.name)
             guard let existing = mergedByKey[key] else {
                 mergedByKey[key] = item

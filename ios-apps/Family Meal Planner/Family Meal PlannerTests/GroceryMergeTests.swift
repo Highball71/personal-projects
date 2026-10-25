@@ -75,6 +75,38 @@ final class GroceryMergeTests: XCTestCase {
                        "Not aliased — stays its own item")
     }
 
+    func testRecipeSectionsDoNotBecomePurchasesOrSplitIngredients() {
+        let merged = GroceryMerge.mergeInserts([
+            insert("For the Filling", 1, "piece"),
+            insert("[For the Pork]", 1, "piece"),
+            insert("[For the Pork] apple cider", 2, "cup"),
+            insert("[For the Slaw] apple cider", 1, "cup"),
+            insert("[For the Slaw] extra-virgin olive oil", 2, "tbsp"),
+            insert("olive oil", 1, "tsp"),
+        ])
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged[0].name, "apple cider")
+        XCTAssertEqual(merged[0].quantity, 3)
+        XCTAssertEqual(merged[1].quantity, 2 + 1.0 / 3, accuracy: 0.0001)
+        XCTAssertEqual(GroceryMerge.normalizeName("[For the Pork] apple cider"), "apple cider")
+    }
+
+    func testSectionCleaningPreservesRealIngredientsAndNotes() {
+        let names = ["pie filling", "[optional] cilantro", "pork", "apple cider vinegar"]
+        for name in names {
+            XCTAssertFalse(GroceryMerge.isSectionHeading(name))
+            XCTAssertEqual(GroceryMerge.shoppingName(name), name)
+        }
+        let merged = GroceryMerge.mergeInserts([
+            GroceryItemInsert(householdID: householdID,
+                              name: "[For the Filling] coconut milk", quantity: 1,
+                              unit: "can", note: "14 ounces, unsweetened")
+        ])
+        XCTAssertEqual(merged.first?.name, "coconut milk")
+        XCTAssertEqual(merged.first?.note, "14 ounces, unsweetened")
+        XCTAssertEqual(merged.first?.quantity, 1)
+    }
+
     func testUnitConversionFamilies() {
         // US volume
         XCTAssertEqual(GroceryMerge.convert(1, from: "tbsp", to: "tsp"), 3)
@@ -139,6 +171,29 @@ final class GroceryMergeServiceTests: XCTestCase {
         XCTAssertEqual(rows.first?["quantity"] as? Double ?? 0, 7, accuracy: 0.0001)
         XCTAssertEqual(rows.first?["unit"] as? String, "tbsp",
                        "The existing row's unit is the display unit")
+    }
+
+    @MainActor
+    func testSectionedMealContributionsMergeAndUnwind() async throws {
+        let service = GroceryService()
+        let mealID = UUID()
+        let first = await service.addItems([insert("apple cider", 1, "cup")])
+        XCTAssertTrue(first)
+        let added = await service.addItemsForMealPlan(mealPlanID: mealID, items: [
+            insert("For the Filling", 1, "piece"),
+            insert("[For the Pork] apple cider", 2, "cup"),
+            insert("[For the Slaw] apple cider", 1, "cup")
+        ])
+        XCTAssertTrue(added)
+        XCTAssertEqual(service.items.count, 1)
+        XCTAssertEqual(service.items.first?.quantity, 4)
+        let contributions = await service.fetchContributions(forMealPlans: [mealID])
+        XCTAssertEqual(contributions?.count, 1)
+        XCTAssertEqual(contributions?.first?.quantity, 3)
+        let settled = await service.settleContributions(contributions ?? [])
+        XCTAssertTrue(settled)
+        XCTAssertEqual(service.items.count, 1)
+        XCTAssertEqual(service.items.first?.quantity, 1)
     }
 
     @MainActor

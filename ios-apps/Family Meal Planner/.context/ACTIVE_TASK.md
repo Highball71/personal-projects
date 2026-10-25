@@ -23,3 +23,7 @@
 
 ## Current redesign continuation — October 25
 Branch codex/fluffylist-hybrid-redesign: scan-first optional cookbook-photo step implemented and locally validated. Migration 021 and device delivery pending. See latest HANDOFF entries and RECIPE_CORRECTIONS.md. Shopping-list duplicates/section headings are the next investigation; no live grocery cleanup has run.
+
+
+## 2026-10-25 — Prioritize breadth over recipe polish
+David accepted the scan-first optional cookbook-photo experience and asked to move other areas to good before further polish. Next focus is grocery integrity: suppress legacy recipe-section headings on new additions and normalize explicit [For …] ingredient prefixes, then separately reconcile existing duplicates without losing contributions. Recipe crop/spacing polish deferred. No new release authorized in this turn.
