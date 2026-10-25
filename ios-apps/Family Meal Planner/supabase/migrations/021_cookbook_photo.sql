@@ -1,4 +1,5 @@
--- Prepared locally; not deployed. Book illustrations are not family cooking history.
+-- Applied to FluffyList V2 on 2026-10-25 after isolated policy tests.
+-- Book illustrations are not family cooking history.
 alter table public.recipes add column if not exists cookbook_image_path text;
 alter table public.recipes drop constraint if exists cookbook_photo_ownership;
 alter table public.recipes add constraint cookbook_photo_ownership check (

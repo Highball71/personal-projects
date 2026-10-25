@@ -418,3 +418,13 @@ Migration 021 is prepared, NOT deployed. Tested in a network-isolated disposable
 Full suite: 298 tests per device, 596 total, all passed, /private/tmp/fluffylist-cookbook-images.xcresult. Test storage now serves JPEG payloads from multipart uploads; signed download test verifies image decoding. Render fixtures explicitly say TEST IMAGE, covering family/book/source/no-photo variants. Final targeted rerun after removing conflicting native Photos navigation title: /private/tmp/fluffylist-cookbook-header.xcresult — all targeted tests passed on both devices.
 
 Still required: enable migration 021 before shipping feature; physical scan/camera, real book-photo composition, VoiceOver, rotation/Split View and live two-account sync. Original scans still retain first page only (UI states limit), no backfill of missing historical photos. Grocery duplicates and section headings remain queued in RECIPE_CORRECTIONS.md. Current app build number still 126; corrections/new flow not in TestFlight.
+
+
+## 2026-10-25 — Build 127 delivered to Apple
+User said “Keep going” after the explicit next steps (private storage and TestFlight). Applied migration 021 transactionally through the FluffyList V2 SQL editor. Verified cookbook-recipe-photos public=false, size limit 5242880, all three storage policies present, recipes RLS=true; notified PostgREST schema reload. No existing recipe/grocery rows modified.
+
+Signed archive succeeded, build 127 uploaded successfully to App Store Connect at 08:55:24 Eastern. Apple reports package processing. Browser processing-status check reached Apple login, so tester availability remains unconfirmed. No public App Store submission. Archive: work/releases/FluffyList-hybrid-127.xcarchive; local upload log /private/tmp/fluffylist-127-upload.log. Existing signing config/key consumed by Xcode, not read.
+
+Paired iPhone 16 and iPad 10th gen available, but physical camera/VoiceOver/live two-account sync have NOT been validated. Did not overwrite installed TestFlight apps to run development tests.
+
+Read-only live grocery investigation confirmed 19 heading/prefix rows: an actual “For the Filling” item with quantity 1 piece plus “[For the Pork] apple cider”, “[For the Slaw] apple cider”, etc. Exact unchecked duplicate groups include extra-virgin olive oil (3), coarse salt (2), garlic, minced (2), coconut aminos (2), black pepper (2). Existing merge logic preserves legacy duplicates by selecting first row and does not strip section prefixes. Several units are incompatible (cloves vs tsp; piece vs tsp). No grocery rows were changed. Next pass must handle standalone headings separately from prefixed real ingredients and preserve meal-plan contributions/quantities.
