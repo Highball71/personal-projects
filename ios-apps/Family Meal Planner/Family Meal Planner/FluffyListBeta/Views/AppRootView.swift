@@ -271,25 +271,25 @@ struct SupabaseContentView: View {
         TabView(selection: $selectedTab) {
             SupabaseMealPlanView(selectedTab: $selectedTab)
                 .tabItem {
-                    Label("MEALS", systemImage: "calendar")
+                    Label("Meals", systemImage: "calendar")
                 }
                 .tag(AppTab.mealPlan)
 
             SupabaseRecipeListView()
                 .tabItem {
-                    Label("RECIPES", systemImage: "book")
+                    Label("Recipes", systemImage: "book")
                 }
                 .tag(AppTab.recipes)
 
             SupabaseGroceryListView(selectedTab: $selectedTab)
                 .tabItem {
-                    Label("GROCERY", systemImage: "cart")
+                    Label("Grocery", systemImage: "cart")
                 }
                 .tag(AppTab.groceries)
 
             SupabaseSettingsView()
                 .tabItem {
-                    Label("SETTINGS", systemImage: "gearshape")
+                    Label("Settings", systemImage: "gearshape")
                 }
                 .tag(AppTab.settings)
         }

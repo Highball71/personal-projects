@@ -1,20 +1,4 @@
-//
-//  Font+FluffyList.swift
-//  FluffyList
-//
-//  "The Press" typography scale.
-//  Source Serif 4 for everything — headings AND body. No sans-serif
-//  anywhere, including UI chrome.
-//
-//  Bundled faces (PostScript names, as registered in Info.plist):
-//    - SourceSerif4-Regular
-//    - SourceSerif4-Semibold   (note lowercase 'b' in the PS name)
-//    - SourceSerif4-Bold
-//    - SourceSerif4-It         (italic)
-//
-//  Tracking: SwiftUI .tracking() takes points, the spec uses em.
-//  Use the em-tracking helpers at the bottom (points = em × size).
-//
+// Editorial serif headings paired with scalable system text for controls and body copy.
 
 import SwiftUI
 
@@ -56,7 +40,7 @@ extension Font {
     // -- Body (Source Serif 4 Regular / Italic) --
 
     /// List items, method steps, ingredients — Regular 17pt
-    static let fluffyBody          = Font.custom(FluffyFace.regular, size: 17)
+    static let fluffyBody          = Font.system(.body)
 
     /// Editorial asides, sub-copy, empty states — Italic 15pt
     static let fluffyCallout       = Font.custom(FluffyFace.italic, size: 15)
@@ -65,10 +49,10 @@ extension Font {
     static let fluffyCalloutLarge  = Font.custom(FluffyFace.italic, size: 17)
 
     /// Quantities, right-aligned metadata — Regular 13pt
-    static let fluffyFootnote      = Font.custom(FluffyFace.regular, size: 13)
+    static let fluffyFootnote      = Font.system(.subheadline)
 
     /// Row metadata ("PASTA · 20 MIN") — Regular 12pt, +0.10em, uppercase
-    static let fluffyCaption       = Font.custom(FluffyFace.regular, size: 12)
+    static let fluffyCaption       = Font.system(.subheadline)
 
     /// Masthead label ("FLUFFYLIST" / dateline) — Regular 10pt, +0.16em, uppercase
     static let fluffyMastheadLabel = Font.custom(FluffyFace.regular, size: 10)
@@ -79,10 +63,10 @@ extension Font {
     // -- Utility --
 
     /// Buttons and text links — SemiBold 16pt
-    static let fluffyButton        = Font.custom(FluffyFace.semibold, size: 16)
+    static let fluffyButton        = Font.system(.subheadline)
 
     /// Tab bar — Regular 10pt, +0.12em, uppercase
-    static let fluffyTabLabel      = Font.custom(FluffyFace.regular, size: 10)
+    static let fluffyTabLabel      = Font.system(.subheadline)
 }
 
 // MARK: - Em Tracking

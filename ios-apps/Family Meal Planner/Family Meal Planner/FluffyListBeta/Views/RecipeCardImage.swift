@@ -1,72 +1,56 @@
-//
-//  RecipeCardImage.swift
-//  FluffyList
-//
-//  Shared recipe image. Prefers the homemade photo when available,
-//  falls back to source image, then to a flat editorial placeholder.
-//  Loaded photos take "The Press" halftone treatment (desaturate
-//  ~35%, contrast ~1.15) — square corners, no scrim. 0.25s fade-in.
-//
-
 import SwiftUI
 
+/// Original source images and family cooking photos are separate media roles.
+/// Source images may contain an entire cookbook page: never crop them to fill.
 struct RecipeCardImage: View {
+    enum Role { case browse, source, family }
     let recipe: RecipeRow
     let height: CGFloat
+    var role: Role = .browse
 
-    /// The best available image path: homemade wins over source.
-    private var displayImagePath: String? {
-        recipe.homemadeImagePath ?? recipe.sourceImagePath
+    private var path: String? {
+        switch role {
+        case .browse: recipe.homemadeImagePath ?? recipe.sourceImagePath
+        case .source: recipe.sourceImagePath
+        case .family: recipe.homemadeImagePath
+        }
+    }
+    private var isSource: Bool {
+        role == .source || (role == .browse && recipe.homemadeImagePath == nil && recipe.sourceImagePath != nil)
     }
 
     var body: some View {
-        if let url = SupabaseManager.shared.publicStorageURL(path: displayImagePath) {
-            AsyncImage(url: url, transaction: Transaction(animation: .easeIn(duration: 0.25))) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .fluffyHalftone()
-                case .failure:
-                    gradientFallback
-                default:
-                    gradientFallback
+        GeometryReader { geometry in
+            ZStack {
+                Color.fluffyCard
+                if let url = SupabaseManager.shared.publicStorageURL(path: path) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable()
+                                .aspectRatio(contentMode: isSource ? .fit : .fill)
+                                .frame(width: geometry.size.width, height: height)
+                                .clipped()
+                        case .failure: placeholder("Photo unavailable")
+                        default: ProgressView().accessibilityLabel("Loading photo")
+                        }
+                    }
+                } else {
+                    placeholder("No photo")
                 }
             }
-            .frame(height: height)
-            .clipped()
-        } else {
-            gradientFallback
-                .frame(height: height)
         }
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .accessibilityLabel(isSource ? "Original source image for \(recipe.name)" : "Photo for \(recipe.name)")
     }
 
-    // MARK: - Placeholder Fallback
-
-    /// Flat editorial placeholder: paper-adjacent field, hairline
-    /// rules top and bottom, a light category glyph. No gradients.
-    private var gradientFallback: some View {
-        ZStack {
-            Color.fluffyDivider
-            Image(systemName: categoryIcon)
-                .font(.system(size: height > 100 ? 56 : 22, weight: .ultraLight))
-                .foregroundStyle(Color.fluffySecondary.opacity(0.6))
+    private func placeholder(_ label: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: isSource ? "doc.text.image" : "fork.knife")
+                .font(.system(size: height > 100 ? 32 : 20))
+            if height > 100 { Text(label).font(.caption) }
         }
-        .overlay(alignment: .top) { Rectangle().fill(Color.fluffyPrimary.opacity(0.2)).frame(height: 1) }
-        .overlay(alignment: .bottom) { Rectangle().fill(Color.fluffyPrimary.opacity(0.2)).frame(height: 1) }
-    }
-
-    /// SF Symbol per meal category.
-    private var categoryIcon: String {
-        switch recipe.recipeCategory {
-        case .breakfast: "sunrise"
-        case .lunch:     "sun.max"
-        case .dinner:    "moon.stars"
-        case .snack:     "leaf"
-        case .dessert:   "birthday.cake"
-        case .side:      "carrot"
-        case .drink:     "cup.and.saucer"
-        }
+        .foregroundStyle(Color.fluffySecondary)
     }
 }

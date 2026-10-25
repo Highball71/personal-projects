@@ -1,13 +1,4 @@
-//
-//  FluffyFont.swift
-//  FluffyList
-//
-//  "The Press" shared components — the broadsheet furniture every
-//  screen is built from: the masthead, hairline rules, section heads,
-//  uppercase metadata, underlined text links, and the one filled
-//  button style. Replaces the old FluffySectionHeader /
-//  FluffyPrimaryButton / FluffyMetadataChip card-era components.
-//
+// Shared hybrid design components: editorial headings, quiet metadata, rounded actions.
 
 import SwiftUI
 
@@ -47,7 +38,6 @@ struct FluffyMasthead: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FluffyRule(weight: 4, color: ruleColor)
 
             HStack {
                 Text(brand)
@@ -62,13 +52,12 @@ struct FluffyMasthead: View {
             }
             .padding(.vertical, 8)
 
-            FluffyRule(weight: 1, color: ruleColor)
 
             Text(title)
                 .font(onInk ? .custom(FluffyFace.bold, size: 40) : .fluffyDisplay)
                 .fluffyTracking(-0.025, at: onInk ? 40 : 38)
                 .foregroundStyle(titleColor)
-                .padding(.top, 20)
+                .padding(.top, 4)
         }
     }
 }
@@ -82,9 +71,8 @@ struct FluffySectionHead: View {
     var color: Color = .fluffySecondary
 
     var body: some View {
-        Text(title.uppercased())
-            .font(.fluffySectionHead)
-            .fluffyTracking(0.16, at: 11)
+        Text(title)
+            .font(.custom(FluffyFace.bold, size: 20, relativeTo: .headline))
             .foregroundStyle(color)
     }
 }
@@ -97,9 +85,8 @@ struct FluffyMetadataLine: View {
     var color: Color = .fluffySecondary
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.fluffyCaption)
-            .fluffyTracking(0.10, at: 12)
+        Text(text)
+            .font(.subheadline)
             .foregroundStyle(color)
     }
 }
@@ -136,8 +123,8 @@ struct FluffyTextLink: View {
 struct FluffyFilledButton: View {
     let title: String
     var icon: String? = nil
-    var fill: Color = .fluffyAccent
-    var textColor: Color = .fluffyBackground
+    var fill: Color = Color(hex: "BB3510")
+    var textColor: Color = .white
     let action: () -> Void
 
     var body: some View {
@@ -153,7 +140,7 @@ struct FluffyFilledButton: View {
             .foregroundStyle(textColor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(fill)   // square corners — no shape
+            .background(fill, in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(FluffyFilledDarkenStyle())
     }

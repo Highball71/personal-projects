@@ -1,22 +1,5 @@
-//
-//  SupabaseRecipeDetailView.swift
-//  FluffyList
-//
-//  "The Press" recipe detail. 230pt halftone photo, ink-2 kicker,
-//  36pt Bold title, uppercase metadata, ruled ingredient rows with a
-//  servings scaler, numbered METHOD steps with a fixed numeral
-//  column, and a sticky bottom bar carrying the one filled button in
-//  the app: "Add to the week".
-//
-//  iPad phase 1 ("cookbook on a stand"): in the REGULAR horizontal
-//  size class the same sections rearrange into two columns —
-//  ingredients left, method right, a taller photo across the top —
-//  with the Press type scaled up and the line measure capped so steps
-//  read from a few feet away. All decisions live in RecipeDetailLayout
-//  (size-class driven, never device checks); every compact value
-//  equals the old constant, so the phone renders exactly as before.
-//  The screen also keeps itself awake while visible (ScreenAwake).
-//
+// Adaptive recipe detail with Recipe, Ingredients, Notes, and Photos sections.
+// Original sources and household cooking history remain distinct.
 
 import PhotosUI
 import SwiftUI
@@ -32,8 +15,9 @@ struct SupabaseRecipeDetailView: View {
     /// at push time. Kept only as a fallback; rendering reads `recipe`.
     private let initialRecipe: RecipeRow
 
-    init(recipe: RecipeRow) {
+    init(recipe: RecipeRow, initialSection: DetailTab = .recipe) {
         self.initialRecipe = recipe
+        _selectedSection = State(initialValue: initialSection)
     }
 
     /// The LIVE row, read from the service by id on every render, so a
@@ -52,9 +36,19 @@ struct SupabaseRecipeDetailView: View {
         RecipeDetailLayout(isRegular: horizontalSizeClass == .regular)
     }
 
+    enum DetailTab: String, CaseIterable { case recipe = "Recipe", ingredients = "Ingredients", notes = "Notes", photos = "Photos" }
+    @State private var selectedSection: DetailTab = .recipe
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var familyHistory: [FamilyRecipePhoto] = []
+    @State private var photoHistoryAvailable = false
+    @State private var loadingPhotoHistory = true
+    @State private var photoCaption = ""
+    @State private var replacingSavedPhoto = false
+    @State private var useLegacyPhotoSave = false
     @State private var ingredients: [RecipeIngredientRow] = []
     @State private var isLoadingIngredients = true
     @State private var showingEdit = false
+    @State private var showingOriginalSource = false
     @State private var showingDayPicker = false
     @State private var toastMessage: String?
     @State private var showingHomemadePhotoPicker = false
@@ -88,13 +82,14 @@ struct SupabaseRecipeDetailView: View {
 
     var body: some View {
         ScrollView {
-            if layout.usesTwoColumns {
+            if layout.usesTwoColumns && !dynamicTypeSize.isAccessibilitySize && selectedSection == .recipe {
                 regularContent
             } else {
                 compactContent
             }
         }
         .background(Color.fluffyBackground)
+        .navigationTitle(selectedSection == .photos ? recipe.name : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
         .tint(Color.fluffyAccent)
@@ -106,7 +101,7 @@ struct SupabaseRecipeDetailView: View {
                 // On regular the filled button is capped and centered
                 // (a pane-wide persimmon bar is a banner, not a
                 // button); compact keeps the full-width phone bar.
-                FluffyFilledButton(title: "Add to the week") {
+                FluffyFilledButton(title: "Add to Meal Plan", icon: "plus") {
                     showingDayPicker = true
                 }
                 .frame(maxWidth: layout.bottomBarMaxWidth ?? .infinity)
@@ -135,16 +130,17 @@ struct SupabaseRecipeDetailView: View {
                             }
                         }
                     } label: {
-                        Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
+                        Image(systemName: recipe.isFavorite ? "heart.fill" : "heart").accessibilityLabel(recipe.isFavorite ? "Remove favorite" : "Favorite recipe")
                             .foregroundStyle(recipe.isFavorite ? Color.fluffyAccent : Color.fluffySecondary)
                     }
                     Button { showingEdit = true } label: {
-                        Image(systemName: "pencil")
+                        Image(systemName: "pencil").accessibilityLabel("Edit recipe")
                             .foregroundStyle(Color.fluffyAccent)
                     }
                 }
             }
         }
+        .sheet(isPresented: $showingOriginalSource) { RecipeSourceImageView(recipe: recipe) }
         .sheet(isPresented: $showingEdit) {
             SupabaseAddRecipeView(recipe: recipe, ingredients: ingredients)
                 .fluffyRegularSheetSizing(layout.isRegular)
@@ -162,6 +158,14 @@ struct SupabaseRecipeDetailView: View {
             )
             .fluffyRegularSheetSizing(layout.isRegular)
         }
+        .confirmationDialog("Replace the previously saved photo?", isPresented: $replacingSavedPhoto, titleVisibility: .visible) {
+            Button("Replace Saved Photo", role: .destructive) {
+                useLegacyPhotoSave = true
+                showingHomemadePhotoPicker = true
+            }
+        } message: {
+            Text("This replaces your previously saved family photo. Your original recipe source stays unchanged.")
+        }
         .photosPicker(isPresented: $showingHomemadePhotoPicker, selection: $homemadePhotoItem, matching: .images)
         .onChange(of: homemadePhotoItem) { _, newItem in
             guard let newItem else { return }
@@ -169,6 +173,8 @@ struct SupabaseRecipeDetailView: View {
                 if let data = try? await newItem.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     await uploadHomemadePhoto(image)
+                } else {
+                    actionErrorMessage = "That photo could not be opened. Please choose it again."
                 }
                 homemadePhotoItem = nil
             }
@@ -179,6 +185,7 @@ struct SupabaseRecipeDetailView: View {
             // Initialize the stepper to the recipe's default servings
             if scaledServings == 0 { scaledServings = max(recipe.servings, 1) }
             await loadIngredients()
+            await loadPhotoHistory()
         }
         // Cookbook on a stand: the screen stays awake while a recipe
         // is showing — idle timer off on appear, restored on
@@ -193,36 +200,164 @@ struct SupabaseRecipeDetailView: View {
 
     /// The phone layout, unchanged: one column, everything stacked.
     private var compactContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if recipe.sourceImagePath != nil || recipe.homemadeImagePath != nil {
-                // Full-bleed halftone photo, square corners, no scrim.
-                RecipeCardImage(recipe: recipe, height: layout.photoHeight)
-                    .clipped()
+        VStack(alignment: .leading, spacing: 24) {
+            if selectedSection != .photos, recipe.homemadeImagePath != nil {
+                RecipeCardImage(recipe: recipe, height: layout.photoHeight, role: .family)
             }
-
-            // "Made this? Add your photo" prompt
-            if recipe.homemadeImagePath == nil {
-                homemadePhotoPrompt
+            if selectedSection != .photos { titleSection }
+            sectionTabs
+            switch selectedSection {
+            case .recipe:
+                recipeOverview
+                if !recipe.instructions.isEmpty { methodSection }
+                cookbookSource
+            case .ingredients:
+                ingredientsSection
+            case .notes:
+                if recipe.notes.isEmpty {
+                    Text("No notes yet. Add your cooking notes with Edit recipe.")
+                        .font(.body).foregroundStyle(Color.fluffySecondary).padding(.horizontal, 22)
+                } else { notesSection }
+            case .photos:
+                familyPhotos
+                cookbookSource
             }
+            Spacer(minLength: 24)
+        }
+        .frame(maxWidth: 900)
+        .frame(maxWidth: .infinity)
+    }
 
-            titleSection
-
-            ingredientsSection
-                .padding(.top, 30)
-
-            if !recipe.instructions.isEmpty {
-                methodSection
-                    .padding(.top, 30)
+    private var sectionTabs: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(DetailTab.allCases, id: \.self) { tab in
+                    Button { selectedSection = tab } label: {
+                        Text(tab.rawValue)
+                            .font(.subheadline.weight(selectedSection == tab ? .semibold : .regular))
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 48)
+                            .foregroundStyle(selectedSection == tab ? Color.fluffyAccent : Color.fluffySecondary)
+                            .overlay(alignment: .bottom) {
+                                if selectedSection == tab { Rectangle().fill(Color.fluffyAccent).frame(height: 2) }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selectedSection == tab ? .isSelected : [])
+                }
             }
+            .padding(.horizontal, 16)
+        }
+    }
 
-            if !recipe.notes.isEmpty {
-                notesSection
-                    .padding(.top, 30)
+    private var recipeOverview: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { recipeFacts }
+                VStack(alignment: .leading, spacing: 12) { recipeFacts }
             }
+            Button { selectedSection = .ingredients } label: {
+                Label("Ingredients & serving sizes", systemImage: "scalemass")
+                    .font(.body).frame(minHeight: 44)
+            }
+            .tint(Color.fluffyAccent)
+        }
+        .padding(.horizontal, 22)
+    }
 
-            sourceAttributionText
+    @ViewBuilder
+    private var recipeFacts: some View {
+        if totalMinutes > 0 {
+            Label("\(totalMinutes) min", systemImage: "clock")
+                .padding(14).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
+        }
+        if recipe.servings > 0 {
+            Label("Serves \(recipe.servings)", systemImage: "fork.knife")
+                .padding(14).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
+        }
+    }
 
-            Spacer(minLength: 40)
+    private var familyPhotos: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if loadingPhotoHistory {
+                ProgressView("Loading family photos")
+            } else if photoHistoryAvailable {
+                TextField("A note about this meal (optional)", text: $photoCaption, prompt: Text("A note about this meal (optional)").foregroundStyle(Color.fluffySecondary), axis: .vertical)
+                    .foregroundStyle(Color.fluffyPrimary)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: photoCaption) { _, value in photoCaption = String(value.prefix(2000)) }
+                Button { useLegacyPhotoSave = false; showingHomemadePhotoPicker = true } label: {
+                    Label("Made this recipe? Add a photo", systemImage: "camera")
+                        .font(.body).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .padding(16)
+                        .background(Color.fluffyAccentPale, in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("Photo history couldn’t be loaded. Your saved photo and original source are still available.")
+                    .font(.body).foregroundStyle(Color.fluffySecondary)
+                Button("Retry photo history") { Task { await loadPhotoHistory() } }
+                    .frame(minHeight: 44)
+                Button(recipe.homemadeImagePath == nil ? "Add your first photo" : "Replace previously saved photo") {
+                    if recipe.homemadeImagePath == nil {
+                        useLegacyPhotoSave = true
+                        showingHomemadePhotoPicker = true
+                    } else { replacingSavedPhoto = true }
+                }
+                .frame(minHeight: 44)
+            }
+            FluffySectionHead(title: "Our Family Photos")
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 280 : 155))], alignment: .leading, spacing: 20) {
+                ForEach(familyHistory) { photo in FamilyPhotoTile(photo: photo) }
+                if recipe.homemadeImagePath != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        RecipeCardImage(recipe: recipe, height: 200, role: .family)
+                        Text("Previously saved photo").font(.caption).foregroundStyle(Color.fluffySecondary)
+                    }
+                }
+            }
+            if familyHistory.isEmpty && recipe.homemadeImagePath == nil {
+                Text("Your own cooking photos belong here. Original recipe images are kept separately.")
+                    .font(.body).foregroundStyle(Color.fluffySecondary)
+            }
+        }
+        .padding(.horizontal, 22)
+    }
+
+    private func loadPhotoHistory() async {
+        loadingPhotoHistory = true
+        defer { loadingPhotoHistory = false }
+        do {
+            familyHistory = try await FamilyPhotoService().photos(for: recipe)
+            photoHistoryAvailable = true
+        } catch {
+            photoHistoryAvailable = false
+        }
+    }
+
+    @ViewBuilder
+    private var cookbookSource: some View {
+        if recipe.sourceImagePath != nil || sourceAttribution != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                FluffySectionHead(title: "Original Recipe Source")
+                if recipe.sourceImagePath != nil {
+                    Button { showingOriginalSource = true } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            RecipeCardImage(recipe: recipe, height: 320, role: .source)
+                            Label("View original", systemImage: "arrow.up.left.and.arrow.down.right")
+                                .font(.subheadline).frame(minHeight: 44)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("View original recipe source, with zoom controls")
+                }
+                if let source = sourceAttribution {
+                    Text(source).font(.body).foregroundStyle(Color.fluffySecondary)
+                }
+            }
+            .padding(18)
+            .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 22)
         }
     }
 
@@ -234,14 +369,12 @@ struct SupabaseRecipeDetailView: View {
     /// edge to edge. Same sections as compact, rearranged.
     private var regularContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if recipe.sourceImagePath != nil || recipe.homemadeImagePath != nil {
-                RecipeCardImage(recipe: recipe, height: layout.photoHeight)
+            if recipe.homemadeImagePath != nil {
+                RecipeCardImage(recipe: recipe, height: layout.photoHeight, role: .family)
                     .clipped()
             }
 
-            if recipe.homemadeImagePath == nil {
-                homemadePhotoPrompt
-            }
+            sectionTabs
 
             VStack(alignment: .leading, spacing: 0) {
                 titleSection
@@ -264,7 +397,7 @@ struct SupabaseRecipeDetailView: View {
                             notesSection
                                 .padding(.top, 30)
                         }
-                        sourceAttributionText
+                        cookbookSource
                     }
                     .frame(maxWidth: layout.stepColumnMaxWidth, alignment: .topLeading)
 
@@ -333,9 +466,8 @@ struct SupabaseRecipeDetailView: View {
     private var ingredientsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Section head + serving scaler on the same line
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 FluffySectionHead(title: "Ingredients")
-                Spacer()
                 servingsScaler
             }
             .padding(.horizontal, 22)
@@ -399,6 +531,8 @@ struct SupabaseRecipeDetailView: View {
                         scaledServings > 1 ? Color.fluffyAccent : Color.fluffyBorder
                     )
             }
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityLabel("Decrease servings")
             .disabled(scaledServings <= 1)
 
             Text("\(scaledServings)")
@@ -418,6 +552,8 @@ struct SupabaseRecipeDetailView: View {
                         scaledServings < 24 ? Color.fluffyAccent : Color.fluffyBorder
                     )
             }
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityLabel("Increase servings")
             .disabled(scaledServings >= 24)
 
             Image(systemName: "person.2")
@@ -601,18 +737,24 @@ struct SupabaseRecipeDetailView: View {
         // failure surfaces in the error banner — the old code returned
         // silently here, which is exactly the "picked a photo and
         // nothing happened" bug.
-        guard let path = await recipeService.uploadHomemadeImage(image, recipeID: recipe.id) else {
-            actionErrorMessage = "Couldn't save your photo. Please try again."
+        if useLegacyPhotoSave {
+            guard let path = await recipeService.uploadHomemadeImage(image, recipeID: recipe.id),
+                  await recipeService.setHomemadeImagePath(path, recipeID: recipe.id) else {
+                actionErrorMessage = "Couldn't save your photo. Please try again."
+                return
+            }
+            await recipeService.fetchRecipes()
+            toastMessage = "Photo saved"
             return
         }
-
-        guard await recipeService.setHomemadeImagePath(path, recipeID: recipe.id) else {
-            actionErrorMessage = "Couldn't save your photo. Please try again."
-            return
+        do {
+            try await FamilyPhotoService().add(image, caption: photoCaption, to: recipe)
+            photoCaption = ""
+            await loadPhotoHistory()
+            toastMessage = "Photo added"
+        } catch {
+            actionErrorMessage = "Couldn't save your photo. Your previous photos are unchanged. Please try again."
         }
-
-        await recipeService.fetchRecipes()
-        withAnimation { toastMessage = "Photo added" }
     }
 
     // MARK: - Actions

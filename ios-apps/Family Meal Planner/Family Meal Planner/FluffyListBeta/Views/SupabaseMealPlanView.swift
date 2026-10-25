@@ -604,7 +604,7 @@ struct SupabaseMealPlanView: View {
                 dateColumn(date: date, today: today)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Nothing planned")
+                    Text(isPast ? "Nothing planned" : "Plan a meal")
                         .font(.fluffyHeadline)
                         .fluffyTracking(-0.01, at: 19)
                         .foregroundStyle(Color.fluffyTertiary)
@@ -645,7 +645,7 @@ struct SupabaseMealPlanView: View {
         let isLast = index == count - 1
 
         return VStack(spacing: 0) {
-            if isFirst { FluffyRule().padding(.horizontal, 22) }
+
 
             HStack(alignment: .top, spacing: 14) {
                 if isFirst {
@@ -677,7 +677,8 @@ struct SupabaseMealPlanView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(Color.fluffyAccent)
-                            .padding(.top, 2)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityLabel("Plan a meal for this day")
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -687,6 +688,9 @@ struct SupabaseMealPlanView: View {
             .padding(.top, isFirst ? 14 : 6)
             .padding(.bottom, isLast ? 14 : 6)
         }
+        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color.fluffyBackground)
@@ -758,7 +762,7 @@ struct SupabaseMealPlanView: View {
                             .font(.fluffyHeadline)
                             .fluffyTracking(-0.01, at: 19)
                             .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffyPrimary)
-                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
                         if member == nil {
                             let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
