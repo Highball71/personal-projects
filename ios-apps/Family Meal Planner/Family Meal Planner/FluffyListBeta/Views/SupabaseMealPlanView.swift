@@ -931,12 +931,13 @@ struct SupabaseMealPlanView: View {
             .filter { $0.recipeID != nil }
     }
 
-    /// Recipe IDs planned anywhere in the week containing `date` —
-    /// household and member meals, all seven days — for the picker's
-    /// week-overlap badge. Rows with no recipe (deleted recipes) are
-    /// skipped.
+    /// Recipe IDs planned from `date` through the next six days —
+    /// household and member meals — for the picker's rolling overlap
+    /// window. Rows with no recipe (deleted recipes) are skipped.
     private func plannedRecipeIDs(inWeekContaining date: Date) -> Set<UUID> {
-        let days = DateHelper.weekDays(startingFrom: DateHelper.startOfWeek(containing: date))
+        let days = (0..<7).compactMap {
+            Calendar.current.date(byAdding: .day, value: $0, to: date)
+        }
         return Set(days.flatMap { day in
             (mealPlanService.plansByDate[MealPlanService.isoDate(from: day)] ?? [])
                 .compactMap(\.recipeID)
@@ -1021,6 +1022,10 @@ struct SupabaseMealPlanView: View {
         let ok = await mealPlanService.fetchPlans(weekStart: target)
         guard !Task.isCancelled, target == weekStart else { return }
         fetchFailed = !ok
+        if ok,
+           let nextWindow = Calendar.current.date(byAdding: .day, value: 7, to: target) {
+            _ = await mealPlanService.prefetchPlans(startDate: nextWindow, dayCount: 7)
+        }
     }
 
     private func addMeal(_ recipe: RecipeRow, to date: Date, for memberID: UUID? = nil) async {
@@ -1138,9 +1143,9 @@ struct RecipePickerSheet: View {
     /// full sheet stays underneath (the pick may appear again in the
     /// seasonal and All Recipes sections; nothing is ever hidden).
     var preselectedRecipeID: UUID? = nil
-    /// Every recipe planned in the week being planned (household and
-    /// member meals, all seven days) — drives the observational "ALSO
-    /// USES CABBAGE" badge. Empty = no badges.
+    /// Every recipe planned in the rolling planning window (household
+    /// and member meals, seven days from the selected date) — drives
+    /// the observational "ALSO USES CABBAGE" badge. Empty = no badges.
     var weekRecipeIDs: Set<UUID> = []
     let onPick: (RecipeRow, UUID?) -> Void
     let onCancel: () -> Void
