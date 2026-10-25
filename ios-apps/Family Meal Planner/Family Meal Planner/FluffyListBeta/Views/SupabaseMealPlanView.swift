@@ -1190,6 +1190,21 @@ struct RecipePickerSheet: View {
         )
     }
 
+    /// Recipes that connect to the displayed week's perishables, promoted
+    /// above seasonal suggestions without removing them from All Recipes.
+    /// More shared perishables lead; ties stay alphabetical.
+    private var overlapPicks: [RecipeRow] {
+        let namesByID = overlaps
+        return recipes
+            .filter { $0.id != preselectedRecipeID && namesByID[$0.id] != nil }
+            .sorted { lhs, rhs in
+                let leftCount = namesByID[lhs.id]?.count ?? 0
+                let rightCount = namesByID[rhs.id]?.count ?? 0
+                if leftCount != rightCount { return leftCount > rightCount }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -1232,6 +1247,20 @@ struct RecipePickerSheet: View {
                                     showsLeaf: leafIDs.contains(preselected.id),
                                     overlapText: overlapNames[preselected.id].map(WeekOverlap.badgeText)
                                 )
+                            }
+                        }
+
+                        let connected = overlapPicks
+                        if !connected.isEmpty {
+                            Section("Connects with this week") {
+                                ForEach(connected, id: \.id) { recipe in
+                                    recipeRow(
+                                        recipe,
+                                        seasonalScore: nil,
+                                        showsLeaf: leafIDs.contains(recipe.id),
+                                        overlapText: overlapNames[recipe.id].map(WeekOverlap.badgeText)
+                                    )
+                                }
                             }
                         }
 
