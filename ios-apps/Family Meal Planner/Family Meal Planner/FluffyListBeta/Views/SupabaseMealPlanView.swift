@@ -509,7 +509,7 @@ struct SupabaseMealPlanView: View {
 
                     VStack(alignment: .leading, spacing: 20) {
                         if isFooterVisible {
-                            FluffyTextLink(title: "Copy last week") {
+                            FluffyTextLink(title: "Copy last week's meals") {
                                 Task { await copyLastWeek() }
                             }
                         }
@@ -1004,12 +1004,12 @@ struct SupabaseMealPlanView: View {
             if result.skippedPast > 0 { return "Those days have passed." }
             return "Nothing to copy."
         }
-        let dinners = copied == 1 ? "dinner" : "dinners"
+        let meals = copied == 1 ? "meal" : "meals"
         if result.skippedFilled > 0 {
             let kept = result.skippedFilled == 1 ? "day you'd planned" : "days you'd planned"
-            return "Copied \(word(copied)) \(dinners); kept the \(kept)."
+            return "Copied \(word(copied)) \(meals); kept the \(kept)."
         }
-        return "Copied \(word(copied)) \(dinners) from last week."
+        return "Copied \(word(copied)) \(meals) from last week."
     }
 
     /// Fetch the displayed week and record whether it succeeded, so a
