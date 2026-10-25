@@ -32,3 +32,7 @@ Grocery data cleanup completed 2026-10-25: 167→156 rows, 18 section prefixes s
 
 ## 2026-10-25 — Shopping refresh / build 128 in preparation
 David wants to keep moving and may meal-plan and shop today. His IMG_9741 screenshot shows build127 Store Mode, 156 items, a refresh error banner, and horizontal overflow. Read-only Supabase logs show grocery GET200 at09:27:39 and09:28:11, no4xx/5xx in the visible hour; exact client cause remains unconfirmed. New refresh lifecycle/cancellation handling, explicit refresh/timestamp, wrapping rows, Store Mode contrast and partial-plan-save reporting implemented and being archived as128. Prior source cleanups cover For-prefixes only; screenshot revealed [Asparagus] and [Sauce (optional)] still present. Do not claim all labels are removed. No new release authorization yet.
+
+
+## 2026-10-25 — Build 128 uploaded with explicit approval
+David explicitly approved uploading build128 to TestFlight. Uploaded the final signed archive FluffyList-hybrid-128-final.xcarchive successfully at 09:59:35 Eastern. Apple reports the package is processing; tester availability remains unconfirmed. No public App Store submission. Upload log: /private/tmp/fluffylist-128-upload.log. Next device acceptance: refresh Grocery, verify readable Store Mode and quantities, add one meal and check resulting groceries before planning the full week. Remaining bracket-label/aisle refinements and transaction limitations are unchanged.
