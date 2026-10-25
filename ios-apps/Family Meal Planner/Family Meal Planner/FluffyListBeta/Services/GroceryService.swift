@@ -17,6 +17,9 @@ final class GroceryService: ObservableObject {
     @Published var items: [SupabaseGroceryItem] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published private(set) var lastRefreshedAt: Date?
+    private var fetchGeneration = 0
+    private var loadedHouseholdID: UUID?
 
     private var supabase: SupabaseClient { SupabaseManager.shared.client }
 
@@ -27,17 +30,27 @@ final class GroceryService: ObservableObject {
     /// instead of "Nothing to buy yet"); discardable for legacy call sites.
     @discardableResult
     func fetchItems() async -> Bool {
+        fetchGeneration += 1
+        let generation = fetchGeneration
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
-            Logger.supabase.warning("fetchItems: no household ID set, returning empty list")
             items = []
+            loadedHouseholdID = nil
+            lastRefreshedAt = nil
+            errorMessage = nil
+            isLoading = false
             return true
         }
-
-        Logger.supabase.info("fetchItems: loading for household \(householdID.uuidString)")
+        if loadedHouseholdID != householdID {
+            items = []
+            lastRefreshedAt = nil
+            loadedHouseholdID = householdID
+        }
         isLoading = true
+        errorMessage = nil
+        defer { if generation == fetchGeneration { isLoading = false } }
 
         do {
-            items = try await supabase
+            let fetched: [SupabaseGroceryItem] = try await supabase
                 .from("grocery_items")
                 .select()
                 .eq("household_id", value: householdID.uuidString)
@@ -46,13 +59,23 @@ final class GroceryService: ObservableObject {
                 .execute()
                 .value
 
-            Logger.supabase.info("fetchItems: loaded \(self.items.count) item(s)")
-            isLoading = false
+            // A previous refresh must not replace a newer list or another
+            // household's data after the user switches accounts.
+            guard generation == fetchGeneration,
+                  SupabaseManager.shared.currentHouseholdID == householdID,
+                  !Task.isCancelled else { return false }
+            items = fetched
+            lastRefreshedAt = Date()
+            errorMessage = nil
             return true
         } catch {
-            Logger.supabase.error("fetchItems: failed — \(error.localizedDescription)")
+            guard generation == fetchGeneration,
+                  SupabaseManager.shared.currentHouseholdID == householdID else { return false }
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                return false
+            }
             errorMessage = error.localizedDescription
-            isLoading = false
+            // Keep the last successful list and timestamp for this household.
             return false
         }
     }

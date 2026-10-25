@@ -63,6 +63,10 @@ final class HybridRedesignTests: XCTestCase {
         }
         let originalPalette = SeasonalAppearance.shared.palette
         defer { SeasonalAppearance.shared.palette = originalPalette }
+        for text in [Color.fluffyPaperOnInk, .fluffyPaperDimOnInk] {
+            let a = luminance(text, .dark), b = luminance(.fluffyInkGround, .dark)
+            XCTAssertGreaterThanOrEqual((max(a,b) + 0.05) / (min(a,b) + 0.05), 4.5)
+        }
         for palette in SeasonalPalette.allCases {
             SeasonalAppearance.shared.palette = palette
         for style in [UIUserInterfaceStyle.light, .dark] {
@@ -213,6 +217,19 @@ final class HybridRedesignTests: XCTestCase {
         let mealPlan = MealPlanService()
         let grocery = GroceryService()
         let auth = AuthService()
+        let previousStoreMode = UserDefaults.standard.bool(forKey: "groceryStoreMode")
+        defer { UserDefaults.standard.set(previousStoreMode, forKey: "groceryStoreMode") }
+        let groceriesSaved = await grocery.addItems([
+            GroceryItemInsert(householdID: householdID, name: "Extra-virgin olive oil", quantity: 4, unit: "tbsp"),
+            GroceryItemInsert(householdID: householdID, name: "Whole30-compliant coarse-grain mustard", quantity: 1, unit: "tsp"),
+            GroceryItemInsert(householdID: householdID, name: "Crushed tomatoes", quantity: 2, unit: "can", note: "14 ounces each"),
+            GroceryItemInsert(householdID: householdID, name: "Fresh cilantro", quantity: 1, unit: "bunch")
+        ])
+        XCTAssertTrue(groceriesSaved)
+        if let item = grocery.items.first(where: { $0.name == "Fresh cilantro" }) {
+            let checked = await grocery.toggleChecked(item)
+            XCTAssertTrue(checked)
+        }
         let screens: [(String, AnyView)] = [
             ("CookbookStep", AnyView(CookbookPhotoStepView(recipe: recipe, isAfterScan: true) {})),
             ("Browse", AnyView(SupabaseRecipeListView())),
@@ -222,16 +239,25 @@ final class HybridRedesignTests: XCTestCase {
             ("SourceDetails", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: sourceRecipe) })),
             ("NoPhotoDetails", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: noPhotoRecipe) })),
             ("Photos", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: recipe, initialSection: .photos) })),
-            ("Planner", AnyView(SupabaseMealPlanView(selectedTab: .constant(.mealPlan))))
+            ("Planner", AnyView(SupabaseMealPlanView(selectedTab: .constant(.mealPlan)))),
+            ("Grocery", AnyView(SupabaseGroceryListView(selectedTab: .constant(.groceries)))),
+            ("GroceryStore", AnyView(SupabaseGroceryListView(selectedTab: .constant(.groceries)))),
+            ("GroceryError", AnyView(SupabaseGroceryListView(selectedTab: .constant(.groceries))))
         ]
         for (name, screen) in screens {
+            UserDefaults.standard.set(name == "GroceryStore", forKey: "groceryStoreMode")
+            FakePostgRESTStore.shared.failGETTables = name == "GroceryError" ? ["grocery_items"] : []
             for (dark, large) in [(false, false), (true, false), (false, true)] {
                 // Include system tab chrome; isolated pages missed the space
                 // occupied by the bottom navigation in the installed build.
-                let root = TabView(selection: .constant(1)) {
-                    Text("Meals").tabItem { Label("Meals", systemImage: "calendar") }.tag(0)
-                    screen.tabItem { Label("Recipes", systemImage: "book") }.tag(1)
-                    Text("Grocery").tabItem { Label("Grocery", systemImage: "cart") }.tag(2)
+                let activeTab = name.hasPrefix("Grocery") ? 2 : name == "Planner" ? 0 : 1
+                let root = TabView(selection: .constant(activeTab)) {
+                    Group { if activeTab == 0 { screen } else { Text("Meals") } }
+                        .tabItem { Label("Meals", systemImage: "calendar") }.tag(0)
+                    Group { if activeTab == 1 { screen } else { Text("Recipes") } }
+                        .tabItem { Label("Recipes", systemImage: "book") }.tag(1)
+                    Group { if activeTab == 2 { screen } else { Text("Grocery") } }
+                        .tabItem { Label("Grocery", systemImage: "cart") }.tag(2)
                     Text("Settings").tabItem { Label("Settings", systemImage: "gearshape") }.tag(3)
                 }.tint(Color.fluffyAccent)
                     .environmentObject(recipes).environmentObject(household)

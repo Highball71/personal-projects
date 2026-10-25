@@ -37,6 +37,7 @@ final class FakePostgRESTStore: @unchecked Sendable {
     /// Used to test that a failed contribution snapshot aborts the
     /// meal delete instead of stranding groceries.
     var failGETTables: Set<String> = []
+    var cancelGroceryGET = false
 
     /// Table names whose DELETE requests silently affect zero rows —
     /// exactly what PostgREST does when RLS hides the target rows:
@@ -61,6 +62,7 @@ final class FakePostgRESTStore: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         tables = ["meal_plans": [], "grocery_items": [], "grocery_contributions": []]
         failGETTables = []
+        cancelGroceryGET = false
         rlsDeleteBlockedTables = []
         storageObjects = [:]
         storageUploadBlocked = false
@@ -307,6 +309,11 @@ final class FakePostgRESTProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        if FakePostgRESTStore.shared.cancelGroceryGET,
+           request.httpMethod == "GET", request.url?.path == "/rest/v1/grocery_items" {
+            client?.urlProtocol(self, didFailWithError: URLError(.cancelled))
+            return
+        }
         // Bodies arrive as a stream under URLProtocol, not httpBody.
         let body = request.httpBody ?? request.httpBodyStream.map(Self.readAll)
         let (status, data) = FakePostgRESTStore.shared.handle(request, body: body)

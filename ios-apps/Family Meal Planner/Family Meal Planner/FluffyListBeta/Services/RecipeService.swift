@@ -95,19 +95,23 @@ final class RecipeService: ObservableObject {
         }
     }
 
-    /// Fetch ingredients for a single recipe.
+    /// Fetch ingredients for display; mutation flows use the throwing version
+    /// so a failed request cannot be mistaken for an ingredient-free recipe.
     func fetchIngredients(for recipeID: UUID) async -> [RecipeIngredientRow] {
-        do {
-            return try await supabase
-                .from("recipe_ingredients")
-                .select()
-                .eq("recipe_id", value: recipeID.uuidString)
-                .execute()
-                .value
-        } catch {
+        do { return try await loadIngredients(for: recipeID) }
+        catch {
             errorMessage = error.localizedDescription
             return []
         }
+    }
+
+    func loadIngredients(for recipeID: UUID) async throws -> [RecipeIngredientRow] {
+        try await supabase
+            .from("recipe_ingredients")
+            .select()
+            .eq("recipe_id", value: recipeID.uuidString)
+            .execute()
+            .value
     }
 
     // MARK: - Create

@@ -988,7 +988,7 @@ struct SupabaseMealPlanView: View {
         await reloadWeek()
 
         if result.failed > 0 {
-            actionErrorMessage = "Copied \(result.copied) meal\(result.copied == 1 ? "" : "s"), but \(result.failed) didn't make it. Please try again."
+            actionErrorMessage = "\(result.failed) meal or grocery update\(result.failed == 1 ? "" : "s") couldn't finish. Check the plan and grocery list before trying again."
             return
         }
 
@@ -1036,7 +1036,8 @@ struct SupabaseMealPlanView: View {
         )
 
         guard let newPlanID = result else {
-            actionErrorMessage = "Couldn't add that meal. Please try again."
+            actionErrorMessage = mealPlanService.errorMessage ?? "Couldn't add that meal. Please try again."
+            await mealPlanService.fetchPlans(weekStart: DateHelper.startOfWeek(containing: date), quiet: true)
             return
         }
 

@@ -104,7 +104,7 @@ extension Color {
     static let fluffyPaperOnInk      = Color(hex: "F3F2F2")
 
     /// Dimmed / checked text on the ink ground
-    static let fluffyPaperDimOnInk   = Color(hex: "F3F2F2").opacity(0.4)
+    static let fluffyPaperDimOnInk   = Color(hex: "BDBBB8")
 
     /// Hairline rules on the ink ground
     static let fluffyRuleOnInk       = Color(hex: "F3F2F2").opacity(0.18)

@@ -817,7 +817,8 @@ struct SupabaseRecipeListView: View {
         )
 
         guard result != nil else {
-            actionErrorMessage = "Couldn't add that meal. Please try again."
+            actionErrorMessage = mealPlanService.errorMessage ?? "Couldn't add that meal. Please try again."
+            await mealPlanService.fetchPlans(weekStart: DateHelper.startOfWeek(containing: date), quiet: true)
             return
         }
 

@@ -176,12 +176,12 @@ struct FluffyCheckbox: View {
     var onInk: Bool = false
 
     private var strokeColor: Color {
-        if isChecked { return onInk ? .fluffyAccentPale : .fluffyAccent }
-        return onInk ? .fluffyRuleOnInk : .fluffyBorder
+        if isChecked { return onInk ? .fluffyPaperOnInk : .fluffyAccent }
+        return onInk ? .fluffyPaperDimOnInk : .fluffySecondary
     }
     private var fillColor: Color {
         guard isChecked else { return .clear }
-        return onInk ? .fluffyAccentPale : .fluffyAccent
+        return onInk ? .fluffyPaperOnInk : .fluffyAccent
     }
     private var checkColor: Color {
         onInk ? .fluffyInkGround : .fluffyBackground

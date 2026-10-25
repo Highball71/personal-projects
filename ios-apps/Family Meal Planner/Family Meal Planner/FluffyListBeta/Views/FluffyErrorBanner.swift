@@ -34,7 +34,7 @@ struct FluffyErrorBanner: View {
                         .foregroundStyle(Color.fluffyAccent)
 
                     Text(message)
-                        .font(.custom(FluffyFace.regular, size: 15))
+                        .font(.system(.subheadline))
                         .foregroundStyle(Color.fluffyPrimary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -51,14 +51,17 @@ struct FluffyErrorBanner: View {
                         }
                         .fixedSize()
                     }
+                    .buttonStyle(.plain)
+                    .frame(minWidth: 44, minHeight: 44)
                 }
 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.fluffySecondary)
-                        .frame(minWidth: 28, minHeight: 28)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss")
             }
             .padding(.horizontal, 22)

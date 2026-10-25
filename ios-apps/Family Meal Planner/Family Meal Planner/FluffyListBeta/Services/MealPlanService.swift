@@ -214,7 +214,8 @@ final class MealPlanService: ObservableObject {
     /// it on an empty slot is just an insert; calling it on a filled
     /// slot is a clean replace.
     ///
-    /// Returns the new meal plan ID on success, nil on failure.
+    /// Returns the new ID only when planning and grocery writes both finish.
+    /// A nil result can be a partial save; errorMessage explains what remains.
     func addMealWithGroceries(
         recipe: RecipeRow,
         on date: Date,
@@ -226,6 +227,24 @@ final class MealPlanService: ObservableObject {
         if Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date()) {
             Logger.supabase.warning("addMealWithGroceries: blocked — date \(Self.isoDate(from: date)) is in the past")
             errorMessage = "You can only plan meals for today or future days."
+            return nil
+        }
+
+        errorMessage = nil
+        guard SupabaseManager.shared.currentHouseholdID == recipe.householdID else {
+            errorMessage = "Your household changed. Reopen the recipe before planning it."
+            return nil
+        }
+        // Resolve ingredients before replacing a planned meal. A failed read
+        // must not erase the old meal or silently produce no groceries.
+        let ingredients: [RecipeIngredientRow]
+        do { ingredients = try await recipeService.loadIngredients(for: recipe.id) }
+        catch {
+            errorMessage = "Couldn't load the ingredients. Your meal plan hasn't changed. Please try again."
+            return nil
+        }
+        guard SupabaseManager.shared.currentHouseholdID == recipe.householdID else {
+            errorMessage = "Your household changed. Reopen the recipe before planning it."
             return nil
         }
 
@@ -253,12 +272,13 @@ final class MealPlanService: ObservableObject {
             return nil
         }
 
-        // 3. Fetch the recipe's ingredients
-        let ingredients = await recipeService.fetchIngredients(for: recipe.id)
-        Logger.supabase.info("addMealWithGroceries: fetched \(ingredients.count) ingredient(s)")
-
         // 4. Insert grocery items with contributions
-        if !ingredients.isEmpty, let householdID = SupabaseManager.shared.currentHouseholdID {
+        if !ingredients.isEmpty {
+            guard SupabaseManager.shared.currentHouseholdID == recipe.householdID else {
+                errorMessage = "The meal was saved, but your household changed before groceries were added. Check the original household's list."
+                return nil
+            }
+            let householdID = recipe.householdID
             let inserts = ingredients
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map { ing in
@@ -273,7 +293,10 @@ final class MealPlanService: ObservableObject {
                         note: ing.note
                     )
                 }
-            _ = await groceryService.addItemsForMealPlan(mealPlanID: newPlanID, items: inserts)
+            guard await groceryService.addItemsForMealPlan(mealPlanID: newPlanID, items: inserts) else {
+                errorMessage = "The meal was saved, but groceries couldn't finish updating. Check the grocery list before adding anything again."
+                return nil
+            }
         }
 
         return newPlanID

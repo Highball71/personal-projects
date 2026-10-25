@@ -197,6 +197,78 @@ final class GroceryMergeServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testRefreshKeepsLastGoodListOnFailureAndRecovers() async throws {
+        let service = GroceryService()
+        let added = await service.addItems([insert("apple cider", 1, "cup")])
+        XCTAssertTrue(added)
+        let firstUpdate = try XCTUnwrap(service.lastRefreshedAt)
+        FakePostgRESTStore.shared.failGETTables = ["grocery_items"]
+        let failed = await service.fetchItems()
+        XCTAssertFalse(failed)
+        XCTAssertEqual(service.items.first?.name, "apple cider")
+        XCTAssertEqual(service.lastRefreshedAt, firstUpdate)
+        XCTAssertNotNil(service.errorMessage)
+        XCTAssertFalse(service.isLoading)
+        FakePostgRESTStore.shared.failGETTables = []
+        let refreshed = await service.fetchItems()
+        XCTAssertTrue(refreshed)
+        XCTAssertNil(service.errorMessage)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(service.lastRefreshedAt), firstUpdate)
+        SupabaseManager.shared.setCurrentHousehold(UUID())
+        let other = await service.fetchItems()
+        XCTAssertTrue(other)
+        XCTAssertTrue(service.items.isEmpty, "Another household must never see the old list")
+        SupabaseManager.shared.setCurrentHousehold(nil)
+        _ = await service.fetchItems()
+        XCTAssertNil(service.lastRefreshedAt)
+    }
+
+    @MainActor
+    func testCanceledRefreshDoesNotShowConnectionFailure() async throws {
+        let service = GroceryService()
+        _ = await service.addItems([insert("apple cider", 1, "cup")])
+        let updated = service.lastRefreshedAt
+        FakePostgRESTStore.shared.cancelGroceryGET = true
+        _ = await service.fetchItems()
+        XCTAssertNil(service.errorMessage)
+        XCTAssertEqual(service.lastRefreshedAt, updated)
+        XCTAssertEqual(service.items.first?.name, "apple cider")
+        XCTAssertFalse(service.isLoading)
+    }
+
+    @MainActor
+    func testFailedIngredientReadDoesNotReplacePlannedMeal() async throws {
+        let recipeID = TestFixtures.seedRecipe(householdID: Self.householdID, name: "Dinner")
+        let recipe = try TestFixtures.recipeRow(id: recipeID, householdID: Self.householdID, name: "Dinner")
+        let plans = MealPlanService()
+        let existing = await plans.addMeal(recipeID: UUID(), on: Date())
+        XCTAssertNotNil(existing)
+        FakePostgRESTStore.shared.failGETTables = ["recipe_ingredients"]
+        let result = await plans.addMealWithGroceries(recipe: recipe, on: Date(),
+            recipeService: RecipeService(), groceryService: GroceryService())
+        XCTAssertNil(result)
+        let rows = FakePostgRESTStore.shared.rows(in: "meal_plans")
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual((rows.first?["id"] as? String)?.lowercased(), existing?.uuidString.lowercased())
+        XCTAssertTrue(plans.errorMessage?.contains("hasn't changed") == true)
+    }
+
+    @MainActor
+    func testGroceryFailureReportsSavedMealInsteadOfFalseSuccess() async throws {
+        let recipeID = TestFixtures.seedRecipe(householdID: Self.householdID, name: "Dinner",
+                                              ingredients: [("flour", 1, "cup")])
+        let recipe = try TestFixtures.recipeRow(id: recipeID, householdID: Self.householdID, name: "Dinner")
+        let plans = MealPlanService()
+        FakePostgRESTStore.shared.failGETTables = ["grocery_items"]
+        let result = await plans.addMealWithGroceries(recipe: recipe, on: Date(),
+            recipeService: RecipeService(), groceryService: GroceryService())
+        XCTAssertNil(result)
+        XCTAssertEqual(FakePostgRESTStore.shared.rows(in: "meal_plans").count, 1)
+        XCTAssertTrue(plans.errorMessage?.contains("meal was saved") == true)
+        XCTAssertTrue(FakePostgRESTStore.shared.rows(in: "grocery_items").isEmpty)
+    }
+
+    @MainActor
     func testIncompatibleAddNotesExistingRow() async throws {
         let groceryService = GroceryService()
 

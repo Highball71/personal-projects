@@ -13,6 +13,7 @@ import SwiftUI
 
 struct SupabaseGroceryListView: View {
     @EnvironmentObject private var groceryService: GroceryService
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("groceryStoreMode") private var storeMode = false
 
     /// Lets the empty state's "Plan a night" link jump to the Meals tab.
@@ -23,9 +24,10 @@ struct SupabaseGroceryListView: View {
     @State private var fetchFailed = false
     /// Short human message for a failed write (check/delete/clear).
     @State private var actionErrorMessage: String?
+    @State private var updatingItems: Set<UUID> = []
 
     private static let fetchErrorText =
-        "Couldn't load your grocery list. Check your connection and tap Retry."
+        "Couldn't update your grocery list. Tap Retry."
 
     /// Items grouped by auto-detected category, sorted with unchecked
     /// items first within each group.
@@ -77,7 +79,7 @@ struct SupabaseGroceryListView: View {
     private var secondaryTextColor: Color { storeMode ? .fluffyPaperDimOnInk : .fluffySecondary }
     private var dimTextColor: Color { storeMode ? .fluffyPaperDimOnInk : .fluffyTertiary }
     private var lineColor: Color { storeMode ? .fluffyRuleOnInk : .fluffyDivider }
-    private var headColor: Color { storeMode ? .fluffyAccentPale : .fluffySecondary }
+    private var headColor: Color { storeMode ? .fluffyPaperOnInk : .fluffySecondary }
 
     // MARK: - Body
 
@@ -118,7 +120,7 @@ struct SupabaseGroceryListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(bgColor, for: .navigationBar)
-            .toolbarColorScheme(storeMode ? .dark : .light, for: .navigationBar)
+            .toolbarColorScheme(storeMode ? .dark : nil, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -127,9 +129,20 @@ struct SupabaseGroceryListView: View {
                         }
                     } label: {
                         Image(systemName: storeMode ? "sun.max.fill" : "flashlight.on.fill")
-                            .foregroundStyle(storeMode ? Color.fluffyAccentPale : Color.fluffyAccent)
+                            .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyAccent)
                     }
                     .accessibilityLabel(storeMode ? "Exit Store Mode" : "Store Mode")
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await reloadGroceries() }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(groceryService.isLoading)
+                    .accessibilityLabel("Refresh grocery list")
+                    .accessibilityHint("Loads the latest shared shopping list")
                 }
 
                 if hasCheckedItems {
@@ -142,15 +155,18 @@ struct SupabaseGroceryListView: View {
                             }
                         }
                         .font(.fluffyButton)
-                        .foregroundStyle(storeMode ? Color.fluffyAccentPale : Color.fluffyAccent)
+                        .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyAccent)
                     }
                 }
             }
-            .refreshable {
+            .task(id: selectedTab) {
+                guard selectedTab == .groceries else { return }
                 await reloadGroceries()
             }
-            .task {
-                await reloadGroceries()
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active && selectedTab == .groceries {
+                    Task { await reloadGroceries() }
+                }
             }
         }
     }
@@ -158,15 +174,36 @@ struct SupabaseGroceryListView: View {
     // MARK: - Masthead
 
     private var masthead: some View {
-        FluffyMasthead(
-            title: storeMode ? "Aisle by aisle" : "Grocery",
-            dateline: storeMode
-                ? "\(groceryService.items.count) ITEMS"
-                : "\(checkedCount) IN THE CART",
-            onInk: storeMode,
-            brand: storeMode ? "STORE MODE" : "FLUFFYLIST"
-        )
-        .padding(.horizontal, 22)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(storeMode ? "STORE MODE" : "FLUFFYLIST")
+                .font(.caption2.weight(.semibold))
+                .tracking(1.5)
+                .foregroundStyle(secondaryTextColor)
+            Text(storeMode ? "Aisle by aisle" : "Grocery")
+                .font(.custom(FluffyFace.bold, size: 36, relativeTo: .largeTitle))
+                .foregroundStyle(textColor)
+            Text("\(groceryService.items.count - checkedCount) to buy · \(checkedCount) in the cart")
+                .font(.subheadline)
+                .foregroundStyle(secondaryTextColor)
+            HStack(spacing: 6) {
+                if groceryService.isLoading {
+                    ProgressView().controlSize(.small)
+                    Text("Updating list…")
+                } else if let date = groceryService.lastRefreshedAt {
+                    Text("Last updated")
+                    Text(date, style: .time)
+                } else {
+                    Text("Pull down or tap Refresh to update")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(secondaryTextColor)
+            .accessibilityElement(children: .combine)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Reload
@@ -174,8 +211,11 @@ struct SupabaseGroceryListView: View {
     /// Fetch grocery items and record whether it succeeded, so a failed
     /// load shows the retry banner instead of an empty state.
     private func reloadGroceries() async {
-        let ok = await groceryService.fetchItems()
-        fetchFailed = !ok
+        _ = await groceryService.fetchItems()
+        guard !Task.isCancelled else { return }
+        // Ignore canceled/superseded refreshes; only the current request's
+        // actual failure should produce a warning above a valid cached list.
+        fetchFailed = groceryService.errorMessage != nil
     }
 
     // MARK: - Loading / Failed Shell
@@ -197,6 +237,8 @@ struct SupabaseGroceryListView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollBounceBehavior(.always)
+        .refreshable { await reloadGroceries() }
     }
 
     // MARK: - Empty State
@@ -233,6 +275,8 @@ struct SupabaseGroceryListView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollBounceBehavior(.always)
+        .refreshable { await reloadGroceries() }
     }
 
     // MARK: - Grocery List
@@ -252,8 +296,8 @@ struct SupabaseGroceryListView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Share the list \u{2192}")
                             .font(.fluffyButton)
-                            .foregroundStyle(storeMode ? Color.fluffyAccentPale : Color.fluffyAccent)
-                        FluffyRule(weight: 2, color: storeMode ? .fluffyAccentPale : .fluffyAccent)
+                            .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyAccent)
+                        FluffyRule(weight: 2, color: storeMode ? .fluffyPaperOnInk : .fluffyAccent)
                     }
                     .fixedSize()
                 }
@@ -263,6 +307,8 @@ struct SupabaseGroceryListView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollBounceBehavior(.always)
+        .refreshable { await reloadGroceries() }
     }
 
     // MARK: - Category Section
@@ -291,40 +337,46 @@ struct SupabaseGroceryListView: View {
 
     private func itemRow(_ item: SupabaseGroceryItem) -> some View {
         Button {
+            guard updatingItems.insert(item.id).inserted else { return }
             Task {
+                defer { updatingItems.remove(item.id) }
                 if !(await groceryService.toggleChecked(item)) {
                     actionErrorMessage = "Couldn't update that item. Please try again."
                 }
             }
         } label: {
-            HStack(spacing: storeMode ? 16 : 14) {
+            HStack(alignment: .top, spacing: 14) {
                 FluffyCheckbox(
                     isChecked: item.isChecked,
-                    size: storeMode ? 30 : 20,
+                    size: storeMode ? 30 : 24,
                     onInk: storeMode
                 )
+                .padding(.top, 2)
 
-                Text(item.name)
-                    .font(.custom(FluffyFace.regular, size: storeMode ? 21 : 17))
-                    .foregroundStyle(item.isChecked ? dimTextColor : textColor)
-                    .strikethrough(item.isChecked, color: dimTextColor)
-                    .animation(.easeInOut(duration: 0.18), value: item.isChecked)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                Spacer()
-
-                Text(quantityText(item))
-                    .font(.custom(FluffyFace.regular, size: storeMode ? 16 : 13))
-                    .monospacedDigit()
-                    .fixedSize()
-                    .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name)
+                        .font(.system(storeMode ? .title3 : .body, weight: .medium))
+                        .foregroundStyle(item.isChecked ? dimTextColor : textColor)
+                        .strikethrough(item.isChecked, color: dimTextColor)
+                    Text(quantityText(item))
+                        .font(storeMode ? .body : .subheadline)
+                        .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 20)
             .padding(.vertical, storeMode ? 16 : 12)
+            .frame(minHeight: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(updatingItems.contains(item.id))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(item.name), \(quantityText(item))")
+        .accessibilityValue(item.isChecked ? "In the cart" : "To buy")
+        .accessibilityHint(item.isChecked ? "Mark as still needed" : "Mark as in the cart")
         .contextMenu {
             Button(role: .destructive) {
                 Task {
