@@ -115,6 +115,23 @@ final class HybridRedesignTests: XCTestCase {
         XCTAssertFalse(restored[0].isArchived)
     }
 
+    @MainActor
+    func testScannedPageAttachmentPreservesExistingOriginal() {
+        let page = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10)).image { _ in }
+        let form = SupabaseRecipeFormViewModel()
+        form.attachScannedPageIfMissing(page)
+        XCTAssertTrue(form.sourceImage === page)
+        form.sourceImage = nil
+        form.sourceImagePath = "original-page.jpg"
+        form.attachScannedPageIfMissing(page)
+        XCTAssertNil(form.sourceImage)
+        XCTAssertEqual(form.sourceImagePath, "original-page.jpg")
+        form.sourceImagePath = nil
+        form.sourceImageRemoved = true
+        form.attachScannedPageIfMissing(page)
+        XCTAssertNil(form.sourceImage)
+    }
+
     /// Real SwiftUI views with synthetic recipes and intercepted networking.
     /// Attachments are visual evidence, not pixel assertions.
     @MainActor
@@ -140,7 +157,15 @@ final class HybridRedesignTests: XCTestCase {
         ]
         for (name, screen) in screens {
             for (dark, large) in [(false, false), (true, false), (false, true)] {
-                let root = screen.environmentObject(recipes).environmentObject(household)
+                // Include system tab chrome; isolated pages missed the space
+                // occupied by the bottom navigation in the installed build.
+                let root = TabView(selection: .constant(1)) {
+                    Text("Meals").tabItem { Label("Meals", systemImage: "calendar") }.tag(0)
+                    screen.tabItem { Label("Recipes", systemImage: "book") }.tag(1)
+                    Text("Grocery").tabItem { Label("Grocery", systemImage: "cart") }.tag(2)
+                    Text("Settings").tabItem { Label("Settings", systemImage: "gearshape") }.tag(3)
+                }.tint(Color.fluffyAccent)
+                    .environmentObject(recipes).environmentObject(household)
                     .environmentObject(mealPlan).environmentObject(grocery).environmentObject(auth)
                     .environment(\.colorScheme, dark ? .dark : .light)
                     .environment(\.dynamicTypeSize, large ? .accessibility3 : .large)

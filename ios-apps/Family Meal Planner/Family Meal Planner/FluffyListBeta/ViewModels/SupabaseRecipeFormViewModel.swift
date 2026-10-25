@@ -76,6 +76,13 @@ final class SupabaseRecipeFormViewModel {
         }
     }
 
+    /// A scan is source material, never a family cooking photo. Preserve an
+    /// existing original or an attachment the user has already selected.
+    func attachScannedPageIfMissing(_ image: UIImage?) {
+        guard sourceImage == nil, sourceImagePath == nil, !sourceImageRemoved else { return }
+        sourceImage = image
+    }
+
     // MARK: - Populate from extraction
 
     /// Fill the form from a Claude Vision API extraction result.

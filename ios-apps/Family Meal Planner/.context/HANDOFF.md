@@ -402,3 +402,9 @@ Ingredient Chaining Phase 1 prototype. **Wording is OBSERVATIONAL ONLY** (David,
 - **Device pass owed (checklist in ACTIVE_TASK.md).** Push only — David merges after.
 - **Rebased 2026-10-21 onto main `e3727ad`** (photo-attach merge + Xcode 27 upgrade + build 123), so the branch now carries both. **Suite after the rebase: 289 tests, 0 failures** (the 281 above + main's 8 `PhotoAttachTests`), zero warnings on a clean build. The MacBook's stale 09-24 edits are no longer stashed — they are main's `e3727ad`.
 - **Machine note (MacBook Air):** Xcode 27.1 ran its first-launch component install (admin prompt) on 2026-10-21 before the simulators would start.
+
+
+## 2026-10-25 — Recipe corrections in progress
+User supplied build 126 screenshots and rejected spacing/proportions versus hybrid mockup. Correction branch remains codex/fluffylist-hybrid-redesign. Compact browse/search, inline detail actions, dish-camera entry and retained first scan page implemented. Source images and family history remain separate. New regression preserves existing original attachment. Full phone/tablet suite plus render attachments being validated; no correction release uploaded yet. See RECIPE_CORRECTIONS.md for queued grocery duplicates/section-heading issue.
+
+Correction verification: 296 tests passed on each simulator (592 runs), xcresult /private/tmp/fluffylist-corrections-final.xcresult. Captures exported to outputs/recipe-corrections. Captures use no-photo fixtures; real photographic cases and physical camera/VoiceOver/live sync still pending. No release upload.

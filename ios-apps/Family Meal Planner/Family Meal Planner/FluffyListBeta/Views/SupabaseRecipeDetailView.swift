@@ -5,6 +5,10 @@ import PhotosUI
 import SwiftUI
 
 struct SupabaseRecipeDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingDishPhotoOptions = false
+    @State private var showingDishCamera = false
+
     @EnvironmentObject private var recipeService: RecipeService
     @EnvironmentObject private var mealPlanService: MealPlanService
     @EnvironmentObject private var groceryService: GroceryService
@@ -99,33 +103,6 @@ struct SupabaseRecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
         .tint(Color.fluffyAccent)
-        // Sticky bottom bar on paper with a 1px ink top rule — the one
-        // place a filled button appears in the app.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                FluffyRule(weight: 1, color: .fluffyPrimary)
-                // On regular the filled button is capped and centered
-                // (a pane-wide persimmon bar is a banner, not a
-                // button); compact keeps the full-width phone bar.
-                FluffyFilledButton(title: "Add to Meal Plan", icon: "plus") {
-                    showingDayPicker = true
-                }
-                .frame(maxWidth: layout.bottomBarMaxWidth ?? .infinity)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 12)
-                Button { showingGroceryPreview = true } label: {
-                    Label("Add to Grocery List", systemImage: "cart.badge.plus")
-                        .font(.body)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(Color.fluffyAccent)
-                        .frame(maxWidth: layout.bottomBarMaxWidth ?? .infinity, minHeight: 44)
-                        .padding(.horizontal, 22)
-                }
-                .disabled(isLoadingIngredients || ingredients.isEmpty || addingGroceries)
-            }
-            .background(Color.fluffyBackground)
-        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if let message = actionErrorMessage {
                 FluffyErrorBanner(
@@ -135,24 +112,19 @@ struct SupabaseRecipeDetailView: View {
                 .background(Color.fluffyBackground)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 16) {
-                    Button {
-                        Task {
-                            if !(await recipeService.toggleFavorite(recipe)) {
-                                actionErrorMessage = "Couldn't update favorites. Please try again."
-                            }
-                        }
-                    } label: {
-                        Image(systemName: recipe.isFavorite ? "heart.fill" : "heart").accessibilityLabel(recipe.isFavorite ? "Remove favorite" : "Favorite recipe")
-                            .foregroundStyle(recipe.isFavorite ? Color.fluffyAccent : Color.fluffySecondary)
-                    }
-                    Button { showingEdit = true } label: {
-                        Image(systemName: "pencil").accessibilityLabel("Edit recipe")
-                            .foregroundStyle(Color.fluffyAccent)
-                    }
-                }
+        .toolbar(.hidden, for: .navigationBar)
+        .confirmationDialog("Add a photo of your dish", isPresented: $showingDishPhotoOptions, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Take a dish photo") { showingDishCamera = true }
+            }
+            Button("Choose a dish photo") { showingHomemadePhotoPicker = true }
+        } message: {
+            Text("For photos of food you cooked. Recipe pages stay under Original Recipe Source.")
+        }
+        .fullScreenCover(isPresented: $showingDishCamera) {
+            CameraView { image in
+                showingDishCamera = false
+                if let image { Task { await uploadHomemadePhoto(image) } }
             }
         }
         .sheet(isPresented: $showingGroceryPreview) {
@@ -257,15 +229,14 @@ struct SupabaseRecipeDetailView: View {
 
     /// The phone layout, unchanged: one column, everything stacked.
     private var compactContent: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            if selectedSection != .photos, recipe.homemadeImagePath != nil || recipe.familyCoverImagePath != nil {
-                RecipeCardImage(recipe: recipe, height: layout.photoHeight, role: .family)
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            detailHeader
             if selectedSection != .photos { titleSection }
             sectionTabs
             switch selectedSection {
             case .recipe:
                 recipeOverview
+                recipeActions
                 if !recipe.instructions.isEmpty { methodSection }
                 cookbookSource
             case .ingredients:
@@ -307,30 +278,79 @@ struct SupabaseRecipeDetailView: View {
         }
     }
 
-    private var recipeOverview: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { recipeFacts }
-                VStack(alignment: .leading, spacing: 12) { recipeFacts }
+    private var detailHeader: some View {
+        ZStack(alignment: .top) {
+            if selectedSection != .photos && (recipe.familyCoverImagePath != nil || recipe.homemadeImagePath != nil) {
+                RecipeCardImage(recipe: recipe, height: horizontalSizeClass == .regular ? 320 : 250, role: .family)
             }
-            Button { selectedSection = .ingredients } label: {
-                Label("Ingredients & serving sizes", systemImage: "scalemass")
-                    .font(.body).frame(minHeight: 44)
+            HStack {
+                RecipeIconButton(symbol: "chevron.left", label: "Back") { dismiss() }
+                if selectedSection == .photos {
+                    Text(recipe.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                }
+                Spacer()
+                RecipeIconButton(symbol: recipe.isFavorite ? "heart.fill" : "heart", label: "Toggle favorite") {
+                    Task {
+                        if !(await recipeService.toggleFavorite(recipe)) { actionErrorMessage = "Couldn't update favorites. Please try again." }
+                    }
+                }
+                RecipeIconButton(symbol: "pencil", label: "Edit recipe") { showingEdit = true }
             }
-            .tint(Color.fluffyAccent)
+            .padding(.horizontal, 12).padding(.top, 8)
         }
-        .padding(.horizontal, 22)
+    }
+
+    private var recipeOverview: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { recipeFacts }
+            VStack(alignment: .leading, spacing: 8) { recipeFacts }
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 16)
+    }
+
+    private var recipeActions: some View {
+        VStack(spacing: 8) {
+            Button { showingDayPicker = true } label: {
+                Label("Add to Meal Plan", systemImage: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .foregroundStyle(.white)
+                    .background(Color.fluffyButtonFill, in: RoundedRectangle(cornerRadius: 12))
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { secondaryRecipeActions }
+                VStack(spacing: 8) { secondaryRecipeActions }
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private var secondaryRecipeActions: some View {
+        Button { showingGroceryPreview = true } label: {
+            Label("Add to Grocery List", systemImage: "cart")
+                .font(.caption).fixedSize().frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .disabled(isLoadingIngredients || ingredients.isEmpty || addingGroceries)
+        Button { selectedSection = .ingredients } label: {
+            Label("Scale Recipe", systemImage: "arrow.up.left.and.arrow.down.right")
+                .font(.caption).fixedSize().frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 
     @ViewBuilder
     private var recipeFacts: some View {
         if totalMinutes > 0 {
             Label("\(totalMinutes) min", systemImage: "clock")
-                .padding(14).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
+                .padding(12).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
         }
         if recipe.servings > 0 {
             Label("Serves \(recipe.servings)", systemImage: "fork.knife")
-                .padding(14).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
+                .padding(12).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
         }
     }
 
@@ -343,8 +363,8 @@ struct SupabaseRecipeDetailView: View {
                     .foregroundStyle(Color.fluffyPrimary)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: photoCaption) { _, value in photoCaption = String(value.prefix(2000)) }
-                Button { useLegacyPhotoSave = false; showingHomemadePhotoPicker = true } label: {
-                    Label("Made this recipe? Add a photo", systemImage: "camera")
+                Button { useLegacyPhotoSave = false; showingDishPhotoOptions = true } label: {
+                    Label("Made this recipe? Add a dish photo", systemImage: "camera")
                         .font(.body).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                         .padding(16)
                         .background(Color.fluffyAccentPale, in: RoundedRectangle(cornerRadius: 16))
@@ -500,15 +520,14 @@ struct SupabaseRecipeDetailView: View {
     /// edge to edge. Same sections as compact, rearranged.
     private var regularContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if recipe.homemadeImagePath != nil || recipe.familyCoverImagePath != nil {
-                RecipeCardImage(recipe: recipe, height: layout.photoHeight, role: .family)
-                    .clipped()
-            }
+            detailHeader
 
             sectionTabs
 
             VStack(alignment: .leading, spacing: 0) {
                 titleSection
+                recipeOverview.padding(.top, 12)
+                recipeActions.padding(.vertical, 12)
 
                 HStack(alignment: .top, spacing: 0) {
                     ingredientsSection
@@ -560,16 +579,8 @@ struct SupabaseRecipeDetailView: View {
     /// Ink-2 kicker, 36pt Bold title, one line of uppercase metadata.
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(kickerText)
-                .font(.fluffyMastheadLabel)
-                .fluffyTracking(0.16, at: 10)
-                .foregroundStyle(Color.fluffyInk2)
-                .padding(.bottom, 8)
-
-            // .fluffyTitle is custom(bold, 36); the same face at the
-            // layout's size so regular scales it without changing it.
             Text(recipe.name)
-                .font(.custom(FluffyFace.bold, size: layout.titleSize))
+                .font(.custom(FluffyFace.bold, size: horizontalSizeClass == .regular ? 34 : 28, relativeTo: .title2))
                 .fluffyTracking(-0.03, at: layout.titleSize)
                 .lineSpacing(layout.titleSize * 0.02)
                 .foregroundStyle(Color.fluffyPrimary)
@@ -578,7 +589,7 @@ struct SupabaseRecipeDetailView: View {
             FluffyMetadataLine(text: metadataText)
         }
         .padding(.horizontal, 22)
-        .padding(.top, 20)
+        .padding(.top, 0)
     }
 
     private var kickerText: String {
@@ -587,7 +598,7 @@ struct SupabaseRecipeDetailView: View {
 
     private var metadataText: String {
         var parts = [recipe.category]
-        if recipe.servings > 0 { parts.append("Serves \(recipe.servings)") }
+        if recipe.isFavorite { parts.append("Family favorite") }
         if totalMinutes > 0 { parts.append("\(totalMinutes) min") }
         return parts.joined(separator: " \u{00B7} ")
     }
@@ -716,8 +727,8 @@ struct SupabaseRecipeDetailView: View {
                             .fluffyTracking(-0.03, at: layout.stepNumeralSize)
                             .foregroundStyle(Color.fluffyAccent)
                             .frame(width: layout.stepNumeralColumnWidth, alignment: .leading)
-                        Text(highlightIngredients(in: step))
-                            .lineSpacing(layout.bodySize * 0.5)
+                        Text(highlightIngredients(in: step.replacingOccurrences(of: #"^\d+[.)]\s*"#, with: "", options: .regularExpression)))
+                            .lineSpacing(5)
                     }
                     .padding(.horizontal, 22)
                 }

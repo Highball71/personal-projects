@@ -194,16 +194,16 @@ struct SupabaseAddRecipeView: View {
     /// the type-checker resolves their generic chain in isolation.
     private func withPhotoSurfaces<V: View>(_ content: V) -> some View {
         content
-            .confirmationDialog("Add Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
+            .confirmationDialog("Scan a recipe page", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button("Scan Pages") {
+                    Button("Scan cookbook pages") {
                         showingPhotoOptions = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                             showingCamera = true
                         }
                     }
                 }
-                Button("Choose from Library") {
+                Button("Choose recipe pages from library") {
                     showingPhotoOptions = false
                     showingRecipePhotoLibrary = true
                 }
@@ -399,16 +399,20 @@ struct SupabaseAddRecipeView: View {
                         Image(systemName: "photo.badge.plus")
                             .font(.system(size: 26, weight: .light))
                             .foregroundStyle(Color.fluffyPrimary)
-                        Text("Add a recipe photo")
+                        Text("Attach an original recipe page")
                             .font(.fluffyCallout)
                             .foregroundStyle(Color.fluffySecondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 140)
-                    .overlay(Rectangle().strokeBorder(Color.fluffyPrimary, lineWidth: 2))
+                    .padding(16)
+                    .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 22)
             }
+            Text("Photos of the food you cook belong in Family Photos after saving the recipe.")
+                .font(.caption).foregroundStyle(Color.fluffySecondary)
+                .padding(.horizontal, 22)
         }
     }
 
@@ -426,10 +430,10 @@ struct SupabaseAddRecipeView: View {
                     .font(.system(size: 20, weight: .light))
                     .foregroundStyle(Color.fluffyPrimary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Scan from a photo")
+                    Text("Scan a recipe page")
                         .font(.custom(FluffyFace.semibold, size: 16))
                         .foregroundStyle(Color.fluffyPrimary)
-                    Text("Point it at a cookbook page or a card.")
+                    Text("Read a cookbook page or recipe card. The first page is kept as your source.")
                         .font(.custom(FluffyFace.italic, size: 13))
                         .foregroundStyle(Color.fluffySecondary)
                 }
@@ -439,7 +443,7 @@ struct SupabaseAddRecipeView: View {
                     .foregroundStyle(Color.fluffyAccent)
             }
             .padding(16)
-            .overlay(Rectangle().strokeBorder(Color.fluffyPrimary, lineWidth: 2))
+            .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -986,6 +990,8 @@ struct SupabaseAddRecipeView: View {
 
     // MARK: - Photo Extraction
 
+    @State private var pendingScannedPage: UIImage?
+
     private func extractRecipe(from images: [UIImage]) async {
         isExtracting = true
         extractingPageCount = images.count
@@ -998,6 +1004,7 @@ struct SupabaseAddRecipeView: View {
             Logger.supabase.info("Photo import: got \"\(extracted.name)\" with \(extracted.ingredients.count) ingredients")
 
             viewModel.populateFrom(extracted, sourceType: .photo)
+            pendingScannedPage = images.first
 
             // Duplicate guard for the extraction flow. We do an
             // authoritative DB lookup BEFORE save, because the silent
@@ -1012,6 +1019,10 @@ struct SupabaseAddRecipeView: View {
                 extractingPageCount = 0
                 return
             }
+
+            // Keep the original source separate from finished-dish history.
+            // The existing source model stores one page; extraction still reads all pages.
+            viewModel.attachScannedPageIfMissing(pendingScannedPage)
 
             Logger.supabase.info("Photo import: auto-saving extracted recipe")
             let autoSaved = await viewModel.save(recipeService: recipeService)
@@ -1088,6 +1099,7 @@ struct SupabaseAddRecipeView: View {
         }
 
         viewModel.switchToUpdate(of: existing)
+        viewModel.attachScannedPageIfMissing(pendingScannedPage)
 
         let success = await viewModel.save(recipeService: recipeService)
         guard success else {
@@ -1114,6 +1126,7 @@ struct SupabaseAddRecipeView: View {
             extractingPageCount = 0
         }
 
+        viewModel.attachScannedPageIfMissing(pendingScannedPage)
         let original = viewModel.name
         viewModel.name = disambiguatedRecipeName(for: original)
         Logger.supabase.info("Photo import: disambiguated \"\(original)\" -> \"\(self.viewModel.name)\"")
