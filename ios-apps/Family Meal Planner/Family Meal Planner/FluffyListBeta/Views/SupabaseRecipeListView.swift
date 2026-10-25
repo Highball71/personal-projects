@@ -112,7 +112,7 @@ struct SupabaseRecipeListView: View {
 
     /// The hero card recipe — first favorite, or newest recipe.
     private var heroRecipe: RecipeRow? {
-        let photographed = displayedRecipes.filter { $0.familyCoverImagePath != nil || $0.homemadeImagePath != nil }
+        let photographed = displayedRecipes.filter { $0.hasDishPhoto }
         return photographed.first { $0.isFavorite } ?? photographed.first
             ?? displayedRecipes.first { $0.isFavorite } ?? displayedRecipes.first
     }
@@ -476,7 +476,7 @@ struct SupabaseRecipeListView: View {
                         }
                         Button { selectedTag = tag } label: {
                             VStack(spacing: 8) {
-                                if let photo = matches.first(where: { $0.familyCoverImagePath != nil || $0.homemadeImagePath != nil }) {
+                                if let photo = matches.first(where: { $0.hasDishPhoto }) {
                                     RecipeCardImage(recipe: photo, height: 70, role: .family).frame(width: 76)
                                 } else {
                                     Image(systemName: tag == .vegetarian ? "leaf" : tag == .fish ? "fish" : "fork.knife")
@@ -583,10 +583,10 @@ struct SupabaseRecipeListView: View {
     // MARK: - Hero
 
     private func heroBlock(_ recipe: RecipeRow) -> some View {
-        let hasPhoto = recipe.familyCoverImagePath != nil || recipe.homemadeImagePath != nil
+        let hasPhoto = recipe.hasDishPhoto
         return ZStack(alignment: .bottomLeading) {
             if hasPhoto {
-                RecipeCardImage(recipe: recipe, height: 225, role: .family)
+                RecipeCardImage(recipe: recipe, height: 225, role: .family, showsPlaceholder: false)
                 LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .center, endPoint: .bottom)
             } else { Color.fluffyCard }
             VStack(alignment: .leading, spacing: 5) {

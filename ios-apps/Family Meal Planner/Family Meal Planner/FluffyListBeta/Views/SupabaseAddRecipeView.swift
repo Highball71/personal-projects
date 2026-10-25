@@ -43,6 +43,8 @@ struct SupabaseAddRecipeView: View {
     @State private var showingExtractionError = false
     @State private var showingCameraPermissionDenied = false
     @State private var showingExtractionSuccess = false
+    @State private var scannedRecipeForPhotoStep: RecipeRow?
+    @State private var completedScan = false
     /// Set when an extraction completed but its recipe name collides
     /// with an existing recipe. Drives the three-button dialog so the
     /// user picks Update / New Copy / Cancel — preventing silent loss
@@ -91,6 +93,11 @@ struct SupabaseAddRecipeView: View {
                 )
             )
         }
+        .sheet(item: $scannedRecipeForPhotoStep, onDismiss: { dismiss() }) { recipe in
+            CookbookPhotoStepView(recipe: recipe, isAfterScan: true) {
+                scannedRecipeForPhotoStep = nil
+            }.environmentObject(recipeService)
+        }
     }
 
     // MARK: - Body: form content
@@ -115,8 +122,8 @@ struct SupabaseAddRecipeView: View {
                 }
                 .padding(.horizontal, 22)
 
-                photoBlock
                 scanBlock
+                photoBlock
                 urlImportBlock
                 nameBlock
                 categoryChips
@@ -946,7 +953,21 @@ struct SupabaseAddRecipeView: View {
     private func saveRecipe() async {
         let success = await viewModel.save(recipeService: recipeService)
         if success {
-            dismiss()
+            if completedScan { await finishSavedScan() }
+            else { dismiss() }
+        }
+    }
+
+    private func finishSavedScan() async {
+        isExtracting = false
+        extractingPageCount = 0
+        await recipeService.fetchRecipes()
+        if let saved = recipeService.recipes.first(where: { $0.id == viewModel.recipeID }) {
+            scannedRecipeForPhotoStep = saved
+        } else {
+            // The recipe was saved even if the refresh failed. Keep the form
+            // open with its ID so retrying cannot create a duplicate recipe.
+            viewModel.saveError = "Recipe saved. Couldn’t open the optional photo step; retry Save or close this form and add the cookbook photo later."
         }
     }
 
@@ -1005,6 +1026,7 @@ struct SupabaseAddRecipeView: View {
 
             viewModel.populateFrom(extracted, sourceType: .photo)
             pendingScannedPage = images.first
+            completedScan = true
 
             // Duplicate guard for the extraction flow. We do an
             // authoritative DB lookup BEFORE save, because the silent
@@ -1030,9 +1052,7 @@ struct SupabaseAddRecipeView: View {
                 Logger.supabase.info("Photo import: auto-save succeeded, dismissing")
                 isExtracting = false
                 extractingPageCount = 0
-                withAnimation { showingExtractionSuccess = true }
-                try? await Task.sleep(for: .milliseconds(1200))
-                dismiss()
+                await finishSavedScan()
                 return
             } else {
                 Logger.supabase.error("Photo import: auto-save failed — user must save manually")
@@ -1110,9 +1130,7 @@ struct SupabaseAddRecipeView: View {
 
         Logger.supabase.info("Photo import: update-existing succeeded, dismissing")
         extractionDuplicateExisting = nil
-        withAnimation { showingExtractionSuccess = true }
-        try? await Task.sleep(for: .milliseconds(1200))
-        dismiss()
+        await finishSavedScan()
     }
 
     /// User chose "Create New Copy" after a photo import detected a
@@ -1140,9 +1158,7 @@ struct SupabaseAddRecipeView: View {
 
         Logger.supabase.info("Photo import: new-copy save succeeded, dismissing")
         extractionDuplicateExisting = nil
-        withAnimation { showingExtractionSuccess = true }
-        try? await Task.sleep(for: .milliseconds(1200))
-        dismiss()
+        await finishSavedScan()
     }
 
     /// Pick a name like "Foo (Copy)" or "Foo (Copy 2)" that doesn't

@@ -132,6 +132,44 @@ final class HybridRedesignTests: XCTestCase {
         XCTAssertNil(form.sourceImage)
     }
 
+    @MainActor
+    func testCookbookPhotoIsSeparateAndUploadFailurePreservesRecipe() async throws {
+        let id = TestFixtures.seedRecipe(householdID: householdID, name: "Book soup")
+        let recipes = RecipeService()
+        await recipes.fetchRecipes()
+        let recipe = try XCTUnwrap(recipes.recipes.first { $0.id == id })
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20)).image { _ in }
+        let service = CookbookPhotoService()
+        try await service.save(image, for: recipe)
+        await recipes.fetchRecipes()
+        let saved = try XCTUnwrap(recipes.recipes.first { $0.id == id })
+        let path = try XCTUnwrap(saved.cookbookImagePath)
+        let storedImage = try XCTUnwrap(FakePostgRESTStore.shared.storageObject(at: "cookbook-recipe-photos/\(path)"))
+        XCTAssertNotNil(UIImage(data: storedImage))
+        let signed = try await service.imageURL(path: path)
+        let (download, _) = try await URLSession.shared.data(from: signed)
+        XCTAssertNotNil(UIImage(data: download), "Signed URL must deliver decodable image bytes")
+        XCTAssertEqual(saved.sourceImagePath, recipe.sourceImagePath)
+        XCTAssertEqual(saved.homemadeImagePath, recipe.homemadeImagePath)
+        XCTAssertNil(saved.familyCoverImagePath)
+        XCTAssertTrue(FakePostgRESTStore.shared.rows(in: "recipe_family_photos").isEmpty)
+        FakePostgRESTStore.shared.storageUploadBlocked = true
+        do { try await service.save(image, for: saved); XCTFail("Blocked upload must fail") }
+        catch { }
+        await recipes.fetchRecipes()
+        XCTAssertEqual(recipes.recipes.first?.cookbookImagePath, path)
+        XCTAssertEqual(recipes.recipes.count, 1)
+    }
+
+    @MainActor
+    func testCookbookPhotoRejectsWrongHousehold() async throws {
+        let recipe = try TestFixtures.recipeRow(householdID: UUID(), name: "Other household")
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20)).image { _ in }
+        do { try await CookbookPhotoService().save(image, for: recipe); XCTFail("Wrong household") }
+        catch { }
+        XCTAssertTrue(FakePostgRESTStore.shared.rows(in: "recipes").isEmpty)
+    }
+
     /// Real SwiftUI views with synthetic recipes and intercepted networking.
     /// Attachments are visual evidence, not pixel assertions.
     @MainActor
@@ -143,15 +181,46 @@ final class HybridRedesignTests: XCTestCase {
         }
         let recipes = RecipeService()
         await recipes.fetchRecipes()
-        let recipe = try XCTUnwrap(recipes.recipes.first)
+        // Clearly labeled geometric test panels exercise image layout without
+        // inventing food photography or copying cookbook artwork into fixtures.
+        func panel(_ label: String, page: Bool = false) -> UIImage {
+            let size = page ? CGSize(width: 400, height: 700) : CGSize(width: 700, height: 500)
+            return UIGraphicsImageRenderer(size: size).image { context in
+                UIColor.systemTeal.setFill(); context.fill(CGRect(origin: .zero, size: size))
+                UIColor.systemOrange.setFill(); context.fill(CGRect(x: 40, y: 40, width: size.width - 80, height: size.height - 80))
+                ("TEST IMAGE\n" + label).draw(in: CGRect(x: 60, y: 120, width: size.width - 120, height: 240),
+                    withAttributes: [.font: UIFont.systemFont(ofSize: 36), .foregroundColor: UIColor.black])
+            }
+        }
+        let family = try XCTUnwrap(recipes.recipes.first)
+        let book = recipes.recipes[1]
+        let source = recipes.recipes[2]
+        let familyService = FamilyPhotoService()
+        try await familyService.add(panel("Family cooking"), caption: "Test cooking history", to: family)
+        let history = try await familyService.photos(for: family)
+        try await familyService.setCover(try XCTUnwrap(history.first), for: family)
+        try await CookbookPhotoService().save(panel("Cookbook picture"), for: book)
+        let originalForm = SupabaseRecipeFormViewModel(recipe: source, ingredients: [])
+        originalForm.sourceImage = panel("Original page", page: true)
+        let originalSaved = await originalForm.save(recipeService: recipes)
+        XCTAssertTrue(originalSaved)
+        await recipes.fetchRecipes()
+        let recipe = try XCTUnwrap(recipes.recipes.first { $0.id == family.id })
+        let bookRecipe = try XCTUnwrap(recipes.recipes.first { $0.id == book.id })
+        let sourceRecipe = try XCTUnwrap(recipes.recipes.first { $0.id == source.id })
+        let noPhotoRecipe = try XCTUnwrap(recipes.recipes.first { !$0.hasDishPhoto && $0.sourceImagePath == nil })
         let household = HouseholdService()
         let mealPlan = MealPlanService()
         let grocery = GroceryService()
         let auth = AuthService()
         let screens: [(String, AnyView)] = [
+            ("CookbookStep", AnyView(CookbookPhotoStepView(recipe: recipe, isAfterScan: true) {})),
             ("Browse", AnyView(SupabaseRecipeListView())),
             ("Search", AnyView(SupabaseRecipeListView(initialSearch: "chicken"))),
             ("Details", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: recipe) })),
+            ("BookDetails", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: bookRecipe) })),
+            ("SourceDetails", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: sourceRecipe) })),
+            ("NoPhotoDetails", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: noPhotoRecipe) })),
             ("Photos", AnyView(NavigationStack { SupabaseRecipeDetailView(recipe: recipe, initialSection: .photos) })),
             ("Planner", AnyView(SupabaseMealPlanView(selectedTab: .constant(.mealPlan))))
         ]

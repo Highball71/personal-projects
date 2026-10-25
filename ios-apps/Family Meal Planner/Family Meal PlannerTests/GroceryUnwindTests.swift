@@ -100,6 +100,16 @@ final class FakePostgRESTStore: @unchecked Sendable {
         // storage.objects INSERT looks like from the client.
         if pathParts.count > 3, pathParts[0] == "storage", pathParts[1] == "v1", pathParts[2] == "object" {
             let method = request.httpMethod?.uppercased() ?? "GET"
+            if pathParts[3] == "sign", method == "POST" {
+                let key = pathParts.dropFirst(4).joined(separator: "/")
+                guard storageObject(at: key) != nil else { return (404, Data("{}".utf8)) }
+                return (200, Data("{\"signedURL\":\"/object/sign/\(key)?token=test-only\"}".utf8))
+            }
+            if method == "GET", ["sign", "public"].contains(pathParts[3]) {
+                let key = pathParts.dropFirst(4).joined(separator: "/")
+                guard let data = storageObject(at: key) else { return (404, Data("{}".utf8)) }
+                return (200, data)
+            }
             guard method == "POST" || method == "PUT" else {
                 return (404, Data("{}".utf8))
             }
@@ -108,7 +118,16 @@ final class FakePostgRESTStore: @unchecked Sendable {
                 return (403, Data(#"{"statusCode":"403","error":"Unauthorized","message":"new row violates row-level security policy"}"#.utf8))
             }
             let key = pathParts[3...].joined(separator: "/")
-            storageObjects[key] = body ?? Data()
+            // Storage receives multipart uploads but serves the JPEG payload,
+            // not the enclosing form fields. Keep fixture downloads decodable.
+            let uploaded = body ?? Data()
+            if let start = uploaded.range(of: Data([0xff, 0xd8])),
+               let end = uploaded.range(of: Data([0xff, 0xd9]), options: .backwards),
+               end.upperBound > start.lowerBound {
+                storageObjects[key] = uploaded.subdata(in: start.lowerBound..<end.upperBound)
+            } else {
+                storageObjects[key] = uploaded
+            }
             let response = #"{"Key":"\#(key)","Id":"\#(UUID().uuidString.lowercased())"}"#
             return (200, Data(response.utf8))
         }
@@ -294,7 +313,7 @@ final class FakePostgRESTProtocol: URLProtocol {
         guard let url = request.url,
               let response = HTTPURLResponse(
                 url: url, statusCode: status, httpVersion: "HTTP/1.1",
-                headerFields: ["Content-Type": "application/json"]
+                headerFields: ["Content-Type": request.httpMethod == "GET" && url.path.contains("/storage/v1/object/") ? "image/jpeg" : "application/json"]
               )
         else { return }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

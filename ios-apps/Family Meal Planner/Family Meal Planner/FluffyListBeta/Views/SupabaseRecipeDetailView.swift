@@ -58,6 +58,7 @@ struct SupabaseRecipeDetailView: View {
     @State private var ingredients: [RecipeIngredientRow] = []
     @State private var isLoadingIngredients = true
     @State private var showingEdit = false
+    @State private var showingCookbookPhoto = false
     @State private var showingOriginalSource = false
     @State private var showingDayPicker = false
     @State private var toastMessage: String?
@@ -99,7 +100,7 @@ struct SupabaseRecipeDetailView: View {
             }
         }
         .background(Color.fluffyBackground)
-        .navigationTitle(selectedSection == .photos ? recipe.name : "")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
         .tint(Color.fluffyAccent)
@@ -168,6 +169,10 @@ struct SupabaseRecipeDetailView: View {
                 }
                 .interactiveDismissDisabled(savingPhotoChange)
             }
+        }
+        .sheet(isPresented: $showingCookbookPhoto) {
+            CookbookPhotoStepView(recipe: recipe, isAfterScan: false) { showingCookbookPhoto = false }
+                .environmentObject(recipeService)
         }
         .sheet(isPresented: $showingOriginalSource) { RecipeSourceImageView(recipe: recipe) }
         .sheet(isPresented: $showingEdit) {
@@ -280,13 +285,14 @@ struct SupabaseRecipeDetailView: View {
 
     private var detailHeader: some View {
         ZStack(alignment: .top) {
-            if selectedSection != .photos && (recipe.familyCoverImagePath != nil || recipe.homemadeImagePath != nil) {
+            if selectedSection != .photos && recipe.hasDishPhoto {
                 RecipeCardImage(recipe: recipe, height: horizontalSizeClass == .regular ? 320 : 250, role: .family)
             }
             HStack {
                 RecipeIconButton(symbol: "chevron.left", label: "Back") { dismiss() }
                 if selectedSection == .photos {
                     Text(recipe.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                        .truncationMode(.tail).layoutPriority(-1)
                 }
                 Spacer()
                 RecipeIconButton(symbol: recipe.isFavorite ? "heart.fill" : "heart", label: "Toggle favorite") {
@@ -488,16 +494,23 @@ struct SupabaseRecipeDetailView: View {
 
     @ViewBuilder
     private var cookbookSource: some View {
+        cookbookPhotoSection
         if recipe.sourceImagePath != nil || sourceAttribution != nil {
             VStack(alignment: .leading, spacing: 12) {
                 FluffySectionHead(title: "Original Recipe Source")
                 if recipe.sourceImagePath != nil {
                     Button { showingOriginalSource = true } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            RecipeCardImage(recipe: recipe, height: 320, role: .source)
-                            Label("View original", systemImage: "arrow.up.left.and.arrow.down.right")
-                                .font(.subheadline).frame(minHeight: 44)
-                        }
+                        HStack(spacing: 12) {
+                            RecipeCardImage(recipe: recipe, height: 100, role: .source)
+                                .frame(width: 85)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Original recipe page").font(.subheadline.weight(.medium))
+                                Text("Open the full page and zoom in")
+                                    .font(.caption).foregroundStyle(Color.fluffySecondary)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                        }.frame(minHeight: 100)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("View original recipe source, with zoom controls")
@@ -510,6 +523,24 @@ struct SupabaseRecipeDetailView: View {
             .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 18))
             .padding(.horizontal, 22)
         }
+    }
+
+    private var cookbookPhotoSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Cookbook Photo").font(.headline)
+            if recipe.cookbookImagePath != nil {
+                RecipeCardImage(recipe: recipe, height: 180, role: .cookbook)
+                Text(sourceAttribution ?? "From the recipe's cookbook")
+                    .font(.caption).foregroundStyle(Color.fluffySecondary)
+            }
+            Button(recipe.cookbookImagePath == nil ? "Add the book’s dish photo" : "Replace cookbook photo") {
+                showingCookbookPhoto = true
+            }.font(.subheadline).frame(minHeight: 44).buttonStyle(.plain)
+            Text("Book illustrations stay separate from your family’s cooking photos.")
+                .font(.caption).foregroundStyle(Color.fluffySecondary)
+        }.padding(16)
+            .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 22)
     }
 
     /// The cookbook-on-a-stand layout (regular width): taller photo
@@ -597,7 +628,8 @@ struct SupabaseRecipeDetailView: View {
     }
 
     private var metadataText: String {
-        var parts = [recipe.category]
+        var parts = [recipe.recipeCategory.rawValue.capitalized]
+        if recipe.usesCookbookCover { parts.append("Cookbook photo") }
         if recipe.isFavorite { parts.append("Family favorite") }
         if totalMinutes > 0 { parts.append("\(totalMinutes) min") }
         return parts.joined(separator: " \u{00B7} ")

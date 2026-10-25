@@ -119,6 +119,7 @@ struct RecipeRow: Codable, Identifiable, Equatable {
     let sourceImagePath: String?
     let homemadeImagePath: String?
     let familyCoverImagePath: String?
+    let cookbookImagePath: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -132,6 +133,7 @@ struct RecipeRow: Codable, Identifiable, Equatable {
         case sourceImagePath = "source_image_path"
         case homemadeImagePath = "homemade_image_path"
         case familyCoverImagePath = "family_cover_image_path"
+        case cookbookImagePath = "cookbook_image_path"
         case createdAt = "created_at"
     }
 
@@ -154,6 +156,16 @@ struct RecipeRow: Codable, Identifiable, Equatable {
         sourceImagePath = try? c.decode(String.self, forKey: .sourceImagePath)
         homemadeImagePath = try? c.decode(String.self, forKey: .homemadeImagePath)
         familyCoverImagePath = try? c.decode(String.self, forKey: .familyCoverImagePath)
+        cookbookImagePath = try? c.decode(String.self, forKey: .cookbookImagePath)
+    }
+
+    /// A family cover takes precedence; cookbook art never becomes cooking history.
+    var usesCookbookCover: Bool {
+        familyCoverImagePath == nil && homemadeImagePath == nil && cookbookImagePath != nil
+    }
+
+    var hasDishPhoto: Bool {
+        familyCoverImagePath != nil || homemadeImagePath != nil || cookbookImagePath != nil
     }
 
     /// Map the Supabase category string to the existing RecipeCategory enum.

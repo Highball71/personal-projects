@@ -20,3 +20,6 @@
 3. Announcement email for the 113/116 rollout.
 4. Seasonal v1.5 (parked): seasonal produce list into the AI suggestion prompt.
 5. Parked: Engineer Mode; pantry-scan suggestions; community recipes; toast icon string-match cosmetic. Doc nit: RULES/CLAUDE.md still say "target iOS 17+" — the project's deployment target is 26.2.
+
+## Current redesign continuation — October 25
+Branch codex/fluffylist-hybrid-redesign: scan-first optional cookbook-photo step implemented and locally validated. Migration 021 and device delivery pending. See latest HANDOFF entries and RECIPE_CORRECTIONS.md. Shopping-list duplicates/section headings are the next investigation; no live grocery cleanup has run.
