@@ -20,7 +20,7 @@ The new policies were first tested in a disposable, network-isolated Supabase Po
 
 ## Validation
 
-295 tests passed on each of iPhone 17 and iPad Pro 11-inch M5 (iOS 26.5), zero failures/skips. Final source run: `/private/tmp/fluffylist-125-final.xcresult`. Only the build number changed from 125 to 126 afterward. Hosted renderings cover five screens in light, dark and accessibility3 text; screenshots use synthetic text-only recipes, no actual household or fabricated food photos. All four seasonal accent palettes pass 4.5:1 text contrast on background/card surfaces in both appearances. Signed archive succeeded for build 125; build 126 release status is recorded in the user-facing report.
+295 tests passed on each of iPhone 17 and iPad Pro 11-inch M5 (iOS 26.5), zero failures/skips. Final source run: `/private/tmp/fluffylist-125-final.xcresult`. Only the build number changed from 125 to 126 afterward. Hosted renderings cover five screens in light, dark and accessibility3 text; screenshots use synthetic text-only recipes, no actual household or fabricated food photos. All four seasonal accent palettes pass 4.5:1 text contrast on background/card surfaces in both appearances. Signed archive and App Store Connect upload succeeded for build 126 at 07:07 Eastern on October 25. Apple reported that the package is processing; processing completion and tester availability are unconfirmed.
 
 ## Remaining acceptance checks
 
