@@ -149,6 +149,42 @@ final class MealPlanService: ObservableObject {
         }
     }
 
+    /// Quietly preload a future planning window without replacing the week
+    /// currently shown on screen. Used by the recipe picker so ingredient
+    /// connections can cross a Sunday boundary.
+    @discardableResult
+    func prefetchPlans(startDate: Date, dayCount: Int) async -> Bool {
+        guard let householdID = SupabaseManager.shared.currentHouseholdID,
+              dayCount > 0,
+              let endDate = Calendar.current.date(byAdding: .day, value: dayCount, to: startDate)
+        else { return false }
+
+        do {
+            let rows: [MealPlanRow] = try await supabase
+                .from("meal_plans")
+                .select()
+                .eq("household_id", value: householdID.uuidString)
+                .gte("date", value: Self.isoDate(from: startDate))
+                .lt("date", value: Self.isoDate(from: endDate))
+                .execute()
+                .value
+
+            guard SupabaseManager.shared.currentHouseholdID == householdID,
+                  !Task.isCancelled else { return false }
+
+            var merged = plansByDate
+            let windowRows = Dictionary(grouping: rows, by: \.date)
+            for (date, rowsForDate) in windowRows {
+                merged[date] = rowsForDate
+            }
+            plansByDate = merged
+            return true
+        } catch {
+            Logger.supabase.info("prefetchPlans: skipped future window — \(error.localizedDescription)")
+            return false
+        }
+    }
+
     // MARK: - Add Meal
 
     /// Insert a new meal plan row for (household, date, member).
