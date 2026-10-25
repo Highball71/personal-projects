@@ -49,35 +49,47 @@ final class GroceryService: ObservableObject {
         errorMessage = nil
         defer { if generation == fetchGeneration { isLoading = false } }
 
-        do {
-            let fetched: [SupabaseGroceryItem] = try await supabase
-                .from("grocery_items")
-                .select()
-                .eq("household_id", value: householdID.uuidString)
-                .order("is_checked", ascending: true)
-                .order("created_at", ascending: true)
-                .execute()
-                .value
+        var lastError: Error?
+        for attempt in 0..<2 {
+            do {
+                let fetched: [SupabaseGroceryItem] = try await supabase
+                    .from("grocery_items")
+                    .select()
+                    .eq("household_id", value: householdID.uuidString)
+                    .order("is_checked", ascending: true)
+                    .order("created_at", ascending: true)
+                    .execute()
+                    .value
 
-            // A previous refresh must not replace a newer list or another
-            // household's data after the user switches accounts.
-            guard generation == fetchGeneration,
-                  SupabaseManager.shared.currentHouseholdID == householdID,
-                  !Task.isCancelled else { return false }
-            items = fetched
-            lastRefreshedAt = Date()
-            errorMessage = nil
-            return true
-        } catch {
-            guard generation == fetchGeneration,
-                  SupabaseManager.shared.currentHouseholdID == householdID else { return false }
-            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
-                return false
+                // A previous refresh must not replace a newer list or another
+                // household's data after the user switches accounts.
+                guard generation == fetchGeneration,
+                      SupabaseManager.shared.currentHouseholdID == householdID,
+                      !Task.isCancelled else { return false }
+                items = fetched
+                lastRefreshedAt = Date()
+                errorMessage = nil
+                return true
+            } catch {
+                guard generation == fetchGeneration,
+                      SupabaseManager.shared.currentHouseholdID == householdID else { return false }
+                if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                    return false
+                }
+                lastError = error
+                if attempt == 0 {
+                    // Pull-to-refresh often races a brief connection wake-up.
+                    // Retry once before surfacing an error over the cached list.
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                }
             }
-            errorMessage = error.localizedDescription
-            // Keep the last successful list and timestamp for this household.
-            return false
         }
+
+        if let lastError {
+            errorMessage = lastError.localizedDescription
+        }
+        // Keep the last successful list and timestamp for this household.
+        return false
     }
 
     // MARK: - Create
