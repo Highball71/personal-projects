@@ -453,7 +453,7 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
     private static let pantryFirstWords = [
         "canned ", "can of ", "jarred ", "tomato paste", "tomato sauce",
         "diced tomato", "crushed tomato", "pepper sauce", "hot sauce",
-        "soy sauce", "apple cider vinegar", "balsamic vinegar"
+        "soy sauce", "apple cider vinegar", "apple cider", "balsamic vinegar"
     ]
 
     private static let keywordMap: [(GroceryCategory, [String])] = [
