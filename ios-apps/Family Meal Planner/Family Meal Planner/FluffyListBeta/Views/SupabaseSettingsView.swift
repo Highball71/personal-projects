@@ -27,6 +27,9 @@ struct SupabaseSettingsView: View {
     /// (no section, no badges, no nagging anywhere).
     @AppStorage("seasonalRegion") private var seasonalRegionRaw: String = ""
 
+    @AppStorage("seasonalPalette") private var seasonalPalette = "Automatic"
+    @AppStorage("southernHemisphereColors") private var southernHemisphereColors = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -92,6 +95,14 @@ struct SupabaseSettingsView: View {
                             detail: "Dark, large text for shopping",
                             isOn: $storeMode
                         )
+                    }
+
+                    settingsGroup("Appearance") {
+                        pickerRow(label: "Seasonal colors", selection: $seasonalPalette,
+                                  options: ["Automatic"] + SeasonalPalette.allCases.map(\.rawValue))
+                        if seasonalPalette == "Automatic" {
+                            toggleRow(label: "Southern hemisphere", detail: "Reverse the seasonal color calendar", isOn: $southernHemisphereColors)
+                        }
                     }
 
                     settingsGroup("App") {
@@ -258,11 +269,12 @@ struct SupabaseSettingsView: View {
                     .font(.custom(FluffyFace.regular, size: 17))
                     .foregroundStyle(Color.fluffyPrimary)
                 Spacer()
-                Picker("", selection: selection) {
+                Picker(label, selection: selection) {
                     ForEach(options, id: \.self) { option in
                         Text(option).tag(option)
                     }
                 }
+                .labelsHidden()
                 .tint(Color.fluffyAccent)
             }
             .padding(.horizontal, 22)
@@ -294,6 +306,7 @@ struct SupabaseSettingsView: View {
                         Text(region.displayName).tag(region.rawValue)
                     }
                 }
+                .labelsHidden()
                 .tint(Color.fluffyAccent)
             }
             .padding(.horizontal, 22)

@@ -61,6 +61,10 @@ final class HybridRedesignTests: XCTestCase {
             func linear(_ x: CGFloat) -> Double { x <= 0.04045 ? Double(x / 12.92) : pow(Double((x + 0.055) / 1.055), 2.4) }
             return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
         }
+        let originalPalette = SeasonalAppearance.shared.palette
+        defer { SeasonalAppearance.shared.palette = originalPalette }
+        for palette in SeasonalPalette.allCases {
+            SeasonalAppearance.shared.palette = palette
         for style in [UIUserInterfaceStyle.light, .dark] {
             for text in [Color.fluffyPrimary, .fluffySecondary, .fluffyAccent] {
                 for surface in [Color.fluffyBackground, .fluffyCard] {
@@ -69,6 +73,46 @@ final class HybridRedesignTests: XCTestCase {
                 }
             }
         }
+        }
+    }
+
+    @MainActor
+    func testSeasonalCalendarAndPinnedChoice() {
+        XCTAssertEqual(SeasonalPalette.automatic(month: 1, southernHemisphere: false), .winter)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 4, southernHemisphere: false), .spring)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 7, southernHemisphere: false), .summer)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 10, southernHemisphere: false), .autumn)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 1, southernHemisphere: true), .summer)
+        let appearance = SeasonalAppearance()
+        appearance.refresh(choice: "Spring", southernHemisphere: false)
+        XCTAssertEqual(appearance.palette, .spring)
+    }
+
+    @MainActor
+    func testPhotoManagementPreservesHistoryAndSource() async throws {
+        let id = TestFixtures.seedRecipe(householdID: householdID, name: "Soup")
+        let recipes = RecipeService()
+        await recipes.fetchRecipes()
+        let recipe = try XCTUnwrap(recipes.recipes.first { $0.id == id })
+        let service = FamilyPhotoService()
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10)).image { _ in }
+        try await service.add(image, caption: "First", to: recipe)
+        let addedPhotos = try await service.photos(for: recipe)
+        let photo = try XCTUnwrap(addedPhotos.first)
+        try await service.setCover(photo, for: recipe)
+        await recipes.fetchRecipes()
+        XCTAssertEqual(recipes.recipes.first?.familyCoverImagePath, photo.imagePath)
+        XCTAssertEqual(recipes.recipes.first?.sourceImagePath, recipe.sourceImagePath)
+        try await service.setCover(nil, for: recipe)
+        try await service.update(photo, caption: "Updated note", archived: true)
+        let updatedPhotos = try await service.photos(for: recipe)
+        let archived = try XCTUnwrap(updatedPhotos.first)
+        XCTAssertTrue(archived.isArchived)
+        XCTAssertEqual(archived.caption, "Updated note")
+        try await service.update(archived, caption: archived.caption, archived: false)
+        let restored = try await service.photos(for: recipe)
+        XCTAssertEqual(restored.count, 1)
+        XCTAssertFalse(restored[0].isArchived)
     }
 
     /// Real SwiftUI views with synthetic recipes and intercepted networking.

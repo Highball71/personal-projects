@@ -43,6 +43,12 @@ struct SupabaseRecipeDetailView: View {
     @State private var photoHistoryAvailable = false
     @State private var loadingPhotoHistory = true
     @State private var photoCaption = ""
+    @State private var managingPhotos = false
+    @State private var editingPhoto: FamilyRecipePhoto?
+    @State private var editedCaption = ""
+    @State private var savingPhotoChange = false
+    @State private var showingGroceryPreview = false
+    @State private var addingGroceries = false
     @State private var replacingSavedPhoto = false
     @State private var useLegacyPhotoSave = false
     @State private var ingredients: [RecipeIngredientRow] = []
@@ -108,6 +114,15 @@ struct SupabaseRecipeDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 22)
                 .padding(.vertical, 12)
+                Button { showingGroceryPreview = true } label: {
+                    Label("Add to Grocery List", systemImage: "cart.badge.plus")
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(Color.fluffyAccent)
+                        .frame(maxWidth: layout.bottomBarMaxWidth ?? .infinity, minHeight: 44)
+                        .padding(.horizontal, 22)
+                }
+                .disabled(isLoadingIngredients || ingredients.isEmpty || addingGroceries)
             }
             .background(Color.fluffyBackground)
         }
@@ -138,6 +153,48 @@ struct SupabaseRecipeDetailView: View {
                             .foregroundStyle(Color.fluffyAccent)
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showingGroceryPreview) {
+            NavigationStack {
+                List {
+                    Section {
+                        ForEach(ingredients.sorted { $0.sortOrder < $1.sortOrder }) { ingredient in
+                            VStack(alignment: .leading) {
+                                Text(ingredient.name)
+                                Text(IngredientDisplay.render(quantity: ingredient.quantity, unit: ingredient.unit, note: ingredient.note).combined)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: { Text("Saved recipe · \(recipe.servings) servings") }
+                    footer: { Text("Adds the saved recipe quantities to your groceries. Existing items are combined. Your meal plan stays unchanged.") }
+                }
+                .navigationTitle("Add ingredients")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingGroceryPreview = false }.disabled(addingGroceries) }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(addingGroceries ? "Adding…" : "Add") { Task { await addGroceriesOnly() } }
+                            .disabled(addingGroceries || ingredients.isEmpty)
+                    }
+                }
+                .interactiveDismissDisabled(addingGroceries)
+            }
+        }
+        .sheet(item: $editingPhoto) { photo in
+            NavigationStack {
+                Form {
+                    TextField("Cooking note", text: $editedCaption, axis: .vertical)
+                        .onChange(of: editedCaption) { _, value in editedCaption = String(value.prefix(2000)) }
+                }
+                .navigationTitle("Photo note")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { editingPhoto = nil } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { Task { await updatePhoto(photo, caption: editedCaption, archived: photo.isArchived) } }
+                            .disabled(savingPhotoChange)
+                    }
+                }
+                .interactiveDismissDisabled(savingPhotoChange)
             }
         }
         .sheet(isPresented: $showingOriginalSource) { RecipeSourceImageView(recipe: recipe) }
@@ -201,7 +258,7 @@ struct SupabaseRecipeDetailView: View {
     /// The phone layout, unchanged: one column, everything stacked.
     private var compactContent: some View {
         VStack(alignment: .leading, spacing: 24) {
-            if selectedSection != .photos, recipe.homemadeImagePath != nil {
+            if selectedSection != .photos, recipe.homemadeImagePath != nil || recipe.familyCoverImagePath != nil {
                 RecipeCardImage(recipe: recipe, height: layout.photoHeight, role: .family)
             }
             if selectedSection != .photos { titleSection }
@@ -306,12 +363,42 @@ struct SupabaseRecipeDetailView: View {
                 }
                 .frame(minHeight: 44)
             }
-            FluffySectionHead(title: "Our Family Photos")
+            HStack {
+                FluffySectionHead(title: "Our Family Photos")
+                Spacer()
+                Button(managingPhotos ? "Done" : "Manage") { managingPhotos.toggle() }.frame(minHeight: 44)
+                    .disabled(!photoHistoryAvailable || savingPhotoChange)
+            }
+            if managingPhotos && recipe.familyCoverImagePath != nil {
+                Button("Reset recipe cover") { Task { await setPhotoCover(nil) } }
+                    .frame(minHeight: 44).disabled(savingPhotoChange)
+            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 280 : 155))], alignment: .leading, spacing: 20) {
-                ForEach(familyHistory) { photo in FamilyPhotoTile(photo: photo) }
+                ForEach(familyHistory.filter { managingPhotos || !$0.isArchived }) { photo in
+                    VStack(alignment: .leading, spacing: 8) {
+                        FamilyPhotoTile(photo: photo)
+                        if recipe.familyCoverImagePath == photo.imagePath {
+                            Label("Recipe cover", systemImage: "star.fill").font(.caption)
+                        }
+                        if photo.isArchived { Text("Archived").font(.caption).foregroundStyle(Color.fluffySecondary) }
+                        if managingPhotos {
+                            Menu("Photo options") {
+                                Button("Edit note") { editedCaption = photo.caption; editingPhoto = photo }
+                                if !photo.isArchived {
+                                    Button("Use as recipe cover") { Task { await setPhotoCover(photo) } }
+                                }
+                                Button(photo.isArchived ? "Restore photo" : "Archive photo") {
+                                    Task { await updatePhoto(photo, caption: photo.caption, archived: !photo.isArchived) }
+                                }
+                                .disabled(recipe.familyCoverImagePath == photo.imagePath)
+                            }
+                            .frame(minHeight: 44).disabled(savingPhotoChange)
+                        }
+                    }
+                }
                 if recipe.homemadeImagePath != nil {
                     VStack(alignment: .leading, spacing: 8) {
-                        RecipeCardImage(recipe: recipe, height: 200, role: .family)
+                        RecipeCardImage(recipe: recipe, height: 200, role: .legacyFamily)
                         Text("Previously saved photo").font(.caption).foregroundStyle(Color.fluffySecondary)
                     }
                 }
@@ -322,6 +409,50 @@ struct SupabaseRecipeDetailView: View {
             }
         }
         .padding(.horizontal, 22)
+    }
+
+    private func setPhotoCover(_ photo: FamilyRecipePhoto?) async {
+        savingPhotoChange = true
+        defer { savingPhotoChange = false }
+        do {
+            try await FamilyPhotoService().setCover(photo, for: recipe)
+            guard await recipeService.fetchRecipes() else {
+                actionErrorMessage = "Cover saved, but the recipe could not refresh. Reopen it when connected."
+                return
+            }
+        } catch { actionErrorMessage = "Couldn't change the cover. Please try again." }
+    }
+
+    private func updatePhoto(_ photo: FamilyRecipePhoto, caption: String, archived: Bool) async {
+        savingPhotoChange = true
+        defer { savingPhotoChange = false }
+        do {
+            try await FamilyPhotoService().update(photo, caption: caption, archived: archived)
+            editingPhoto = nil
+            await loadPhotoHistory()
+        } catch {
+            editingPhoto = nil
+            actionErrorMessage = "Couldn't update the photo. Reset its cover first if you are archiving it, then try again."
+        }
+    }
+
+    private func addGroceriesOnly() async {
+        guard !addingGroceries else { return }
+        guard SupabaseManager.shared.currentHouseholdID == recipe.householdID else {
+            showingGroceryPreview = false
+            actionErrorMessage = "Your household changed. Reopen the recipe before adding ingredients."
+            return
+        }
+        addingGroceries = true
+        defer { addingGroceries = false }
+        let inserts = ingredients.sorted { $0.sortOrder < $1.sortOrder }.map {
+            GroceryItemInsert(householdID: recipe.householdID, name: $0.name,
+                              quantity: $0.quantity, unit: $0.unit, note: $0.note)
+        }
+        let saved = await groceryService.addItems(inserts)
+        showingGroceryPreview = false
+        if saved { toastMessage = "Ingredients added to groceries" }
+        else { actionErrorMessage = "Couldn't finish adding ingredients. Check the grocery list before trying again." }
     }
 
     private func loadPhotoHistory() async {
@@ -369,7 +500,7 @@ struct SupabaseRecipeDetailView: View {
     /// edge to edge. Same sections as compact, rearranged.
     private var regularContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if recipe.homemadeImagePath != nil {
+            if recipe.homemadeImagePath != nil || recipe.familyCoverImagePath != nil {
                 RecipeCardImage(recipe: recipe, height: layout.photoHeight, role: .family)
                     .clipped()
             }

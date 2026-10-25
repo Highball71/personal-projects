@@ -42,5 +42,30 @@ final class FamilyPhotoService {
             .createSignedURL(path: photo.imagePath, expiresIn: 3600)
     }
 
+    func update(_ photo: FamilyRecipePhoto, caption: String, archived: Bool) async throws {
+        guard SupabaseManager.shared.currentHouseholdID == photo.householdID else { throw PhotoError.cannotSave }
+        struct Update: Encodable { let caption: String; let is_archived: Bool }
+        let saved: [FamilyRecipePhoto] = try await client.from("recipe_family_photos")
+            .update(Update(caption: String(caption.prefix(2000)), is_archived: archived))
+            .eq("id", value: photo.id.uuidString).eq("household_id", value: photo.householdID.uuidString)
+            .select().execute().value
+        guard saved.count == 1 else { throw PhotoError.cannotSave }
+    }
+
+    func setCover(_ photo: FamilyRecipePhoto?, for recipe: RecipeRow) async throws {
+        guard SupabaseManager.shared.currentHouseholdID == recipe.householdID,
+              photo == nil || (photo?.recipeID == recipe.id && photo?.householdID == recipe.householdID && photo?.isArchived == false)
+        else { throw PhotoError.cannotSave }
+        let saved: [RecipeRow] = try await client.from("recipes")
+            .update(["family_cover_image_path": photo?.imagePath])
+            .eq("id", value: recipe.id.uuidString).eq("household_id", value: recipe.householdID.uuidString)
+            .select().execute().value
+        guard saved.count == 1 else { throw PhotoError.cannotSave }
+    }
+
+    func imageURL(path: String) async throws -> URL {
+        try await client.storage.from("family-recipe-photos").createSignedURL(path: path, expiresIn: 3600)
+    }
+
     enum PhotoError: Error { case cannotSave }
 }

@@ -8,9 +8,11 @@ struct FamilyRecipePhoto: Codable, Identifiable, Equatable {
     let imagePath: String
     let caption: String
     let createdAt: Date
+    var isArchived: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case id, caption
+        case isArchived = "is_archived"
         case recipeID = "recipe_id", householdID = "household_id"
         case imagePath = "image_path", createdAt = "created_at"
     }

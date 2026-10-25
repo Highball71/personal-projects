@@ -20,6 +20,9 @@ struct SupabaseRecipeListView: View {
     @State private var showingAddRecipe = false
     @State private var showingHouseholdInfo = false
     @State private var searchText = ""
+    @State private var maximumMinutes = 0
+    @State private var mealCategory = "All meals"
+    @State private var showingFilters = false
     @State private var selectedTag: BrowseTag = .all
     @State private var showFavoritesOnly = false
     @State private var recipeToPlan: RecipeRow?
@@ -100,7 +103,11 @@ struct SupabaseRecipeListView: View {
             }
         }
 
-        return result
+        return result.filter { recipe in
+            let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
+            return (mealCategory == "All meals" || recipe.category == mealCategory)
+                && (maximumMinutes == 0 || (total > 0 && total <= maximumMinutes))
+        }
     }
 
     /// The hero card recipe — first favorite, or newest recipe.
@@ -194,6 +201,8 @@ struct SupabaseRecipeListView: View {
                         if isFinding {
                             searchText = ""
                             selectedTag = .all
+                            maximumMinutes = 0
+                            mealCategory = "All meals"
                             showFavoritesOnly = false
                             searchFocused = false
                         } else { showingHouseholdInfo = true }
@@ -219,6 +228,35 @@ struct SupabaseRecipeListView: View {
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showingFilters) {
+                NavigationStack {
+                    Form {
+                        Picker("Meal", selection: $mealCategory) {
+                            Text("All meals").tag("All meals")
+                            ForEach(Array(Set(recipeService.recipes.map(\.category))).sorted(), id: \.self) { category in
+                                Text(category).tag(category)
+                            }
+                        }
+                        Picker("Total time", selection: $maximumMinutes) {
+                            Text("Any time").tag(0)
+                            Text("30 minutes or less").tag(30)
+                            Text("60 minutes or less").tag(60)
+                        }
+                        Text("Time filters include recipes with a saved total time.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Toggle("Favorites only", isOn: $showFavoritesOnly)
+                        Button("Reset filters") {
+                            maximumMinutes = 0; mealCategory = "All meals"
+                            showFavoritesOnly = false; selectedTag = .all
+                        }
+                    }
+                    .navigationTitle("Recipe filters")
+                    .toolbar { ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingFilters = false }
+                    } }
+                }
+                .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showingAddRecipe) {
                 SupabaseAddRecipeView()
@@ -322,7 +360,7 @@ struct SupabaseRecipeListView: View {
                     .padding(.bottom, 20)
 
                 if isFinding {
-                    Text("\(displayedRecipes.count) recipes")
+                    Text("\(displayedRecipes.count) recipes" + (mealCategory == "All meals" ? "" : " · \(mealCategory)") + (maximumMinutes == 0 ? "" : " · ≤ \(maximumMinutes) min"))
                         .font(.subheadline)
                         .foregroundStyle(Color.fluffySecondary)
                         .padding(.horizontal, 22)
@@ -398,11 +436,18 @@ struct SupabaseRecipeListView: View {
     /// glass on a single hairline bottom rule.
     private var isFinding: Bool {
         searchFocused || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || selectedTag != .all || showFavoritesOnly
+            || selectedTag != .all || showFavoritesOnly || maximumMinutes > 0 || mealCategory != "All meals"
     }
 
     private var searchRule: some View {
         HStack(spacing: 10) {
+            Button { searchFocused = false; showingFilters = true } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(maximumMinutes > 0 || mealCategory != "All meals" ? Color.fluffyAccent : Color.fluffySecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Recipe filters")
+            .accessibilityValue(maximumMinutes > 0 || mealCategory != "All meals" ? "Filters active" : "No extra filters")
             Image(systemName: "magnifyingglass").accessibilityHidden(true)
             TextField("Search recipes or ingredients", text: $searchText, prompt: Text("Search recipes or ingredients").foregroundStyle(Color.fluffySecondary))
                 .font(.body)
@@ -437,7 +482,7 @@ struct SupabaseRecipeListView: View {
                             .padding(.horizontal, 16)
                             .frame(minHeight: 44)
                             .foregroundStyle(selectedTag == tag ? Color.white : Color.fluffyPrimary)
-                            .background(selectedTag == tag ? Color(hex: "BB3510") : Color.fluffyCard, in: Capsule())
+                            .background(selectedTag == tag ? Color.fluffyButtonFill : Color.fluffyCard, in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(selectedTag == tag ? .isSelected : [])

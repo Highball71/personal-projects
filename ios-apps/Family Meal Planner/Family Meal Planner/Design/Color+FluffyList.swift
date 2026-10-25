@@ -50,13 +50,22 @@ extension Color {
 extension Color {
 
     /// Ink 1 — Persimmon. The only tappable colour. (#D93A14)
-    static let fluffyAccent      = Color.fluffyAdaptive("BB3510", dark: "FF956E")
+    static var fluffyAccent: Color {
+        let pair = SeasonalAppearance.shared.palette.accent
+        return .fluffyAdaptive(pair.light, dark: pair.dark)
+    }
+
+    /// Always a dark ink so white button labels retain contrast.
+    static var fluffyButtonFill: Color { Color(hex: SeasonalAppearance.shared.palette.accent.light) }
 
     /// Ink 1 deep — pressed / hover state (#9E2A0E)
-    static let fluffyAccentDeep  = Color.fluffyAdaptive("9E2A0E", dark: "FFAB8B")
+    static var fluffyAccentDeep: Color { fluffyAccent }
 
     /// Ink 1 pale — Store Mode checkbox fill, tinted marks (#FFC9B8)
-    static let fluffyAccentPale  = Color.fluffyAdaptive("FCE9DB", dark: "422B22")
+    static var fluffyAccentPale: Color {
+        let pair = SeasonalAppearance.shared.palette.pale
+        return .fluffyAdaptive(pair.light, dark: pair.dark)
+    }
 
     /// Ink 2 — Deep spruce. The rare second spot colour. (#14663E)
     static let fluffyInk2        = Color.fluffyAdaptive("14663E", dark: "80CDA3")
@@ -70,12 +79,12 @@ extension Color {
     // -- Retired per-section accents --
     // Sections are no longer colour-coded. These aliases keep any
     // straggling call sites compiling; all collapse to persimmon.
-    static let fluffyAmber           = fluffyAccent
-    static let fluffyAmberLight      = fluffyAccentPale
-    static let fluffyTeal            = fluffyAccent
-    static let fluffyTealLight       = fluffyAccentPale
-    static let fluffySlateBlue       = fluffyAccent
-    static let fluffySlateBlueLight  = fluffyAccentPale
+    static var fluffyAmber: Color { fluffyAccent }
+    static var fluffyAmberLight: Color { fluffyAccentPale }
+    static var fluffyTeal: Color { fluffyAccent }
+    static var fluffyTealLight: Color { fluffyAccentPale }
+    static var fluffySlateBlue: Color { fluffyAccent }
+    static var fluffySlateBlueLight: Color { fluffyAccentPale }
 }
 
 // MARK: - Semantic Helpers

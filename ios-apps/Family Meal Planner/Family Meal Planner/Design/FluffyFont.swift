@@ -123,7 +123,7 @@ struct FluffyTextLink: View {
 struct FluffyFilledButton: View {
     let title: String
     var icon: String? = nil
-    var fill: Color = Color(hex: "BB3510")
+    var fill: Color = .fluffyButtonFill
     var textColor: Color = .white
     let action: () -> Void
 

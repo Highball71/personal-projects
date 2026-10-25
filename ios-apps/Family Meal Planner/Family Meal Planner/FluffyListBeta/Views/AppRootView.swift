@@ -29,6 +29,9 @@ struct AppRootView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    @AppStorage("seasonalPalette") private var seasonalPalette = "Automatic"
+    @AppStorage("southernHemisphereColors") private var southernHemisphereColors = false
+
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     /// Tracks which onboarding screen to show before the flag is set.
@@ -49,6 +52,10 @@ struct AppRootView: View {
                 sessionGate
             }
         }
+        .onAppear { refreshPalette() }
+        .onChange(of: seasonalPalette) { _, _ in refreshPalette() }
+        .onChange(of: southernHemisphereColors) { _, _ in refreshPalette() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in refreshPalette() }
         .task {
             // Only check session if we're past onboarding and configured.
             if hasSeenOnboarding && supabaseManager.configError == nil {
@@ -56,6 +63,7 @@ struct AppRootView: View {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active { refreshPalette() }
             // A token can expire while backgrounded; re-validate on return so
             // we don't render a logged-in-but-broken app.
             guard newPhase == .active,
@@ -63,6 +71,10 @@ struct AppRootView: View {
                   supabaseManager.configError == nil else { return }
             Task { await authService.revalidateOnForeground() }
         }
+    }
+
+    private func refreshPalette() {
+        SeasonalAppearance.shared.refresh(choice: seasonalPalette, southernHemisphere: southernHemisphereColors)
     }
 
     /// Routes on the auth-restore state so a returning user sees a brief
@@ -245,7 +257,6 @@ struct SupabaseContentView: View {
         appearance.shadowColor = UIColor(Color.fluffyPrimary)
 
         let inactive = UIColor(red: 0x7D / 255, green: 0x79 / 255, blue: 0x79 / 255, alpha: 1)
-        let active = UIColor(Color.fluffyAccent)
         let labelFont = UIFont(name: FluffyFace.regular, size: 10)
             ?? UIFont.systemFont(ofSize: 10)
         // 0.12em at 10pt = 1.2pt of kern.
@@ -253,14 +264,13 @@ struct SupabaseContentView: View {
             .font: labelFont, .kern: 1.2, .foregroundColor: inactive
         ]
         let selectedAttrs: [NSAttributedString.Key: Any] = [
-            .font: labelFont, .kern: 1.2, .foregroundColor: active
+            .font: labelFont, .kern: 1.2
         ]
         for item in [appearance.stackedLayoutAppearance,
                      appearance.inlineLayoutAppearance,
                      appearance.compactInlineLayoutAppearance] {
             item.normal.iconColor = inactive
             item.normal.titleTextAttributes = normalAttrs
-            item.selected.iconColor = active
             item.selected.titleTextAttributes = selectedAttrs
         }
         UITabBar.appearance().standardAppearance = appearance

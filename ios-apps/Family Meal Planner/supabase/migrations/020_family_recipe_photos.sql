@@ -1,4 +1,4 @@
--- Staged only. Apply through an explicitly authorized deployment.
+-- Applied to FluffyList V2 on 2026-10-25 after isolated PostgreSQL policy tests.
 -- Additive history: no recipe, source image, grocery or meal-plan rewrites.
 create table if not exists public.recipe_family_photos (
   id uuid primary key,
@@ -37,3 +37,44 @@ using (bucket_id = 'family-recipe-photos' and public.is_household_member(((stora
   and not exists (select 1 from public.recipe_family_photos p where p.image_path = name));
 revoke all on public.recipe_family_photos from anon;
 grant select, insert on public.recipe_family_photos to authenticated;
+
+-- Keep archived cooking photos recoverable. Never delete original scans.
+alter table public.recipe_family_photos add column if not exists is_archived boolean not null default false;
+alter table public.recipes add column if not exists family_cover_image_path text;
+
+create or replace function public.validate_family_photo_cover() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.family_cover_image_path is not null then
+    perform 1 from public.recipe_family_photos p
+      where p.image_path = new.family_cover_image_path and p.recipe_id = new.id
+        and p.household_id = new.household_id and not p.is_archived for update;
+    if not found then raise exception 'Choose an active cooking photo from this recipe'; end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists validate_family_photo_cover on public.recipes;
+create trigger validate_family_photo_cover before insert or update of family_cover_image_path on public.recipes
+for each row execute function public.validate_family_photo_cover();
+
+create or replace function public.protect_family_photo_cover() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.is_archived and exists (select 1 from public.recipes r where r.family_cover_image_path = new.image_path) then
+    raise exception 'Choose another cover or reset the cover before archiving this photo';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists protect_family_photo_cover on public.recipe_family_photos;
+create trigger protect_family_photo_cover before update of is_archived on public.recipe_family_photos
+for each row execute function public.protect_family_photo_cover();
+
+drop policy if exists "Manage household cooking photos" on public.recipe_family_photos;
+create policy "Manage household cooking photos" on public.recipe_family_photos for update to authenticated
+using (public.is_household_member(household_id)) with check (public.is_household_member(household_id));
+-- Only captions and archive state are editable, never household, path, or recipe.
+revoke all on public.recipe_family_photos from authenticated;
+grant select, insert on public.recipe_family_photos to authenticated;
+grant update(caption, is_archived) on public.recipe_family_photos to authenticated;
