@@ -422,7 +422,7 @@ struct SupabaseGroceryListView: View {
 
 /// Client-side classification of grocery items into aisle-style
 /// categories based on ingredient name keywords.
-private enum GroceryCategory: String, CaseIterable, Identifiable {
+enum GroceryCategory: String, CaseIterable, Identifiable {
     case produce = "Produce"
     case protein = "Protein"
     case dairy   = "Dairy & Eggs"
@@ -433,6 +433,15 @@ private enum GroceryCategory: String, CaseIterable, Identifiable {
 
     static func classify(_ name: String) -> GroceryCategory {
         let lower = name.lowercased()
+
+        // Prepared and packaged forms belong in Pantry even when their
+        // name contains a produce word (for example, "canned tomatoes"
+        // or "pepper sauce"). Check these explicit forms before the
+        // broader produce vocabulary below.
+        if pantryFirstWords.contains(where: { lower.contains($0) }) {
+            return .pantry
+        }
+
         for (category, words) in keywordMap {
             if words.contains(where: { lower.contains($0) }) {
                 return category
@@ -440,6 +449,12 @@ private enum GroceryCategory: String, CaseIterable, Identifiable {
         }
         return .other
     }
+
+    private static let pantryFirstWords = [
+        "canned ", "can of ", "jarred ", "tomato paste", "tomato sauce",
+        "diced tomato", "crushed tomato", "pepper sauce", "hot sauce",
+        "soy sauce", "apple cider vinegar", "balsamic vinegar"
+    ]
 
     private static let keywordMap: [(GroceryCategory, [String])] = [
         (.protein, [

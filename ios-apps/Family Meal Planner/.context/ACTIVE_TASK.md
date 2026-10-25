@@ -48,6 +48,9 @@ Live READ verified 2 tsp arrowroot flour (or tapioca flour), 2 tsp arrowroot flo
 Final validation: screen rendering and contrast tests passed on both simulators (light/dark/large type), screenshots inspected. Signed build129 archive succeeded at work/releases/FluffyList-hybrid-129.xcarchive; bundle/version verified. Not uploaded. Separate explicit TestFlight approval question now pending as well. All intended code is ready; only live repair and release await approval.
 
 
+## 2026-10-25 — Pantry classification follow-up
+Added explicit pantry-first classification for packaged/prepared names that contain produce words (canned tomatoes, pepper sauce, vinegar variants, and similar). GroceryCategory is now testable and GroceryMergeTests cover prepared versus fresh tomato/pepper cases. This is source-only pending the next authorized build; no live data changed and no release uploaded. Simulator validation was blocked in this session by CoreSimulator connection failure and unavailable network package resolution, so rerun the targeted suite on the next machine pass.
+
 ## 2026-10-25 — Approved ingredient repair and build129 delivered
 David explicitly approved both the saved-list repair and TestFlight129 upload. Applied the recoverable cleanup with an additional transaction guard refusing changes outside the approved arrowroot pair and divided-oil name. One initial submission failed SQL parsing (JavaScript replacement collapsed dollar-quote delimiters); corrected before successful commit, with no partial mutations. Final39→38 items, one duplicate combined, one name cleaned, all41 meal links retained,0 checked items. Private recovery ID0b2fe376-97e6-456b-97ac-33de0660f174; before/after snapshots independently verified. Prior automatic approval rejection resolved by explicit user approval; no workaround used.
 

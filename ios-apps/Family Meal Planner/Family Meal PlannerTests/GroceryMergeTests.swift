@@ -25,6 +25,14 @@ final class GroceryMergeTests: XCTestCase {
         GroceryItemInsert(householdID: householdID, name: name, quantity: quantity, unit: unit)
     }
 
+    func testPreparedProduceNamesStayInPantry() {
+        XCTAssertEqual(GroceryCategory.classify("canned tomatoes"), .pantry)
+        XCTAssertEqual(GroceryCategory.classify("pepper sauce"), .pantry)
+        XCTAssertEqual(GroceryCategory.classify("apple cider vinegar"), .pantry)
+        XCTAssertEqual(GroceryCategory.classify("fresh tomatoes"), .produce)
+        XCTAssertEqual(GroceryCategory.classify("fresh bell pepper"), .produce)
+    }
+
     /// The Costco case: 2 tbsp + 1/4 cup + 1 tbsp extra-virgin
     /// = one row, 7 tbsp. (FractionFormatter.formatAsFraction(7) is
     /// "7", so the row displays cleanly as "7 tbsp" — the alternative
