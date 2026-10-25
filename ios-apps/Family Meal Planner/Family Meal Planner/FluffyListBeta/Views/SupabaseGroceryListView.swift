@@ -27,7 +27,7 @@ struct SupabaseGroceryListView: View {
     @State private var updatingItems: Set<UUID> = []
 
     private static let fetchErrorText =
-        "Couldn't update your grocery list. Tap Retry."
+        "Couldn't refresh your grocery list. Showing your last saved list. Tap Retry."
 
     /// Items grouped by auto-detected category, sorted with unchecked
     /// items first within each group.
