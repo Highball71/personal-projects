@@ -27,3 +27,5 @@ Branch codex/fluffylist-hybrid-redesign: scan-first optional cookbook-photo step
 
 ## 2026-10-25 — Prioritize breadth over recipe polish
 David accepted the scan-first optional cookbook-photo experience and asked to move other areas to good before further polish. Next focus is grocery integrity: suppress legacy recipe-section headings on new additions and normalize explicit [For …] ingredient prefixes, then separately reconcile existing duplicates without losing contributions. Recipe crop/spacing polish deferred. No new release authorized in this turn.
+
+Grocery data cleanup completed 2026-10-25: 167→156 rows, 18 section prefixes stripped, 267 meal links and 3 checked rows preserved. Recoverable admin scripts tested and run; see HANDOFF. App prevention remains on branch, not in TestFlight127. Next stage is grocery presentation/weekly planner; do not return to recipe-photo polish before other flows are good.
