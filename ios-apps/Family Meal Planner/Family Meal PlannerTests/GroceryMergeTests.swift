@@ -28,6 +28,7 @@ final class GroceryMergeTests: XCTestCase {
     func testPreparedProduceNamesStayInPantry() {
         XCTAssertEqual(GroceryCategory.classify("canned tomatoes"), .pantry)
         XCTAssertEqual(GroceryCategory.classify("pepper sauce"), .pantry)
+        XCTAssertEqual(GroceryCategory.classify("apple cider"), .pantry)
         XCTAssertEqual(GroceryCategory.classify("apple cider vinegar"), .pantry)
         XCTAssertEqual(GroceryCategory.classify("fresh tomatoes"), .produce)
         XCTAssertEqual(GroceryCategory.classify("fresh bell pepper"), .produce)
