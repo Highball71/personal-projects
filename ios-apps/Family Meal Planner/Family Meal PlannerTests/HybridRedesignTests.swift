@@ -221,7 +221,7 @@ final class HybridRedesignTests: XCTestCase {
         defer { UserDefaults.standard.set(previousStoreMode, forKey: "groceryStoreMode") }
         let groceriesSaved = await grocery.addItems([
             GroceryItemInsert(householdID: householdID, name: "Extra-virgin olive oil", quantity: 4, unit: "tbsp"),
-            GroceryItemInsert(householdID: householdID, name: "Whole30-compliant coarse-grain mustard", quantity: 1, unit: "tsp"),
+            GroceryItemInsert(householdID: householdID, name: "arrowroot flour (or tapioca flour)", quantity: 4, unit: "tsp"),
             GroceryItemInsert(householdID: householdID, name: "Crushed tomatoes", quantity: 2, unit: "can", note: "14 ounces each"),
             GroceryItemInsert(householdID: householdID, name: "Fresh cilantro", quantity: 1, unit: "bunch")
         ])

@@ -25,12 +25,14 @@ revoke all on fluffylist_maintenance.grocery_cleanup from public, anon, authenti
 alter table fluffylist_maintenance.grocery_cleanup enable row level security;
 
 create or replace function pg_temp.shopping_name(value text) returns text language sql immutable as $$
-  select btrim(regexp_replace(value, '^\s*\[For\s+[^\]]+\]\s*', '', 'i'));
+  select btrim(regexp_replace(regexp_replace(value, '^\s*\[For\s+[^\]]+\]\s*', '', 'i'), '\s*\(divided\)\s*$', '', 'i'));
 $$;
 create or replace function pg_temp.shopping_key(value text) returns text language sql immutable as $$
   with normalized as (select lower(regexp_replace(btrim(value), '\s+', ' ', 'g')) as name)
   select case when name in ('extra-virgin olive oil','extra virgin olive oil','evoo')
-    then 'olive oil' else name end from normalized;
+    then 'olive oil'
+    when name in ('arrowroot flour (or tapioca flour)', 'arrowroot flour or tapioca')
+    then 'arrowroot flour or tapioca flour' else name end from normalized;
 $$;
 create or replace function pg_temp.unit_key(value text) returns text language sql immutable as $$
   select case lower(btrim(value))
@@ -151,7 +153,7 @@ where r.id=(select id from cleanup_run);
 select (select id from cleanup_run) as recovery_id,
   (select count(*) from cleanup_before) as original_rows,
   (select count(*) from cleanup_before where heading) as headings_removed,
-  (select count(*) from cleanup_before where not is_checked and not heading and name<>cleaned_name) as section_labels_removed,
+  (select count(*) from cleanup_before where not is_checked and not heading and name<>cleaned_name) as shopping_names_cleaned,
   (select count(*) from cleanup_map where id<>keep_id) as duplicate_rows_combined,
   (select count(*) from public.grocery_items where household_id=current_setting('fluffylist.cleanup_household')::uuid) as remaining_rows,
   (select count(*) from cleanup_links c join cleanup_before b on b.id=c.grocery_item_id where not b.heading) as preserved_meal_links,

@@ -34,7 +34,7 @@ struct SupabaseGroceryListView: View {
     private var groupedItems: [(GroceryCategory, [SupabaseGroceryItem])] {
         var buckets: [GroceryCategory: [SupabaseGroceryItem]] = [:]
         for item in groceryService.items {
-            let cat = GroceryCategory.classify(item.name)
+            let cat = GroceryCategory.classify(GroceryMerge.shoppingName(item.name))
             buckets[cat, default: []].append(item)
         }
         for key in buckets.keys {
@@ -57,7 +57,7 @@ struct SupabaseGroceryListView: View {
             guard !unchecked.isEmpty else { continue }
             lines.append(cat.rawValue.uppercased())
             for item in unchecked {
-                lines.append("  \(quantityText(item)) \(item.name)")
+                lines.append("  \(quantityText(item)) \(GroceryMerge.shoppingLabel(item.name))")
             }
             lines.append("")
         }
@@ -354,10 +354,15 @@ struct SupabaseGroceryListView: View {
                 .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(item.name)
+                    Text(GroceryMerge.shoppingName(item.name))
                         .font(.system(storeMode ? .title3 : .body, weight: .medium))
                         .foregroundStyle(item.isChecked ? dimTextColor : textColor)
                         .strikethrough(item.isChecked, color: dimTextColor)
+                    if GroceryMerge.hasAlternatives(item.name) {
+                        Text("Choose one")
+                            .font(.subheadline)
+                            .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
+                    }
                     Text(quantityText(item))
                         .font(storeMode ? .body : .subheadline)
                         .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
@@ -374,7 +379,7 @@ struct SupabaseGroceryListView: View {
         .buttonStyle(.plain)
         .disabled(updatingItems.contains(item.id))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(item.name), \(quantityText(item))")
+        .accessibilityLabel("\(GroceryMerge.shoppingLabel(item.name)), \(quantityText(item))")
         .accessibilityValue(item.isChecked ? "In the cart" : "To buy")
         .accessibilityHint(item.isChecked ? "Mark as still needed" : "Mark as in the cart")
         .contextMenu {

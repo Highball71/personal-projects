@@ -107,6 +107,40 @@ final class GroceryMergeTests: XCTestCase {
         XCTAssertEqual(merged.first?.quantity, 1)
     }
 
+    func testObservedAlternativeSpellingsCombineWithoutChoosingAnIngredient() {
+        let merged = GroceryMerge.mergeInserts([
+            insert("arrowroot flour (or tapioca flour)", 2, "tsp"),
+            insert("arrowroot flour or tapioca", 2, "tsp"),
+            insert("arrowroot flour", 1, "tsp"),
+            insert("tapioca flour", 1, "tsp"),
+            insert("arrowroot flour or cornstarch", 1, "tsp"),
+        ])
+        XCTAssertEqual(merged.count, 4)
+        XCTAssertEqual(merged[0].quantity, 4)
+        XCTAssertTrue(GroceryMerge.hasAlternatives(merged[0].name))
+        XCTAssertEqual(merged[1].quantity, 1)
+        XCTAssertEqual(merged[2].quantity, 1)
+    }
+
+    func testDividedIsCookingContextButOtherQualifiersRemain() {
+        let merged = GroceryMerge.mergeInserts([
+            insert("extra-virgin olive oil (Divided)", 2, "tbsp"),
+            insert("olive oil", 1, "tbsp"),
+            insert("extra-virgin olive oil, Clarified Butter, or ghee", 1, "cup"),
+        ])
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged[0].name, "extra-virgin olive oil")
+        XCTAssertEqual(merged[0].quantity, 3)
+        XCTAssertEqual(merged[1].quantity, 1)
+        for name in ["tomatoes (14 ounces)", "cilantro (optional)", "salt (to taste)",
+                     "flour (gluten-free)", "olive oil (divided, plus extra)"] {
+            XCTAssertEqual(GroceryMerge.shoppingName(name), name)
+        }
+        XCTAssertEqual(GroceryMerge.shoppingLabel("broth or water"), "Choose one: broth or water")
+        XCTAssertEqual(GroceryMerge.shoppingLabel("coriander"), "coriander")
+        XCTAssertEqual(GroceryMerge.shoppingLabel("olive oil (divided)"), "olive oil")
+    }
+
     func testUnitConversionFamilies() {
         // US volume
         XCTAssertEqual(GroceryMerge.convert(1, from: "tbsp", to: "tsp"), 3)
@@ -194,6 +228,42 @@ final class GroceryMergeServiceTests: XCTestCase {
         XCTAssertTrue(settled)
         XCTAssertEqual(service.items.count, 1)
         XCTAssertEqual(service.items.first?.quantity, 1)
+    }
+
+    @MainActor
+    func testAlternativeAndDividedMealsKeepIndependentContributions() async throws {
+        let service = GroceryService()
+        let monday = UUID(), wednesday = UUID(), friday = UUID()
+        let manual = await service.addItems([insert("olive oil (divided)", 1, "tbsp")])
+        XCTAssertTrue(manual)
+        let first = await service.addItemsForMealPlan(mealPlanID: monday, items: [
+            insert("arrowroot flour (or tapioca flour)", 2, "tsp"),
+            insert("olive oil", 2, "tbsp"),
+        ])
+        let second = await service.addItemsForMealPlan(mealPlanID: wednesday, items: [
+            insert("arrowroot flour or tapioca", 2, "tsp"),
+            insert("extra-virgin olive oil (divided)", 0.25, "cup"),
+        ])
+        let third = await service.addItemsForMealPlan(mealPlanID: friday, items: [
+            insert("extra-virgin olive oil, Clarified Butter, or ghee", 1, "cup"),
+        ])
+        XCTAssertTrue(first && second && third)
+        XCTAssertEqual(service.items.count, 3)
+        XCTAssertEqual(service.items.first { GroceryMerge.normalizeName($0.name) == "olive oil" }?.quantity, 7)
+        XCTAssertEqual(service.items.first { $0.name.contains("arrowroot") }?.quantity, 4)
+        let fetchedLinks = await service.fetchContributions(forMealPlans: [wednesday])
+        let links = try XCTUnwrap(fetchedLinks)
+        XCTAssertEqual(links.count, 2)
+        let settled = await service.settleContributions(links)
+        XCTAssertTrue(settled)
+        XCTAssertEqual(service.items.first { GroceryMerge.normalizeName($0.name) == "olive oil" }?.quantity, 3)
+        XCTAssertEqual(service.items.first { $0.name.contains("arrowroot") }?.quantity, 2)
+        let fetchedRemaining = await service.fetchContributions(forMealPlans: [monday, friday])
+        let remaining = try XCTUnwrap(fetchedRemaining)
+        let settledRemaining = await service.settleContributions(remaining)
+        XCTAssertTrue(settledRemaining)
+        XCTAssertEqual(service.items.count, 1)
+        XCTAssertEqual(service.items.first?.quantity, 1, "Manual oil survives both meal removals")
     }
 
     @MainActor

@@ -39,6 +39,10 @@ enum GroceryMerge {
         "extra-virgin olive oil": "olive oil",
         "extra virgin olive oil": "olive oil",
         "evoo": "olive oil",
+        // These observed scan variants describe the SAME pair of choices.
+        // Never alias either choice to arrowroot alone or tapioca alone.
+        "arrowroot flour (or tapioca flour)": "arrowroot flour or tapioca flour",
+        "arrowroot flour or tapioca": "arrowroot flour or tapioca flour",
     ]
 
     /// Trim, lowercase, collapse internal whitespace, then apply the
@@ -59,7 +63,23 @@ enum GroceryMerge {
         name.replacingOccurrences(
             of: #"^\s*\[For\s+[^\]]+\]\s*"#,
             with: "", options: [.regularExpression, .caseInsensitive]
+        ).replacingOccurrences(
+            // A cooking instruction, not a separate product. Keep other
+            // parentheses (alternatives, package sizes, optional) intact.
+            of: #"\s*\(divided\)\s*$"#,
+            with: "", options: [.regularExpression, .caseInsensitive]
         ).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Preserve all alternatives; never silently pick or sum each option.
+    static func hasAlternatives(_ name: String) -> Bool {
+        shoppingName(name).range(of: #"\bor\b"#,
+                                 options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    static func shoppingLabel(_ name: String) -> String {
+        let cleaned = shoppingName(name)
+        return hasAlternatives(cleaned) ? "Choose one: \(cleaned)" : cleaned
     }
 
     /// Restrict heading detection to the explicit legacy "For the …"
