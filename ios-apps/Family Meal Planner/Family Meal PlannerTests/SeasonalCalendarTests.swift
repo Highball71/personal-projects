@@ -63,4 +63,23 @@ final class SeasonalCalendarTests: XCTestCase {
         XCTAssertNil(calendar.produce(for: .northeast, month: 0))
         XCTAssertNil(calendar.produce(for: .northeast, month: 13))
     }
+
+    func testAutomaticPaletteFollowsNorthernSeasons() {
+        XCTAssertEqual(SeasonalPalette.automatic(month: 3, southernHemisphere: false), .spring)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 6, southernHemisphere: false), .summer)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 9, southernHemisphere: false), .autumn)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 12, southernHemisphere: false), .winter)
+    }
+
+    func testAutomaticPaletteReversesForSouthernHemisphere() {
+        XCTAssertEqual(SeasonalPalette.automatic(month: 3, southernHemisphere: true), .autumn)
+        XCTAssertEqual(SeasonalPalette.automatic(month: 9, southernHemisphere: true), .spring)
+    }
+
+    func testPalettesHaveDistinctAccents() {
+        let lightAccents = Set(SeasonalPalette.allCases.map { $0.accent.light })
+        let darkAccents = Set(SeasonalPalette.allCases.map { $0.accent.dark })
+        XCTAssertEqual(lightAccents.count, SeasonalPalette.allCases.count)
+        XCTAssertEqual(darkAccents.count, SeasonalPalette.allCases.count)
+    }
 }
