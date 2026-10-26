@@ -16,21 +16,23 @@ enum SeasonalPalette: String, CaseIterable, Identifiable {
         }
     }
 
-    // Dark inks on light paper and brighter equivalents on dark paper.
+    // Distinct, high-contrast inks on light paper and brighter equivalents
+    // on dark paper. The automatic date calendar can add special moments
+    // later without changing this stable seasonal foundation.
     var accent: (light: String, dark: String) {
         switch self {
-        case .spring: return ("356441", "A0D5A9")
-        case .summer: return ("AA392F", "FFAAA0")
-        case .autumn: return ("BB3510", "FF956E")
-        case .winter: return ("205E58", "8CD0C7")
+        case .spring: return ("176B45", "8FE0B0")
+        case .summer: return ("B52A35", "FF9EA5")
+        case .autumn: return ("C74612", "FFAA7A")
+        case .winter: return ("126B78", "86D7DE")
         }
     }
     var pale: (light: String, dark: String) {
         switch self {
-        case .spring: return ("E7EEDF", "253429")
-        case .summer: return ("FBE7DE", "402A28")
-        case .autumn: return ("FCE9DB", "422B22")
-        case .winter: return ("E2EEEA", "203431")
+        case .spring: return ("E3F3E8", "20372A")
+        case .summer: return ("FBE2E5", "402326")
+        case .autumn: return ("FBE8D9", "43281D")
+        case .winter: return ("DFF2F3", "1E3538")
         }
     }
 }
