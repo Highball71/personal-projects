@@ -60,7 +60,8 @@ struct CookbookPhotoStepView: View {
                             .font(.headline).frame(maxWidth: .infinity, minHeight: 48)
                             .foregroundStyle(.white)
                             .background(Color.fluffyButtonFill, in: RoundedRectangle(cornerRadius: 12))
-                    }.disabled(image == nil || saving || loadingImage)
+                    }
+                    .disabled(saving)
                     Button(isAfterScan ? "Skip for now" : "Cancel", action: onFinish)
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }.padding(20).frame(maxWidth: 640)
@@ -98,7 +99,13 @@ struct CookbookPhotoStepView: View {
     }
 
     private func save() async {
-        guard let image, !saving else { return }
+        guard !saving else { return }
+        guard let image else {
+            errorMessage = loadingImage
+                ? "The photo is still loading. Please wait a moment and try again."
+                : "Choose or photograph the cookbook picture before saving."
+            return
+        }
         saving = true
         defer { saving = false }
         do {
