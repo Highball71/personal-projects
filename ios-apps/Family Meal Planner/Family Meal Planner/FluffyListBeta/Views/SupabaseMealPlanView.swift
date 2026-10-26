@@ -1208,6 +1208,8 @@ struct RecipePickerSheet: View {
                 if leftCount != rightCount { return leftCount > rightCount }
                 return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
+            .prefix(5)
+            .map { $0 }
     }
 
     var body: some View {
