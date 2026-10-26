@@ -100,6 +100,9 @@ struct SupabaseSettingsView: View {
                     settingsGroup("Appearance") {
                         pickerRow(label: "Color calendar", selection: $seasonalPalette,
                                   options: ["Automatic"] + SeasonalPalette.allCases.map(\.rawValue))
+                        Text("Automatic follows the date; choose a season to preview or override it.")
+                            .font(.caption)
+                            .foregroundStyle(Color.fluffySecondary)
                         if seasonalPalette == "Automatic" {
                             toggleRow(label: "Southern hemisphere", detail: "Reverse the seasonal color calendar", isOn: $southernHemisphereColors)
                         }
