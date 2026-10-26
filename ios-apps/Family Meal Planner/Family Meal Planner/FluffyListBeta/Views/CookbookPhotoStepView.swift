@@ -33,16 +33,23 @@ struct CookbookPhotoStepView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .accessibilityLabel("Selected cookbook photo")
                     }
+                    Text("Choose one to add the cookbook picture")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.fluffySecondary)
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
                         Button { showingCamera = true } label: {
                             Label("Photograph the book’s picture", systemImage: "camera")
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .frame(maxWidth: .infinity, minHeight: 52)
                         }
+                        .foregroundStyle(.white)
+                        .background(Color.fluffyButtonFill, in: RoundedRectangle(cornerRadius: 12))
                     }
                     PhotosPicker(selection: $selection, matching: .images) {
                         Label("Choose from library", systemImage: "photo.on.rectangle")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 48)
                     }
+                    .foregroundStyle(Color.fluffyButtonFill)
+                    .background(Color.fluffyButtonFill.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                     if loadingImage { ProgressView("Loading photo") }
                     Text("Cookbook photo · Private to your household")
                         .font(.caption.weight(.semibold))
