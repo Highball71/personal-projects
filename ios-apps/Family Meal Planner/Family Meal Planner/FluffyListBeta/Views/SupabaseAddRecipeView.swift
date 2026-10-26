@@ -1071,7 +1071,11 @@ struct SupabaseAddRecipeView: View {
             case .networkError:
                 extractionError = "Connection timed out. Please try again in a moment."
             case .httpError(let statusCode, _):
-                extractionError = "Server error (\(statusCode)). Please try again."
+                if statusCode == 401 {
+                    extractionError = "Recipe scanning needs a fresh authorization. Rebuild FluffyList, then try the scan again."
+                } else {
+                    extractionError = "Server error (\(statusCode)). Please try again."
+                }
             case .decodingError, .emptyResponse:
                 extractionError = "Got a response but couldn't parse the recipe. Please try again."
             }
