@@ -440,7 +440,7 @@ struct SupabaseAddRecipeView: View {
                     Text("Scan a recipe page")
                         .font(.custom(FluffyFace.semibold, size: 16))
                         .foregroundStyle(Color.fluffyPrimary)
-                    Text("Read a cookbook page or recipe card. The first page is kept as your source.")
+                    Text("Read a cookbook page or recipe card. The original scan is saved with the recipe; a dish photo comes later.")
                         .font(.custom(FluffyFace.italic, size: 13))
                         .foregroundStyle(Color.fluffySecondary)
                 }
