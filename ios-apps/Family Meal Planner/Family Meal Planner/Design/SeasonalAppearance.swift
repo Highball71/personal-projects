@@ -23,7 +23,9 @@ enum SeasonalPalette: String, CaseIterable, Identifiable {
         switch self {
         case .spring: return ("176B45", "8FE0B0")
         case .summer: return ("B52A35", "FF9EA5")
-        case .autumn: return ("C74612", "FFAA7A")
+        // Same hue as the original C74612, a touch darker so it clears
+        // 4.5:1 on fluffyCard (C74612 was 4.15:1).
+        case .autumn: return ("BA4111", "FFAA7A")
         // Clear primary blue — never teal (banned across David's apps).
         case .winter: return ("1F5FC4", "8AB8FF")
         }

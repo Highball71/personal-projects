@@ -509,4 +509,5 @@ Branched from main `d7915bf`. Reduces real-world failures in the hybrid redesign
 - **Winter accent** is primary blue `#1F5FC4` / `#8AB8FF` (pale `#E3EBF9` / `#1D283B`); the teal is gone. Other seasons untouched.
 - Dead code removed (detail kicker/source-attribution/homemade prompt; add-recipe success overlay); stale comments fixed (recipe-list hero and "Recently added", tab bar, detail title).
 - **Tests:** 312 → 327 (15 new in `ReliabilityPassTests`; two existing grocery tests now read `refreshError`). Before and after, the one failure is `HybridRedesignTests.testTextContrastInBothAppearances`: the **autumn** accent `#C74612` on `fluffyCard` is 4.15:1 (< 4.5). Pre-existing on main; left alone because other seasons were out of scope.
+- **Follow-up (same day):** autumn light accent `#C74612` → `#BA4111` (same 17° hue and saturation, slightly darker): 4.64:1 on `fluffyCard`, 5.10:1 on `fluffyBackground`. Dark `#FFAA7A` already passed (9.6:1 / 8.2:1) and is unchanged. The contrast test now passes.
 - Sim quirk again: "Application failed preflight checks" fixed by `xcrun simctl uninstall <udid> com.highball71.fluffylist.beta`.
