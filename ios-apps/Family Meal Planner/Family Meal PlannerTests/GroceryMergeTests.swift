@@ -286,12 +286,12 @@ final class GroceryMergeServiceTests: XCTestCase {
         XCTAssertFalse(failed)
         XCTAssertEqual(service.items.first?.name, "apple cider")
         XCTAssertEqual(service.lastRefreshedAt, firstUpdate)
-        XCTAssertNotNil(service.errorMessage)
+        XCTAssertNotNil(service.refreshError)
         XCTAssertFalse(service.isLoading)
         FakePostgRESTStore.shared.failGETTables = []
         let refreshed = await service.fetchItems()
         XCTAssertTrue(refreshed)
-        XCTAssertNil(service.errorMessage)
+        XCTAssertNil(service.refreshError)
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(service.lastRefreshedAt), firstUpdate)
         SupabaseManager.shared.setCurrentHousehold(UUID())
         let other = await service.fetchItems()
@@ -309,7 +309,7 @@ final class GroceryMergeServiceTests: XCTestCase {
         let updated = service.lastRefreshedAt
         FakePostgRESTStore.shared.cancelGroceryGET = true
         _ = await service.fetchItems()
-        XCTAssertNil(service.errorMessage)
+        XCTAssertNil(service.refreshError)
         XCTAssertEqual(service.lastRefreshedAt, updated)
         XCTAssertEqual(service.items.first?.name, "apple cider")
         XCTAssertFalse(service.isLoading)

@@ -24,7 +24,8 @@ enum SeasonalPalette: String, CaseIterable, Identifiable {
         case .spring: return ("176B45", "8FE0B0")
         case .summer: return ("B52A35", "FF9EA5")
         case .autumn: return ("C74612", "FFAA7A")
-        case .winter: return ("126B78", "86D7DE")
+        // Clear primary blue — never teal (banned across David's apps).
+        case .winter: return ("1F5FC4", "8AB8FF")
         }
     }
     var pale: (light: String, dark: String) {
@@ -32,7 +33,7 @@ enum SeasonalPalette: String, CaseIterable, Identifiable {
         case .spring: return ("E3F3E8", "20372A")
         case .summer: return ("FBE2E5", "402326")
         case .autumn: return ("FBE8D9", "43281D")
-        case .winter: return ("DFF2F3", "1E3538")
+        case .winter: return ("E3EBF9", "1D283B")
         }
     }
 }

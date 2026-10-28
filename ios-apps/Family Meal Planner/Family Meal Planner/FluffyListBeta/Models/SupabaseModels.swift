@@ -169,8 +169,25 @@ struct RecipeRow: Codable, Identifiable, Equatable {
     }
 
     /// Map the Supabase category string to the existing RecipeCategory enum.
+    /// Stored values are mixed-case — the recipe form saves the enum's
+    /// raw value ("Breakfast") while scan/import defaults write lowercase
+    /// ("dinner") — so match case-insensitively. An exact-only match sent
+    /// every lowercase recipe to .dinner.
     var recipeCategory: RecipeCategory {
-        RecipeCategory(rawValue: category) ?? .dinner
+        matchedCategory ?? .dinner
+    }
+
+    /// Category as shown to people: "Dinner", "Side Dish". Unlike
+    /// recipeCategory, an unknown value is shown (capitalized) rather
+    /// than replaced by Dinner.
+    var categoryDisplayName: String {
+        matchedCategory?.rawValue ?? category.capitalized
+    }
+
+    private var matchedCategory: RecipeCategory? {
+        RecipeCategory.allCases.first {
+            $0.rawValue.caseInsensitiveCompare(category) == .orderedSame
+        }
     }
 }
 

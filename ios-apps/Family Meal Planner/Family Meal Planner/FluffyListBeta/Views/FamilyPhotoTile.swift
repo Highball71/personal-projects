@@ -31,8 +31,18 @@ struct FamilyPhotoTile: View {
             if !photo.caption.isEmpty { Text(photo.caption).font(.body) }
         }
         .task(id: photo.imagePath) {
-            do { url = try await FamilyPhotoService().imageURL(for: photo) }
-            catch { failed = true }
+            // A reused tile gets a new path: start clean, so the old
+            // photo or an old failure never shows for the new one.
+            url = nil
+            failed = false
+            do {
+                let signed = try await FamilyPhotoService().imageURL(for: photo)
+                guard !Task.isCancelled else { return }
+                url = signed
+            } catch {
+                guard !Task.isCancelled else { return }
+                failed = true
+            }
         }
     }
 }

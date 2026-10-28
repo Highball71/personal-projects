@@ -94,6 +94,32 @@ enum WeekOverlap {
         return result
     }
 
+    /// At most this many recipes in the picker's "Connects with this
+    /// week" section.
+    static let picksCap = 5
+
+    /// The recipes promoted into "Connects with this week": candidates
+    /// that have an entry in `overlaps` (from overlaps()), most shared
+    /// perishables first, ties alphabetical, capped at picksCap. The
+    /// picker's "Your pick" recipe is excluded — it already sits on top.
+    /// Promotion only: every pick still appears in All Recipes too.
+    static func picks(
+        from recipes: [RecipeRow],
+        overlaps: [UUID: [String]],
+        excluding excludedID: UUID? = nil
+    ) -> [RecipeRow] {
+        recipes
+            .filter { $0.id != excludedID && overlaps[$0.id] != nil }
+            .sorted { lhs, rhs in
+                let leftCount = overlaps[lhs.id]?.count ?? 0
+                let rightCount = overlaps[rhs.id]?.count ?? 0
+                if leftCount != rightCount { return leftCount > rightCount }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+            .prefix(picksCap)
+            .map { $0 }
+    }
+
     /// "Also uses cabbage, cilantro" — FluffyMetadataLine uppercases
     /// it. Names arrive already sorted and capped from overlaps().
     /// nonisolated for the same reason as SeasonalMatch.tokens: it's

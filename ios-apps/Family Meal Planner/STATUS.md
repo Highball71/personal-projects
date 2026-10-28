@@ -1,4 +1,5 @@
 # Family Meal Planner (FluffyList) — STATUS.md
+> **Stale since March 2026 — current state lives in [.context/HANDOFF.md](.context/HANDOFF.md).**
 **Last updated: 2026-03-29**
 
 ---

@@ -66,7 +66,7 @@ struct RecipeCardImage: View {
                     guard !Task.isCancelled else { return }
                     privateURL = signed
                 }
-                catch { privateFailed = true }
+                catch { if !Task.isCancelled { privateFailed = true } }
             }
         }
         .frame(height: height)

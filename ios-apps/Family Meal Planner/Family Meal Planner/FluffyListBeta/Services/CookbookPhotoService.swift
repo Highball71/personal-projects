@@ -30,8 +30,13 @@ final class CookbookPhotoService {
         }
     }
 
+    /// Signed display URL, reused from SignedURLCache while it has
+    /// more than ten minutes left — scrolling never re-signs.
     func imageURL(path: String) async throws -> URL {
-        try await client.storage.from(Self.bucket).createSignedURL(path: path, expiresIn: 3600)
+        let storage = client.storage.from(Self.bucket)
+        return try await SignedURLCache.shared.url(bucket: Self.bucket, path: path) { expiresIn in
+            try await storage.createSignedURL(path: path, expiresIn: expiresIn)
+        }
     }
 
     enum SaveError: Error { case cannotSave }

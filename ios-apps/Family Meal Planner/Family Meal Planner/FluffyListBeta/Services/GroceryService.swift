@@ -16,7 +16,15 @@ import Supabase
 final class GroceryService: ObservableObject {
     @Published var items: [SupabaseGroceryItem] = []
     @Published var isLoading = false
+    /// Last failed WRITE (add/check/delete/clear). Refreshes never
+    /// touch it — see refreshError.
     @Published var errorMessage: String?
+    /// Why the latest list refresh failed; nil when it succeeded, is in
+    /// flight, or was cancelled/superseded. Kept apart from
+    /// errorMessage so a write failing mid-refresh can't show up as
+    /// "Couldn't refresh your grocery list" (and a refresh can't wipe
+    /// a write's error).
+    @Published private(set) var refreshError: String?
     @Published private(set) var lastRefreshedAt: Date?
     private var fetchGeneration = 0
     private var loadedHouseholdID: UUID?
@@ -36,7 +44,7 @@ final class GroceryService: ObservableObject {
             items = []
             loadedHouseholdID = nil
             lastRefreshedAt = nil
-            errorMessage = nil
+            refreshError = nil
             isLoading = false
             return true
         }
@@ -46,7 +54,7 @@ final class GroceryService: ObservableObject {
             loadedHouseholdID = householdID
         }
         isLoading = true
-        errorMessage = nil
+        refreshError = nil
         defer { if generation == fetchGeneration { isLoading = false } }
 
         var lastError: Error?
@@ -68,7 +76,6 @@ final class GroceryService: ObservableObject {
                       !Task.isCancelled else { return false }
                 items = fetched
                 lastRefreshedAt = Date()
-                errorMessage = nil
                 return true
             } catch {
                 guard generation == fetchGeneration,
@@ -80,13 +87,24 @@ final class GroceryService: ObservableObject {
                 if attempt == 0 {
                     // Pull-to-refresh often races a brief connection wake-up.
                     // Retry once before surfacing an error over the cached list.
-                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    // `try` (not `try?`): a cancelled sleep throws, and a
+                    // cancelled refresh must never send the second request.
+                    do {
+                        try await Task.sleep(nanoseconds: 350_000_000)
+                    } catch {
+                        return false
+                    }
+                    // A newer refresh (or a household switch) started while
+                    // we slept — it owns the list now; don't retry.
+                    guard generation == fetchGeneration,
+                          SupabaseManager.shared.currentHouseholdID == householdID,
+                          !Task.isCancelled else { return false }
                 }
             }
         }
 
         if let lastError {
-            errorMessage = lastError.localizedDescription
+            refreshError = lastError.localizedDescription
         }
         // Keep the last successful list and timestamp for this household.
         return false

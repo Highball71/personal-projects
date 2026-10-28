@@ -39,6 +39,14 @@ final class FakePostgRESTStore: @unchecked Sendable {
     var failGETTables: Set<String> = []
     var cancelGroceryGET = false
 
+    /// Fail only the next N GETs to a table, then answer normally —
+    /// a brief connection blip, for testing retry-once paths.
+    var failNextGETs: [String: Int] = [:]
+
+    /// GET requests received per table, so tests can prove how many
+    /// fetches a code path actually sent.
+    private var getCounts: [String: Int] = [:]
+
     /// Table names whose DELETE requests silently affect zero rows —
     /// exactly what PostgREST does when RLS hides the target rows:
     /// HTTP success, empty representation, nothing deleted. Used to
@@ -63,6 +71,8 @@ final class FakePostgRESTStore: @unchecked Sendable {
         tables = ["meal_plans": [], "grocery_items": [], "grocery_contributions": []]
         failGETTables = []
         cancelGroceryGET = false
+        failNextGETs = [:]
+        getCounts = [:]
         rlsDeleteBlockedTables = []
         storageObjects = [:]
         storageUploadBlocked = false
@@ -71,6 +81,11 @@ final class FakePostgRESTStore: @unchecked Sendable {
     func storageObject(at key: String) -> Data? {
         lock.lock(); defer { lock.unlock() }
         return storageObjects[key]
+    }
+
+    func getCount(for table: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return getCounts[table] ?? 0
     }
 
     func rows(in table: String) -> [[String: Any]] {
@@ -150,7 +165,12 @@ final class FakePostgRESTStore: @unchecked Sendable {
 
         switch method {
         case "GET":
+            getCounts[table, default: 0] += 1
             if failGETTables.contains(table) {
+                return (500, Data(#"{"message":"injected failure"}"#.utf8))
+            }
+            if let remaining = failNextGETs[table], remaining > 0 {
+                failNextGETs[table] = remaining - 1
                 return (500, Data(#"{"message":"injected failure"}"#.utf8))
             }
             let matched = all.filter { Self.matches($0, filters) }

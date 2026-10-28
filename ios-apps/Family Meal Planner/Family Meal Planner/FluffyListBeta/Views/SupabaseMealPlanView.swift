@@ -1199,17 +1199,7 @@ struct RecipePickerSheet: View {
     /// above seasonal suggestions without removing them from All Recipes.
     /// More shared perishables lead; ties stay alphabetical.
     private var overlapPicks: [RecipeRow] {
-        let namesByID = overlaps
-        return recipes
-            .filter { $0.id != preselectedRecipeID && namesByID[$0.id] != nil }
-            .sorted { lhs, rhs in
-                let leftCount = namesByID[lhs.id]?.count ?? 0
-                let rightCount = namesByID[rhs.id]?.count ?? 0
-                if leftCount != rightCount { return leftCount > rightCount }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
-            .prefix(5)
-            .map { $0 }
+        WeekOverlap.picks(from: recipes, overlaps: overlaps, excluding: preselectedRecipeID)
     }
 
     var body: some View {

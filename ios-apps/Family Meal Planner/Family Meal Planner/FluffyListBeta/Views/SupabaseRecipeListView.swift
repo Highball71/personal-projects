@@ -105,7 +105,7 @@ struct SupabaseRecipeListView: View {
 
         return result.filter { recipe in
             let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
-            return (mealCategory == "All meals" || recipe.category == mealCategory)
+            return (mealCategory == "All meals" || recipe.categoryDisplayName == mealCategory)
                 && (maximumMinutes == 0 || (total > 0 && total <= maximumMinutes))
         }
     }
@@ -208,7 +208,9 @@ struct SupabaseRecipeListView: View {
                     Form {
                         Picker("Meal", selection: $mealCategory) {
                             Text("All meals").tag("All meals")
-                            ForEach(Array(Set(recipeService.recipes.map(\.category))).sorted(), id: \.self) { category in
+                            // Display names, so "dinner" and "Dinner"
+                            // rows share one "Dinner" option.
+                            ForEach(Array(Set(recipeService.recipes.map(\.categoryDisplayName))).sorted(), id: \.self) { category in
                                 Text(category).tag(category)
                             }
                         }
@@ -329,8 +331,10 @@ struct SupabaseRecipeListView: View {
                         .padding(.bottom, 12)
                     ruledRecipeList(displayedRecipes, leafIDs: leafIDs)
                 } else {
-                // Hero — full-width halftone image, square corners, no
-                // scrim; kicker, title, and metadata sit below it.
+                // Hero — inset card with rounded corners. With a dish
+                // photo, a dark gradient scrim carries the kicker,
+                // title, and metadata over the image; without one, they
+                // sit on a plain card.
                 if let hero = heroRecipe {
                     NavigationLink {
                         SupabaseRecipeDetailView(recipe: hero)
@@ -345,7 +349,7 @@ struct SupabaseRecipeListView: View {
                 categoryShelf
                     .padding(.bottom, 18)
 
-                // Recently added — a ruled vertical list, not a strip.
+                // Recently added — a horizontal strip of small cards.
                 if !recentlyAdded.isEmpty {
                     FluffySectionHead(title: "Recently added")
                         .padding(.horizontal, 22)
@@ -682,9 +686,9 @@ struct SupabaseRecipeListView: View {
     private func recipeSubtitle(_ recipe: RecipeRow) -> String {
         let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
         if total > 0 {
-            return "\(recipe.category) \u{00B7} \(total) min"
+            return "\(recipe.categoryDisplayName) \u{00B7} \(total) min"
         }
-        return recipe.category
+        return recipe.categoryDisplayName
     }
 
     // MARK: - Context Menu

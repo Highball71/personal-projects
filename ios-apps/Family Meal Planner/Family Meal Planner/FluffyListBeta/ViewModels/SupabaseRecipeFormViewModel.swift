@@ -50,7 +50,9 @@ final class SupabaseRecipeFormViewModel {
     init(recipe: RecipeRow, ingredients: [RecipeIngredientRow]) {
         recipeID = recipe.id
         name = recipe.name
-        category = RecipeCategory(rawValue: recipe.category) ?? .dinner
+        // Case-insensitive: a lowercase "breakfast" must not reopen as
+        // Dinner and get silently re-saved that way.
+        category = recipe.recipeCategory
         servings = recipe.servings
         prepTimeMinutes = recipe.prepTimeMinutes
         cookTimeMinutes = recipe.cookTimeMinutes

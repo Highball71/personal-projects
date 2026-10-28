@@ -4,19 +4,20 @@
 
 "Where things stand" is the current state. The dated entries further down are a chronological log — build numbers and "device pass owed" lines in them were true when written; later entries supersede them.
 
-Last updated: 2026-10-21 (week-overlap-badge rebased onto main, MacBook Air)
+Last updated: 2026-10-28 (reliability-pass branch; migration 016 status corrected, MacBook Air)
 
 ---
 
 ## Where things stand
 
-**main = `e3727ad`.** Every feature branch through `photo-attach-fixes` is merged (Press overhaul, per-person meals, seasonal, week nav, iPad phase 1, empty-week + region prompt, recipe-delete guard + grocery merge, photo-import accuracy arc, ingredient wording polish, photo-attach fixes). `e3727ad` adds the Xcode 27 project upgrade and the build-123 note.
+**main = `d7915bf`** — the hybrid redesign, fast-forward merged 2026-10-28; project build number is 129 (see the 2026-10-25/26 entries below; the build-123 line further down predates them). Before that, **main = `e3727ad`.** Every feature branch through `photo-attach-fixes` is merged (Press overhaul, per-person meals, seasonal, week nav, iPad phase 1, empty-week + region prompt, recipe-delete guard + grocery merge, photo-import accuracy arc, ingredient wording polish, photo-attach fixes). `e3727ad` adds the Xcode 27 project upgrade and the build-123 note.
 
 **Build 123 shipped 2026-09-24** (photo-attach fixes; migrations 018 + 019 applied to production). **NEXT BUILD NUMBER: 124.** TestFlight: five external testers; public link `https://testflight.apple.com/join/h6qxWgE1`.
 
 **Open branches (not merged):**
 - **`week-overlap-badge`** — Ingredient Chaining Phase 1: observational "ALSO USES CABBAGE, CILANTRO" line in the recipe picker. Built and rebased onto `e3727ad`; **289 tests, 0 failures** (272 + 8 `PhotoAttachTests` from main + 9 `WeekOverlapTests`), zero warnings. **Device pass owed — checklist in ACTIVE_TASK.md.** David merges after. Details in the 2026-10-21 entry at the bottom.
-- **`rls-membership-hardening`** — PR #2, migration 016. Unmerged; slated for a build after 123.
+- **`reliability-pass`** — 2026-10-28 fixes for real-world failures in the hybrid redesign (no features, no migrations, build number untouched). Pushed, **not merged — device pass owed.** Details in the 2026-10-28 entry at the bottom.
+- **`rls-membership-hardening`** — PR #2. **Migration 016: APPLIED to production 2026-09-14; SQL lives on unmerged branch rls-membership-hardening.** (Earlier entries calling 016 unapplied/pending are superseded.) The branch itself is still unmerged.
 
 **Open decisions:** whether the app needs the 001 `meal_suggestions` table that is missing on V2 (likely drop it with the legacy CloudKit stack — see the 2026-09-24 evening entry). Still untriaged from Kristin's tester list: pantry-scan recipe suggestions, community recipe section.
 
@@ -486,3 +487,26 @@ Moved on from grocery refresh as requested. Clarified the weekly planner action 
 David said the existing “Also uses…” line was easy to miss and asked whether connected meals should appear at the top, especially for proteins. Added a `Connects with this week` section to the recipe picker, above seasonal suggestions and below assignment chips. It promotes recipes sharing the most perishable ingredients, with alphabetical ties, while retaining every recipe in All Recipes and keeping the observational badge wording. No grocery or meal-write behavior changed. Mirrored to branch commit `c0616fb99d2096b518a98029ee87ab9e4fcd16c0`; no release uploaded.
 ### 2026-10-25 — Rolling Ingredient Chaining window
 David clarified that connected meals should look a few days ahead rather than stop at Saturday night. Changed the picker context from the calendar week to a rolling seven-day window beginning on the selected meal date. The planner quietly preloads the adjacent seven-day plan window and merges it without replacing the displayed week; a failed prefetch only removes extra suggestions and does not block planning. Mirrored to branch commits `4ff95ada1bc469f8bae732c45f932e02a246cbfd` and `44e6394932552879af0bc52cb3df6f927d887f6f`. No release uploaded.
+
+### 2026-10-26 — Commits on the hybrid redesign (recorded 2026-10-28)
+Landed on `codex/fluffylist-hybrid-redesign` and now on main via `d7915bf`:
+- **CloudKit lazy init** (`d9ebfff`) — the legacy CoreData+CloudKit stack no longer initializes on the Supabase path.
+- **Cookbook photo copy** (`b086a52`, `d684d0e`, `f2f756c`) — actionable save feedback, clearer cookbook-photo choices, scan vs dish photo roles explained.
+- **Scan-auth message** (`ad29d44`) — explained 401 scan failures. (Its wording was developer-facing; replaced on `reliability-pass`.)
+- **Palette refresh** (`c70b987`) — seasonal color calendar palette.
+- **Color-calendar tests** (`72011ee`, `6169184`) — automatic color calendar behavior tested and documented.
+- Also `7f43b76` — keep "Connects with this week" suggestions focused.
+
+### 2026-10-28 — `reliability-pass` branch (MacBook Air)
+Branched from main `d7915bf`. Reduces real-world failures in the hybrid redesign; no features, no visual redesign, no migrations, build number untouched (129). **Not merged; device pass owed.**
+- **Rolling ingredient window kept after edits.** `MealPlanService.fetchPlans(quiet: true)` now MERGES — it rewrites only its own seven dates and keeps the rest, so the next-week prefetch survives add/replace/remove reconciles. Loud fetches still replace wholesale (and `reloadWeek` re-prefetches).
+- **prefetchPlans** drops its result if a loud fetch (navigation/refresh) or a newer prefetch started meanwhile, and replaces its whole window so dates that came back empty are cleared.
+- **Grocery refresh** has its own state (`GroceryService.refreshError`); `errorMessage` is writes only, so a write failing mid-refresh no longer shows the "Couldn't refresh" banner. The retry sleep is cancellation-aware and re-checks the generation, so a cancelled/superseded refresh never sends the second request.
+- **Signed photo URLs** go through a new in-memory `SignedURLCache` (keyed by bucket+path, reused until 10 min before the 1-hour expiry; cleared on sign-out). `FamilyPhotoTile` resets its URL/failed state when the path changes.
+- **Captions** are truncated on add as well as update, via a shared helper that counts code points like Postgres `length()` (emoji-safe).
+- **Categories** display capitalized in search rows and the filter sheet (`RecipeRow.categoryDisplayName`). `recipeCategory` now matches case-insensitively — before, a lowercase "breakfast" showed as Dinner on the detail screen and the edit form re-saved it as Dinner.
+- **Scan 401** shows a user-facing message; the developer detail goes to the log.
+- **Winter accent** is primary blue `#1F5FC4` / `#8AB8FF` (pale `#E3EBF9` / `#1D283B`); the teal is gone. Other seasons untouched.
+- Dead code removed (detail kicker/source-attribution/homemade prompt; add-recipe success overlay); stale comments fixed (recipe-list hero and "Recently added", tab bar, detail title).
+- **Tests:** 312 → 327 (15 new in `ReliabilityPassTests`; two existing grocery tests now read `refreshError`). Before and after, the one failure is `HybridRedesignTests.testTextContrastInBothAppearances`: the **autumn** accent `#C74612` on `fluffyCard` is 4.15:1 (< 4.5). Pre-existing on main; left alone because other seasons were out of scope.
+- Sim quirk again: "Application failed preflight checks" fixed by `xcrun simctl uninstall <udid> com.highball71.fluffylist.beta`.

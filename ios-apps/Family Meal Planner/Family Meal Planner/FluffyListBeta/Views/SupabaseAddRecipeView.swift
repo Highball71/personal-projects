@@ -42,7 +42,6 @@ struct SupabaseAddRecipeView: View {
     @State private var extractionError: String?
     @State private var showingExtractionError = false
     @State private var showingCameraPermissionDenied = false
-    @State private var showingExtractionSuccess = false
     @State private var scannedRecipeForPhotoStep: RecipeRow?
     @State private var completedScan = false
     /// Set when an extraction completed but its recipe name collides
@@ -338,12 +337,11 @@ struct SupabaseAddRecipeView: View {
             }
     }
 
-    /// The three transient overlays (extraction spinner, extraction
-    /// success, grocery-added confirmation).
+    /// The two transient overlays (extraction spinner, grocery-added
+    /// confirmation).
     private func withOverlays<V: View>(_ content: V) -> some View {
         content
             .overlay { extractionOverlay }
-            .overlay { successOverlay }
             .overlay { groceryAddedOverlay }
     }
 
@@ -733,23 +731,6 @@ struct SupabaseAddRecipeView: View {
     }
 
     @ViewBuilder
-    private var successOverlay: some View {
-        if showingExtractionSuccess {
-            VStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(Color.fluffySuccess)
-                Text("Recipe saved")
-                    .font(.fluffyHeadline)
-                    .foregroundStyle(Color.fluffyPrimary)
-            }
-            .padding(24)
-            .background(.ultraThinMaterial)
-            .transition(.opacity)
-        }
-    }
-
-    @ViewBuilder
     private var groceryAddedOverlay: some View {
         if showingGroceryAddedConfirmation {
             VStack(spacing: 8) {
@@ -1072,7 +1053,12 @@ struct SupabaseAddRecipeView: View {
                 extractionError = "Connection timed out. Please try again in a moment."
             case .httpError(let statusCode, _):
                 if statusCode == 401 {
-                    extractionError = "Recipe scanning needs a fresh authorization. Rebuild FluffyList, then try the scan again."
+                    // The proxy rejected the app's shared secret — almost
+                    // always a build with a stale/missing proxy token in
+                    // Secrets.xcconfig. Nothing the user can fix; the
+                    // developer detail goes to the log only.
+                    Logger.supabase.error("Photo import: proxy returned 401 — the build's proxy token is missing or stale; rebuild with current Secrets.xcconfig")
+                    extractionError = "Recipe scanning isn't available right now. Please try again later, or type the recipe in by hand."
                 } else {
                     extractionError = "Server error (\(statusCode)). Please try again."
                 }

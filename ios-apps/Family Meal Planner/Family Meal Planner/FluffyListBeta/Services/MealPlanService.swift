@@ -70,6 +70,18 @@ final class MealPlanService: ObservableObject {
     /// so bumping and comparing it is race-free.
     private var fetchGeneration = 0
 
+    /// The fetchGeneration of the most recent LOUD fetch — the one that
+    /// replaces plansByDate wholesale (initial load, week navigation,
+    /// pull-to-refresh). A prefetch that started before it belongs to
+    /// a window that may no longer be next to the displayed week, so
+    /// it's dropped. Quiet reconciles don't count: they only rewrite
+    /// their own seven days, so a prefetch can safely land around them.
+    private var loudFetchGeneration = 0
+
+    /// Bumped by every prefetchPlans call, so an older prefetch that
+    /// lands late never overwrites a newer one's rows.
+    private var prefetchGeneration = 0
+
     /// Formats a Date as an ISO "YYYY-MM-DD" string for Postgres date columns.
     static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -95,6 +107,12 @@ final class MealPlanService: ObservableObject {
     /// local edit, where the screen already shows the expected result
     /// and the fetch only confirms it (or picks up another household
     /// member's concurrent changes).
+    ///
+    /// A loud fetch REPLACES plansByDate with this week. A quiet one
+    /// MERGES: it rewrites only the seven dates it fetched and keeps
+    /// every other date — notably the next-week window prefetchPlans
+    /// loaded for the picker's rolling "Connects with this week"
+    /// section, which an add/replace/remove reconcile used to wipe.
     @discardableResult
     func fetchPlans(weekStart: Date, quiet: Bool = false) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
@@ -111,6 +129,7 @@ final class MealPlanService: ObservableObject {
         if !quiet { isLoading = true }
         fetchGeneration += 1
         let generation = fetchGeneration
+        if !quiet { loudFetchGeneration = generation }
 
         do {
             let rows: [MealPlanRow] = try await supabase
@@ -126,11 +145,11 @@ final class MealPlanService: ObservableObject {
             // its week is the one on screen; drop this result whole.
             guard generation == fetchGeneration else { return true }
 
-            var map: [String: [MealPlanRow]] = [:]
-            for row in rows {
-                map[row.date, default: []].append(row)
+            if quiet {
+                plansByDate = Self.merging(rows, into: plansByDate, fromISO: startISO, toISO: endISO)
+            } else {
+                plansByDate = Dictionary(grouping: rows, by: \.date)
             }
-            plansByDate = map
 
             Logger.supabase.info("fetchPlans: loaded \(rows.count) plan(s)")
             if !quiet { isLoading = false }
@@ -159,30 +178,56 @@ final class MealPlanService: ObservableObject {
               let endDate = Calendar.current.date(byAdding: .day, value: dayCount, to: startDate)
         else { return false }
 
+        let startISO = Self.isoDate(from: startDate)
+        let endISO = Self.isoDate(from: endDate)
+        let startedAfterGeneration = fetchGeneration
+        prefetchGeneration += 1
+        let generation = prefetchGeneration
+
         do {
             let rows: [MealPlanRow] = try await supabase
                 .from("meal_plans")
                 .select()
                 .eq("household_id", value: householdID.uuidString)
-                .gte("date", value: Self.isoDate(from: startDate))
-                .lt("date", value: Self.isoDate(from: endDate))
+                .gte("date", value: startISO)
+                .lt("date", value: endISO)
                 .execute()
                 .value
 
+            // Drop the result if the household changed, the caller went
+            // away, a loud fetch replaced the week meanwhile (the window
+            // may no longer sit next to it), or a newer prefetch started.
             guard SupabaseManager.shared.currentHouseholdID == householdID,
-                  !Task.isCancelled else { return false }
+                  !Task.isCancelled,
+                  loudFetchGeneration <= startedAfterGeneration,
+                  generation == prefetchGeneration else { return false }
 
-            var merged = plansByDate
-            let windowRows = Dictionary(grouping: rows, by: \.date)
-            for (date, rowsForDate) in windowRows {
-                merged[date] = rowsForDate
-            }
-            plansByDate = merged
+            // Replace the whole window, so a meal removed elsewhere
+            // (another household member) leaves no stale date behind.
+            plansByDate = Self.merging(rows, into: plansByDate, fromISO: startISO, toISO: endISO)
             return true
         } catch {
             Logger.supabase.info("prefetchPlans: skipped future window — \(error.localizedDescription)")
             return false
         }
+    }
+
+    /// `existing` with every date in [fromISO, toISO) replaced by the
+    /// fetched `rows` — dates in the range that came back empty are
+    /// cleared, dates outside it are kept. ISO "yyyy-MM-dd" strings
+    /// sort chronologically, so plain string comparison matches the
+    /// query's gte/lt bounds exactly.
+    static func merging(
+        _ rows: [MealPlanRow],
+        into existing: [String: [MealPlanRow]],
+        fromISO: String,
+        toISO: String
+    ) -> [String: [MealPlanRow]] {
+        var merged = existing.filter { date, _ in !(date >= fromISO && date < toISO) }
+        for row in rows {
+            merged[row.date, default: []].append(row)
+        }
+        return merged
     }
 
     // MARK: - Add Meal

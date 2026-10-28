@@ -215,7 +215,9 @@ struct SupabaseGroceryListView: View {
         guard !Task.isCancelled else { return }
         // Ignore canceled/superseded refreshes; only the current request's
         // actual failure should produce a warning above a valid cached list.
-        fetchFailed = groceryService.errorMessage != nil
+        // refreshError (not errorMessage) so a write that failed during
+        // the refresh never masquerades as a failed fetch.
+        fetchFailed = groceryService.refreshError != nil
     }
 
     // MARK: - Loading / Failed Shell

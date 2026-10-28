@@ -130,6 +130,8 @@ final class AuthService: ObservableObject {
             sessionState = .signedOut
             SupabaseManager.shared.setCurrentUser(nil)
             SupabaseManager.shared.setCurrentHousehold(nil)
+            // Signed photo URLs grant access to the old household's files.
+            SignedURLCache.shared.removeAll()
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -593,21 +593,9 @@ struct SupabaseRecipeDetailView: View {
         }
     }
 
-    /// "From: seriouseats.com" — shared by both layouts.
-    @ViewBuilder
-    private var sourceAttributionText: some View {
-        if let source = sourceAttribution {
-            Text(source)
-                .font(.custom(FluffyFace.italic, size: 13))
-                .foregroundStyle(Color.fluffyTertiary)
-                .padding(.horizontal, 22)
-                .padding(.top, 20)
-        }
-    }
-
     // MARK: - Title
 
-    /// Ink-2 kicker, 36pt Bold title, one line of uppercase metadata.
+    /// Bold title (28pt compact, 34pt regular), one line of uppercase metadata.
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(recipe.name)
@@ -623,12 +611,8 @@ struct SupabaseRecipeDetailView: View {
         .padding(.top, 0)
     }
 
-    private var kickerText: String {
-        recipe.isFavorite ? "FAVOURITE" : recipe.category.uppercased()
-    }
-
     private var metadataText: String {
-        var parts = [recipe.recipeCategory.rawValue.capitalized]
+        var parts = [recipe.categoryDisplayName]
         if recipe.usesCookbookCover { parts.append("Cookbook photo") }
         if recipe.isFavorite { parts.append("Family favorite") }
         if totalMinutes > 0 { parts.append("\(totalMinutes) min") }
@@ -871,22 +855,6 @@ struct SupabaseRecipeDetailView: View {
     }
 
     // MARK: - Homemade Photo
-
-    private var homemadePhotoPrompt: some View {
-        Button {
-            showingHomemadePhotoPicker = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "camera")
-                    .font(.fluffyCallout)
-                Text("Made this? Add your photo")
-                    .font(.fluffyCallout)
-            }
-            .foregroundStyle(Color.fluffySecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-        }
-    }
 
     @ViewBuilder
     private var uploadingOverlay: some View {
