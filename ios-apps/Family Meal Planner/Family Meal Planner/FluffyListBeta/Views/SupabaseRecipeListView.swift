@@ -324,7 +324,7 @@ struct SupabaseRecipeListView: View {
             let leafIDs = seasonalIDs
             VStack(alignment: .leading, spacing: 0) {
                 if isFinding {
-                    Text("\(displayedRecipes.count) recipes" + (mealCategory == "All meals" ? "" : " · \(mealCategory)") + (maximumMinutes == 0 ? "" : " · ≤ \(maximumMinutes) min"))
+                    Text("\(displayedRecipes.count) recipes" + (mealCategory == "All meals" ? "" : " · \(mealCategory)") + (maximumMinutes == 0 ? "" : " · ≤ \(DurationText.totalTime(minutes: maximumMinutes))"))
                         .font(.subheadline)
                         .foregroundStyle(Color.fluffySecondary)
                         .padding(.horizontal, 22)
@@ -686,7 +686,7 @@ struct SupabaseRecipeListView: View {
     private func recipeSubtitle(_ recipe: RecipeRow) -> String {
         let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
         if total > 0 {
-            return "\(recipe.categoryDisplayName) \u{00B7} \(total) min"
+            return "\(recipe.categoryDisplayName) \u{00B7} \(DurationText.totalTime(minutes: total))"
         }
         return recipe.categoryDisplayName
     }
@@ -812,8 +812,11 @@ struct SupabaseRecipeListView: View {
     private func addToMealPlan(recipe: RecipeRow, date: Date, memberID: UUID? = nil) async {
         Logger.supabase.info("Recipe list: addToMealPlan recipe=\(recipe.id.uuidString) date=\(MealPlanService.isoDate(from: date)) member=\(memberID?.uuidString ?? "household")")
 
-        let result = await mealPlanService.addMealWithGroceries(
-            recipe: recipe,
+        // planMeal reconciles the Meals screen's whole planner span —
+        // never a loud reload of just this date's week, which replaced
+        // the week on screen and dropped the picker's rolling window.
+        let result = await mealPlanService.planMeal(
+            recipe,
             on: date,
             memberID: memberID,
             recipeService: recipeService,
@@ -822,13 +825,8 @@ struct SupabaseRecipeListView: View {
 
         guard result != nil else {
             actionErrorMessage = mealPlanService.errorMessage ?? "Couldn't add that meal. Please try again."
-            await mealPlanService.fetchPlans(weekStart: DateHelper.startOfWeek(containing: date), quiet: true)
             return
         }
-
-        await mealPlanService.fetchPlans(
-            weekStart: DateHelper.startOfWeek(containing: date)
-        )
 
         let f = DateFormatter()
         f.dateFormat = "EEEE"
@@ -882,68 +880,8 @@ enum SeasonalShelfSession {
 }
 
 // MARK: - Browse Tags
-
-/// Cuisine / ingredient-based filter tags for the recipe browse view.
-/// Matches recipes by scanning their name and ingredient list for keywords.
-private enum BrowseTag: String, CaseIterable, Identifiable {
-    case all        = "All"
-    case chicken    = "Chicken"
-    case pasta      = "Pasta"
-    case fish       = "Fish"
-    case vegetarian = "Vegetarian"
-    case pork       = "Pork"
-    case soups      = "Soups"
-
-    var id: String { rawValue }
-
-    /// Whether a recipe matches this tag based on its name and ingredients.
-    func matches(_ recipe: RecipeRow, ingredientNames: [String]?) -> Bool {
-        let nameLower = recipe.name.lowercased()
-        let ingredients = ingredientNames ?? []
-
-        func containsAny(_ keywords: [String]) -> Bool {
-            keywords.contains { kw in
-                nameLower.contains(kw) || ingredients.contains { $0.contains(kw) }
-            }
-        }
-
-        switch self {
-        case .all:
-            return true
-        case .chicken:
-            return containsAny(["chicken", "poultry"])
-        case .pasta:
-            return containsAny([
-                "pasta", "spaghetti", "penne", "linguine", "fettuccine",
-                "macaroni", "noodle", "lasagna", "rigatoni", "orzo",
-                "tortellini", "ravioli", "gnocchi"
-            ])
-        case .fish:
-            return containsAny([
-                "fish", "salmon", "tuna", "cod", "tilapia", "shrimp",
-                "seafood", "prawn", "crab", "lobster", "scallop",
-                "halibut", "mahi", "swordfish", "anchov"
-            ])
-        case .vegetarian:
-            // Negative match: no common meat/fish keywords
-            let meatKeywords = [
-                "chicken", "beef", "pork", "turkey", "lamb", "bacon",
-                "sausage", "ham", "steak", "prosciutto", "fish",
-                "salmon", "tuna", "shrimp", "prawn", "crab",
-                "lobster", "scallop", "anchov"
-            ]
-            return !containsAny(meatKeywords)
-        case .pork:
-            return containsAny([
-                "pork", "bacon", "ham", "prosciutto", "pancetta"
-            ])
-        case .soups:
-            return containsAny([
-                "soup", "stew", "chowder", "bisque", "broth", "chili"
-            ])
-        }
-    }
-}
+// BrowseTag (the category chips and their matching rules) lives in
+// Models/BrowseTag.swift.
 
 // MARK: - Day Picker Sheet
 

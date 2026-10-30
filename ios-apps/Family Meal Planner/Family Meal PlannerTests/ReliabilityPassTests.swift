@@ -7,10 +7,11 @@
 //
 //    - "Connects with this week" ranking (WeekOverlap.picks, lifted
 //      out of the picker view so it can be tested)
-//    - prefetchPlans: replaces its whole window (clears emptied dates)
-//      and drops results that a newer loud fetch has overtaken
-//    - the rolling next-week window survives the quiet reconcile that
-//      follows an add or remove
+//    - the planner load: one request for the week plus the rolling
+//      window, replacing stale dates; a superseded load is dropped
+//      (the 2026-10-28 prefetch tests, rewritten for the single-request
+//      planner on 2026-10-30 — the real add/remove path is pinned in
+//      ReliabilityPass2Tests)
 //    - grocery refresh: retries once after a blip; a cancelled refresh
 //      never sends the retry; refresh failure is its own state
 //    - SignedURLCache: reuse until ten minutes before expiry
@@ -99,12 +100,12 @@ final class ReliabilityPassTests: XCTestCase {
         XCTAssertTrue(WeekOverlap.picks(from: [recipe], overlaps: [:]).isEmpty)
     }
 
-    // MARK: - prefetchPlans
+    // MARK: - Planner load (the week + the rolling window)
 
-    /// Prefetch merges its window without touching the displayed week,
-    /// and a later prefetch clears a date whose meal is gone.
+    /// One loud planner load brings in the displayed week AND the seven
+    /// days after it, and a later load clears a date whose meal is gone.
     @MainActor
-    func testPrefetchMergesWindowAndClearsEmptiedDates() async throws {
+    func testPlannerLoadCoversWindowAndClearsEmptiedDates() async throws {
         let service = MealPlanService()
         let recipeID = TestFixtures.seedRecipe(householdID: Self.householdID, name: "Tacos")
         let nextWeek = day(7, from: today)
@@ -112,117 +113,51 @@ final class ReliabilityPassTests: XCTestCase {
                                       memberID: nil, dateISO: iso(today))
         let futurePlanID = TestFixtures.seedMealPlan(householdID: Self.householdID, recipeID: recipeID,
                                                      memberID: nil, dateISO: iso(day(2, from: nextWeek)))
+        // Past the window: never loaded.
+        _ = TestFixtures.seedMealPlan(householdID: Self.householdID, recipeID: recipeID,
+                                      memberID: nil, dateISO: iso(day(14, from: today)))
 
-        await service.fetchPlans(weekStart: today)
-        let prefetched = await service.prefetchPlans(startDate: nextWeek, dayCount: 7)
+        let loaded = await service.loadPlanner(weekStart: today)
 
-        XCTAssertTrue(prefetched)
-        XCTAssertEqual(service.plansByDate[iso(today)]?.count, 1, "displayed week untouched")
+        XCTAssertTrue(loaded)
+        XCTAssertEqual(service.plansByDate[iso(today)]?.count, 1)
         XCTAssertEqual(service.plansByDate[iso(day(2, from: nextWeek))]?.first?.id, futurePlanID)
+        XCTAssertNil(service.plansByDate[iso(day(14, from: today))], "the window is 14 days")
+        XCTAssertEqual(FakePostgRESTStore.shared.getCount(for: "meal_plans"), 1, "one request")
 
-        // Someone else removes the future meal; the next prefetch must
-        // clear that date, not leave the stale row behind.
+        // Someone else removes the future meal; the next load clears it.
         let other = MealPlanService()
         let removed = await other.removeMeal(futurePlanID, groceryService: GroceryService())
         XCTAssertTrue(removed)
-        let again = await service.prefetchPlans(startDate: nextWeek, dayCount: 7)
+        await service.loadPlanner(weekStart: today)
 
-        XCTAssertTrue(again)
         XCTAssertNil(service.plansByDate[iso(day(2, from: nextWeek))],
                      "a date that came back empty is cleared")
         XCTAssertEqual(service.plansByDate[iso(today)]?.count, 1)
     }
 
-    /// The generation guard: a loud fetch (week navigation) that starts
-    /// while a prefetch is in flight wins — the late prefetch result
-    /// belongs to the old week's window and is dropped.
+    /// Navigating while a load is in flight: the newer week's load
+    /// wins and the old one's rows never land on it.
     @MainActor
-    func testPrefetchDroppedWhenLoudFetchStartsMeanwhile() async throws {
+    func testSupersededPlannerLoadIsDropped() async throws {
         let service = MealPlanService()
         let recipeID = TestFixtures.seedRecipe(householdID: Self.householdID, name: "Tacos")
-        let nextWeek = day(7, from: today)
-        _ = TestFixtures.seedMealPlan(householdID: Self.householdID, recipeID: recipeID,
-                                      memberID: nil, dateISO: iso(day(1, from: nextWeek)))
-
-        // Start the prefetch and let it reach its network await…
-        let prefetch = Task { await service.prefetchPlans(startDate: nextWeek, dayCount: 7) }
-        await Task.yield()
-        // …then navigate: a loud fetch of a different week begins.
-        let lastWeek = day(-7, from: today)
-        let loaded = await service.fetchPlans(weekStart: lastWeek)
-        let prefetched = await prefetch.value
-
-        XCTAssertTrue(loaded)
-        XCTAssertFalse(prefetched, "an overtaken prefetch reports it was dropped")
-        XCTAssertNil(service.plansByDate[iso(day(1, from: nextWeek))],
-                     "the stale window never lands on the new week")
-    }
-
-    /// A QUIET reconcile is not navigation: a prefetch in flight around
-    /// one still lands.
-    @MainActor
-    func testPrefetchSurvivesQuietReconcileMeanwhile() async throws {
-        let service = MealPlanService()
-        let recipeID = TestFixtures.seedRecipe(householdID: Self.householdID, name: "Tacos")
-        let nextWeek = day(7, from: today)
-        _ = TestFixtures.seedMealPlan(householdID: Self.householdID, recipeID: recipeID,
-                                      memberID: nil, dateISO: iso(day(1, from: nextWeek)))
-        await service.fetchPlans(weekStart: today)
-
-        let prefetch = Task { await service.prefetchPlans(startDate: nextWeek, dayCount: 7) }
-        await Task.yield()
-        await service.fetchPlans(weekStart: today, quiet: true)
-        let prefetched = await prefetch.value
-
-        XCTAssertTrue(prefetched)
-        XCTAssertEqual(service.plansByDate[iso(day(1, from: nextWeek))]?.count, 1)
-    }
-
-    // MARK: - Rolling window survives add/remove
-
-    /// The bug: after an add or remove, the quiet reconcile replaced
-    /// plansByDate with only the displayed week, so next week's
-    /// prefetched days vanished and "Connects with this week" shrank
-    /// for a late-week pick. Quiet reconciles now merge.
-    @MainActor
-    func testRollingWindowSurvivesAddAndRemoveReconciles() async throws {
-        let service = MealPlanService()
-        let groceries = GroceryService()
-        let recipeID = TestFixtures.seedRecipe(householdID: Self.householdID, name: "Tacos")
-        let nextWeek = day(7, from: today)
-        let nextWeekISO = iso(day(1, from: nextWeek))
+        let nextWeekISO = iso(day(8, from: today))
         _ = TestFixtures.seedMealPlan(householdID: Self.householdID, recipeID: recipeID,
                                       memberID: nil, dateISO: nextWeekISO)
 
-        // What reloadWeek does: loud fetch, then prefetch next week.
-        await service.fetchPlans(weekStart: today)
-        await service.prefetchPlans(startDate: nextWeek, dayCount: 7)
-        XCTAssertEqual(service.plansByDate[nextWeekISO]?.count, 1)
+        let first = Task { await service.loadPlanner(weekStart: today) }
+        await Task.yield()
+        // Navigate back a week before the first load lands.
+        let lastWeek = day(-14, from: today)
+        let loaded = await service.loadPlanner(weekStart: lastWeek)
+        _ = await first.value
 
-        // Add a meal this week, then the quiet reconcile.
-        let added = await service.addMeal(recipeID: recipeID, on: day(3, from: today))
-        let newPlanID = try XCTUnwrap(added)
-        await service.fetchPlans(weekStart: today, quiet: true)
-
-        XCTAssertEqual(service.plansByDate[iso(day(3, from: today))]?.first?.id, newPlanID,
-                       "the reconcile picked up the new meal")
-        XCTAssertEqual(service.plansByDate[nextWeekISO]?.count, 1,
-                       "next week's prefetched day survived the add reconcile")
-
-        // Remove it again (optimistic local edit + server delete), then reconcile.
-        _ = service.removeLocalPlan(newPlanID, dateISO: iso(day(3, from: today)))
-        let removed = await service.removeMeal(newPlanID, groceryService: groceries)
-        XCTAssertTrue(removed)
-        await service.fetchPlans(weekStart: today, quiet: true)
-
-        XCTAssertNil(service.plansByDate[iso(day(3, from: today))])
-        XCTAssertEqual(service.plansByDate[nextWeekISO]?.count, 1,
-                       "next week's prefetched day survived the remove reconcile")
-
-        // A LOUD fetch (navigation / pull-to-refresh) still replaces
-        // wholesale — reloadWeek re-runs the prefetch after it.
-        await service.fetchPlans(weekStart: today)
-        XCTAssertNil(service.plansByDate[nextWeekISO])
+        XCTAssertTrue(loaded)
+        XCTAssertNil(service.plansByDate[nextWeekISO],
+                     "the superseded load's window never lands on the new week")
+        XCTAssertEqual(service.plannerWeekStart, lastWeek)
+        XCTAssertFalse(service.isLoading)
     }
 
     // MARK: - Grocery refresh

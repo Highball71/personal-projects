@@ -33,12 +33,12 @@ final class WeekSummaryTests: XCTestCase {
 
         let summary = WeekSummary.build(
             weekDates: dates, today: today, calendar: calendar,
-            hasMeal: { planned.contains($0) },
+            mealCount: { planned.contains($0) ? 1 : 0 },
             hasHouseholdMeal: { planned.contains($0) }
         )
         XCTAssertEqual(summary.openCount, 3, "Thu (today), Fri, Sun — never Mon–Wed")
         XCTAssertEqual(summary.plannedCount, 1)
-        XCTAssertEqual(summary.stateLine, "One dinner planned, three open.")
+        XCTAssertEqual(summary.stateLine, "One meal planned, three nights open.")
         XCTAssertEqual(summary.openNightsLine, "Three nights are still open.")
     }
 
@@ -51,7 +51,7 @@ final class WeekSummaryTests: XCTestCase {
 
         let summary = WeekSummary.build(
             weekDates: dates, today: today, calendar: calendar,
-            hasMeal: { household.contains($0) || $0 == memberOnly },
+            mealCount: { household.contains($0) || $0 == memberOnly ? 1 : 0 },
             hasHouseholdMeal: { household.contains($0) }
         )
         XCTAssertEqual(summary.openCount, 1, "only Friday's household slot is open")
@@ -67,7 +67,7 @@ final class WeekSummaryTests: XCTestCase {
 
         let summary = WeekSummary.build(
             weekDates: dates, today: today, calendar: calendar,
-            hasMeal: { household.contains($0) },
+            mealCount: { household.contains($0) ? 1 : 0 },
             hasHouseholdMeal: { household.contains($0) }
         )
         XCTAssertEqual(summary.openCount, 0)
@@ -80,12 +80,42 @@ final class WeekSummaryTests: XCTestCase {
         let (dates, today) = week(todayOffset: 0)
         let summary = WeekSummary.build(
             weekDates: dates, today: today, calendar: calendar,
-            hasMeal: { _ in false },
+            mealCount: { _ in 0 },
             hasHouseholdMeal: { _ in false }
         )
         XCTAssertEqual(summary.plannedCount, 0)
         XCTAssertEqual(summary.openCount, 7, "Monday morning: the whole week is open")
         XCTAssertEqual(summary.stateLine, "Nothing planned yet.")
         XCTAssertEqual(summary.openNightsLine, "Seven nights are still open.")
+    }
+
+    /// Device pass 2026-10-29: a Monday breakfast and a Wednesday side
+    /// dish were counted as "dinners", and a day holding two meals
+    /// counted once. The line now counts every planned meal, by name.
+    func testCountsEveryMealNotDinnerDays() {
+        let (dates, today) = week(todayOffset: 0)
+        // Mon: breakfast + dinner, Wed: a side dish, Thu: dinner.
+        let meals = [dates[0]: 2, dates[2]: 1, dates[3]: 1]
+
+        let summary = WeekSummary.build(
+            weekDates: dates, today: today, calendar: calendar,
+            mealCount: { meals[$0] ?? 0 },
+            hasHouseholdMeal: { meals[$0] != nil }
+        )
+        XCTAssertEqual(summary.plannedCount, 4)
+        XCTAssertEqual(summary.openCount, 4, "Tue, Fri, Sat, Sun")
+        XCTAssertEqual(summary.stateLine, "Four meals planned, four nights open.")
+        XCTAssertFalse(summary.stateLine.contains("dinner"))
+    }
+
+    /// One open night reads in the singular.
+    func testSingularOpenNight() {
+        let (dates, today) = week(todayOffset: 0)
+        let summary = WeekSummary.build(
+            weekDates: dates, today: today, calendar: calendar,
+            mealCount: { $0 == dates[6] ? 0 : 1 },
+            hasHouseholdMeal: { $0 != dates[6] }
+        )
+        XCTAssertEqual(summary.stateLine, "Six meals planned, one night open.")
     }
 }

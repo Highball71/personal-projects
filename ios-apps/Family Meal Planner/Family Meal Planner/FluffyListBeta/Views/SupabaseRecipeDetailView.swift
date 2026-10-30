@@ -47,6 +47,12 @@ struct SupabaseRecipeDetailView: View {
     @State private var photoHistoryAvailable = false
     @State private var loadingPhotoHistory = true
     @State private var photoCaption = ""
+    /// A family dish photo that's been picked and is waiting on its
+    /// optional note (the "photo, then note" sheet).
+    @State private var pendingDishPhoto: PendingDishPhoto?
+    /// A camera shot held until the camera cover has finished closing
+    /// — presenting the note sheet mid-dismissal can be dropped.
+    @State private var cameraDishPhoto: UIImage?
     @State private var managingPhotos = false
     @State private var editingPhoto: FamilyRecipePhoto?
     @State private var editedCaption = ""
@@ -114,6 +120,9 @@ struct SupabaseRecipeDetailView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        // No bar here, so nothing sat behind the clock once the page
+        // scrolled — give the status bar strip the page's paper.
+        .statusBarBackground()
         .confirmationDialog("Add a photo of your dish", isPresented: $showingDishPhotoOptions, titleVisibility: .visible) {
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("Take a dish photo") { showingDishCamera = true }
@@ -122,11 +131,19 @@ struct SupabaseRecipeDetailView: View {
         } message: {
             Text("For photos of food you cooked. Recipe pages stay under Original Recipe Source.")
         }
-        .fullScreenCover(isPresented: $showingDishCamera) {
-            CameraView { image in
-                showingDishCamera = false
-                if let image { Task { await uploadHomemadePhoto(image) } }
+        .fullScreenCover(isPresented: $showingDishCamera, onDismiss: {
+            if let image = cameraDishPhoto {
+                cameraDishPhoto = nil
+                Task { await receiveDishPhoto(image) }
             }
+        }) {
+            CameraView { image in
+                cameraDishPhoto = image
+                showingDishCamera = false
+            }
+        }
+        .sheet(item: $pendingDishPhoto) { pending in
+            dishPhotoNoteSheet(pending)
         }
         .sheet(isPresented: $showingGroceryPreview) {
             NavigationStack {
@@ -206,7 +223,7 @@ struct SupabaseRecipeDetailView: View {
             Task {
                 if let data = try? await newItem.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
-                    await uploadHomemadePhoto(image)
+                    await receiveDishPhoto(image)
                 } else {
                     actionErrorMessage = "That photo could not be opened. Please choose it again."
                 }
@@ -351,7 +368,7 @@ struct SupabaseRecipeDetailView: View {
     @ViewBuilder
     private var recipeFacts: some View {
         if totalMinutes > 0 {
-            Label("\(totalMinutes) min", systemImage: "clock")
+            Label(DurationText.totalTime(minutes: totalMinutes), systemImage: "clock")
                 .padding(12).background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 14))
         }
         if recipe.servings > 0 {
@@ -365,10 +382,9 @@ struct SupabaseRecipeDetailView: View {
             if loadingPhotoHistory {
                 ProgressView("Loading family photos")
             } else if photoHistoryAvailable {
-                TextField("A note about this meal (optional)", text: $photoCaption, prompt: Text("A note about this meal (optional)").foregroundStyle(Color.fluffySecondary), axis: .vertical)
-                    .foregroundStyle(Color.fluffyPrimary)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: photoCaption) { _, value in photoCaption = String(value.prefix(2000)) }
+                // Photo first; the optional note is asked for once the
+                // photo is chosen (dishPhotoNoteSheet). The note box used
+                // to sit above this button, so you typed before picking.
                 Button { useLegacyPhotoSave = false; showingDishPhotoOptions = true } label: {
                     Label("Made this recipe? Add a dish photo", systemImage: "camera")
                         .font(.body).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
@@ -392,8 +408,17 @@ struct SupabaseRecipeDetailView: View {
             HStack {
                 FluffySectionHead(title: "Our Family Photos")
                 Spacer()
-                Button(managingPhotos ? "Done" : "Manage") { managingPhotos.toggle() }.frame(minHeight: 44)
-                    .disabled(!photoHistoryAvailable || savingPhotoChange)
+                // Only when there's something to manage.
+                if !familyHistory.isEmpty {
+                    Button(managingPhotos ? "Done" : "Edit photos") { managingPhotos.toggle() }
+                        .frame(minHeight: 44)
+                        .disabled(!photoHistoryAvailable || savingPhotoChange)
+                }
+            }
+            if managingPhotos {
+                Text("Use Photo options under a photo to edit its note, make it the recipe cover, or archive it. Archived photos are hidden from this recipe and only show here while editing.")
+                    .font(.callout).foregroundStyle(Color.fluffySecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if managingPhotos && recipe.familyCoverImagePath != nil {
                 Button("Reset recipe cover") { Task { await setPhotoCover(nil) } }
@@ -408,7 +433,7 @@ struct SupabaseRecipeDetailView: View {
                         }
                         if photo.isArchived { Text("Archived").font(.caption).foregroundStyle(Color.fluffySecondary) }
                         if managingPhotos {
-                            Menu("Photo options") {
+                            Menu {
                                 Button("Edit note") { editedCaption = photo.caption; editingPhoto = photo }
                                 if !photo.isArchived {
                                     Button("Use as recipe cover") { Task { await setPhotoCover(photo) } }
@@ -417,6 +442,8 @@ struct SupabaseRecipeDetailView: View {
                                     Task { await updatePhoto(photo, caption: photo.caption, archived: !photo.isArchived) }
                                 }
                                 .disabled(recipe.familyCoverImagePath == photo.imagePath)
+                            } label: {
+                                Label("Photo options", systemImage: "ellipsis.circle")
                             }
                             .frame(minHeight: 44).disabled(savingPhotoChange)
                         }
@@ -615,7 +642,7 @@ struct SupabaseRecipeDetailView: View {
         var parts = [recipe.categoryDisplayName]
         if recipe.usesCookbookCover { parts.append("Cookbook photo") }
         if recipe.isFavorite { parts.append("Family favorite") }
-        if totalMinutes > 0 { parts.append("\(totalMinutes) min") }
+        if totalMinutes > 0 { parts.append(DurationText.totalTime(minutes: totalMinutes)) }
         return parts.joined(separator: " \u{00B7} ")
     }
 
@@ -871,6 +898,56 @@ struct SupabaseRecipeDetailView: View {
         }
     }
 
+    /// A photo arrived from the camera or the library. The legacy
+    /// single-photo save uploads straight away (it has no note); a
+    /// family photo asks for its optional note first.
+    private func receiveDishPhoto(_ image: UIImage) async {
+        if useLegacyPhotoSave {
+            await uploadHomemadePhoto(image)
+            return
+        }
+        photoCaption = ""
+        pendingDishPhoto = PendingDishPhoto(image: image)
+    }
+
+    /// Step two of adding a family photo: the chosen photo, an
+    /// optional note, then Save Photo.
+    private func dishPhotoNoteSheet(_ pending: PendingDishPhoto) -> some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Color.fluffyCard
+                        .frame(height: 240)
+                        .overlay {
+                            Image(uiImage: pending.image).resizable().scaledToFill()
+                        }
+                        .clipped()
+                        .listRowInsets(EdgeInsets())
+                        .accessibilityLabel("The photo you chose")
+                }
+                Section {
+                    TextField("A note about this meal (optional)", text: $photoCaption, axis: .vertical)
+                        .onChange(of: photoCaption) { _, value in photoCaption = String(value.prefix(2000)) }
+                } footer: {
+                    Text("Who cooked it, what you changed, how it went. You can edit the note later.")
+                }
+            }
+            .navigationTitle("Add a note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { pendingDishPhoto = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save Photo") {
+                        pendingDishPhoto = nil
+                        Task { await uploadHomemadePhoto(pending.image) }
+                    }
+                }
+            }
+        }
+    }
+
     private func uploadHomemadePhoto(_ image: UIImage) async {
         isUploadingHomemade = true
         defer { isUploadingHomemade = false }
@@ -907,8 +984,11 @@ struct SupabaseRecipeDetailView: View {
     }
 
     private func addToMealPlan(date: Date, memberID: UUID? = nil) async {
-        let result = await mealPlanService.addMealWithGroceries(
-            recipe: recipe,
+        // planMeal reconciles the Meals screen's whole planner span —
+        // never a loud reload of just this date's week, which replaced
+        // the week on screen and dropped the picker's rolling window.
+        let result = await mealPlanService.planMeal(
+            recipe,
             on: date,
             memberID: memberID,
             recipeService: recipeService,
@@ -917,13 +997,8 @@ struct SupabaseRecipeDetailView: View {
 
         guard result != nil else {
             actionErrorMessage = mealPlanService.errorMessage ?? "Couldn't add that meal. Please try again."
-            await mealPlanService.fetchPlans(weekStart: DateHelper.startOfWeek(containing: date), quiet: true)
             return
         }
-
-        await mealPlanService.fetchPlans(
-            weekStart: DateHelper.startOfWeek(containing: date)
-        )
 
         let f = DateFormatter()
         f.dateFormat = "EEEE"
@@ -955,4 +1030,10 @@ private extension View {
             self
         }
     }
+}
+
+/// A family dish photo picked and waiting on its optional note.
+private struct PendingDishPhoto: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }

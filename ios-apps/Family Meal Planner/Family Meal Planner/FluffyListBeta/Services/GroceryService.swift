@@ -66,6 +66,11 @@ final class GroceryService: ObservableObject {
                     .eq("household_id", value: householdID.uuidString)
                     .order("is_checked", ascending: true)
                     .order("created_at", ascending: true)
+                    // This loop owns retrying. The SDK's own GET retry
+                    // (three more tries, 1 + 2 + 4 s apart) ran inside
+                    // each of our attempts, so offline the "Couldn't
+                    // refresh" banner took ~15 s of silent spinner.
+                    .retry(enabled: false)
                     .execute()
                     .value
 
@@ -108,6 +113,19 @@ final class GroceryService: ObservableObject {
         }
         // Keep the last successful list and timestamp for this household.
         return false
+    }
+
+    /// What the Grocery screen calls for pull-to-refresh, Retry, the
+    /// toolbar Refresh, and tab appear. The fetch runs in its own Task
+    /// so the CALLER being cancelled can't cancel it: SwiftUI cancels a
+    /// .refreshable task when the screen re-renders mid-refresh (and
+    /// isLoading flips at once), the request died as "cancelled", and a
+    /// cancelled refresh is deliberately silent — so an offline pull
+    /// never showed the banner (device pass 2026-10-29). Superseding
+    /// still works: a newer fetchItems bumps the generation.
+    @discardableResult
+    func refresh() async -> Bool {
+        await Task { await fetchItems() }.value
     }
 
     // MARK: - Create

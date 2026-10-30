@@ -39,6 +39,19 @@ final class FakePostgRESTStore: @unchecked Sendable {
     var failGETTables: Set<String> = []
     var cancelGroceryGET = false
 
+    /// Table names whose GET requests fail the way an iPhone in
+    /// Airplane mode does: no HTTP response at all, a URLError
+    /// .notConnectedToInternet. (HTTP 500 alone never exercised the
+    /// SDK's own network-error retries.)
+    var offlineGETTables: Set<String> = []
+
+    func isOffline(_ table: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard offlineGETTables.contains(table) else { return false }
+        getCounts[table, default: 0] += 1
+        return true
+    }
+
     /// Fail only the next N GETs to a table, then answer normally —
     /// a brief connection blip, for testing retry-once paths.
     var failNextGETs: [String: Int] = [:]
@@ -71,6 +84,7 @@ final class FakePostgRESTStore: @unchecked Sendable {
         tables = ["meal_plans": [], "grocery_items": [], "grocery_contributions": []]
         failGETTables = []
         cancelGroceryGET = false
+        offlineGETTables = []
         failNextGETs = [:]
         getCounts = [:]
         rlsDeleteBlockedTables = []
@@ -332,6 +346,12 @@ final class FakePostgRESTProtocol: URLProtocol {
         if FakePostgRESTStore.shared.cancelGroceryGET,
            request.httpMethod == "GET", request.url?.path == "/rest/v1/grocery_items" {
             client?.urlProtocol(self, didFailWithError: URLError(.cancelled))
+            return
+        }
+        if request.httpMethod == "GET",
+           let table = request.url?.path.components(separatedBy: "/rest/v1/").last,
+           FakePostgRESTStore.shared.isOffline(table) {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
             return
         }
         // Bodies arrive as a stream under URLProtocol, not httpBody.

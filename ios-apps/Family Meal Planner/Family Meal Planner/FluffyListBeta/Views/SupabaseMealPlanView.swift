@@ -202,8 +202,15 @@ struct SupabaseMealPlanView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.fluffyBackground, for: .navigationBar)
+            // Always draw the bar's paper background: with the default
+            // (automatic) visibility the week scrolled up under the
+            // clock and battery (device pass 2026-10-29).
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
             .refreshable {
-                await reloadWeek()
+                // A separate Task: SwiftUI can cancel the refresh task
+                // when the screen re-renders mid-refresh, and that
+                // cancelled the request itself. The spinner still waits.
+                await Task { await reloadWeek() }.value
             }
             .task(id: selectedTab) {
                 // Re-fires whenever the user switches into the Meals tab,
@@ -227,7 +234,7 @@ struct SupabaseMealPlanView: View {
                     // month boundary into a different harvest period.
                     seasonalMonth: Calendar.current.component(.month, from: context.date),
                     preselectedRecipeID: context.preselectedRecipeID,
-                    weekRecipeIDs: plannedRecipeIDs(inWeekContaining: context.date),
+                    weekRecipeIDs: mealPlanService.plannedRecipeIDs(from: context.date),
                     onPick: { recipe, memberID in
                         pickerContext = nil
                         Task { await addMeal(recipe, to: context.date, for: memberID) }
@@ -381,7 +388,7 @@ struct SupabaseMealPlanView: View {
     private var weekSummary: WeekSummary {
         WeekSummary.build(
             weekDates: weekDates,
-            hasMeal: { !plans(for: $0).isEmpty },
+            mealCount: { plans(for: $0).count },
             hasHouseholdMeal: { date in
                 !DayPlan.build(from: plans(for: date), members: householdService.members)
                     .householdMeals.isEmpty
@@ -767,7 +774,7 @@ struct SupabaseMealPlanView: View {
                         if member == nil {
                             let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
                             FluffyMetadataLine(text: total > 0
-                                 ? "\(recipe.category) \u{00B7} \(total) min"
+                                 ? "\(recipe.category) \u{00B7} \(DurationText.totalTime(minutes: total))"
                                  : recipe.category)
                         }
                     } else {
@@ -931,19 +938,6 @@ struct SupabaseMealPlanView: View {
             .filter { $0.recipeID != nil }
     }
 
-    /// Recipe IDs planned from `date` through the next six days —
-    /// household and member meals — for the picker's rolling overlap
-    /// window. Rows with no recipe (deleted recipes) are skipped.
-    private func plannedRecipeIDs(inWeekContaining date: Date) -> Set<UUID> {
-        let days = (0..<7).compactMap {
-            Calendar.current.date(byAdding: .day, value: $0, to: date)
-        }
-        return Set(days.flatMap { day in
-            (mealPlanService.plansByDate[MealPlanService.isoDate(from: day)] ?? [])
-                .compactMap(\.recipeID)
-        })
-    }
-
     /// Title shown above the Remove confirmation dialog —
     /// "Pasta Primavera" or "Pasta Primavera — for Maya".
     private var mealActionTitle: String {
@@ -1013,57 +1007,43 @@ struct SupabaseMealPlanView: View {
         return "Copied \(word(copied)) \(meals) from last week."
     }
 
-    /// Fetch the displayed week and record whether it succeeded, so a
-    /// failed load shows the retry banner instead of an empty week.
-    /// If the user navigated on while this fetch was in flight, its
-    /// result belongs to a week no longer shown — drop it.
+    /// Load the displayed week (plus the picker's rolling window after
+    /// it) and record whether it succeeded, so a failed load shows the
+    /// retry banner instead of an empty week. If the user navigated on
+    /// while this load was in flight, its result belongs to a week no
+    /// longer shown — drop it.
     private func reloadWeek() async {
         let target = weekStart
-        let ok = await mealPlanService.fetchPlans(weekStart: target)
+        let ok = await mealPlanService.loadPlanner(weekStart: target)
         guard !Task.isCancelled, target == weekStart else { return }
         fetchFailed = !ok
-        if ok,
-           let nextWindow = Calendar.current.date(byAdding: .day, value: 7, to: target) {
-            _ = await mealPlanService.prefetchPlans(startDate: nextWindow, dayCount: 7)
-        }
     }
 
+    /// The local half of an edit animates; the server half doesn't.
+    private func animateLocalEdit(_ change: () -> Void) {
+        withAnimation(.easeInOut(duration: 0.25), change)
+    }
+
+    /// Add or Replace through MealPlanService.planMeal — the same
+    /// write, local update, and planner reconcile every screen uses
+    /// (and the tests drive), so the week's rows never flicker and the
+    /// picker's rolling window is re-read after the edit.
     private func addMeal(_ recipe: RecipeRow, to date: Date, for memberID: UUID? = nil) async {
         isAssigning = true
         defer { isAssigning = false }
 
-        let result = await mealPlanService.addMealWithGroceries(
-            recipe: recipe,
+        let newPlanID = await mealPlanService.planMeal(
+            recipe,
             on: date,
             memberID: memberID,
             recipeService: recipeService,
-            groceryService: groceryService
+            groceryService: groceryService,
+            applyLocally: animateLocalEdit
         )
-
-        guard let newPlanID = result else {
+        guard newPlanID != nil else {
             actionErrorMessage = mealPlanService.errorMessage ?? "Couldn't add that meal. Please try again."
-            await mealPlanService.fetchPlans(weekStart: DateHelper.startOfWeek(containing: date), quiet: true)
             return
         }
-
-        // The insert succeeded and we know the new row's id — apply
-        // the same change locally (replace this slot's rows with the
-        // new meal) instead of a full reloadWeek, so an add or Replace
-        // never makes the week's rows flicker. Then reconcile quietly
-        // against the server, which also picks up anything another
-        // household member changed meanwhile.
-        if let householdID = SupabaseManager.shared.currentHouseholdID {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                mealPlanService.replaceLocalSlot(with: MealPlanRow(
-                    id: newPlanID,
-                    householdID: householdID,
-                    recipeID: recipe.id,
-                    memberID: memberID,
-                    date: MealPlanService.isoDate(from: date)
-                ))
-            }
-        }
-        await mealPlanService.fetchPlans(weekStart: weekStart, quiet: true)
 
         let day = fullDayName(for: date)
         let memberName = memberID.flatMap { id in
@@ -1079,22 +1059,16 @@ struct SupabaseMealPlanView: View {
     /// the row animates out immediately, THEN the server delete runs;
     /// success reconciles quietly (no loading UI — the screen already
     /// shows the result), failure animates the row back and raises the
-    /// error banner. No full reloadWeek, so the rest of the week never
-    /// flickers.
+    /// error banner. See MealPlanService.unplanMeal.
     private func removeMeal(_ target: MealActionTarget) async {
         Logger.supabase.info("MealPlan removeMeal: plan=\(target.plan.id.uuidString)")
-        let iso = MealPlanService.isoDate(from: target.date)
-        let snapshot = withAnimation(.easeInOut(duration: 0.25)) {
-            mealPlanService.removeLocalPlan(target.plan.id, dateISO: iso)
-        }
-
-        let removed = await mealPlanService.removeMeal(target.plan.id, groceryService: groceryService)
-        if removed {
-            await mealPlanService.fetchPlans(weekStart: weekStart, quiet: true)
-        } else {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                mealPlanService.restoreLocalPlans(snapshot, dateISO: iso)
-            }
+        let removed = await mealPlanService.unplanMeal(
+            target.plan.id,
+            on: target.date,
+            groceryService: groceryService,
+            applyLocally: animateLocalEdit
+        )
+        if !removed {
             actionErrorMessage = "Couldn't remove that meal. Please try again."
         }
     }
@@ -1104,18 +1078,12 @@ struct SupabaseMealPlanView: View {
     /// Same optimistic shape as removeMeal, for the whole date.
     private func removeSlot(date: Date) async {
         Logger.supabase.info("MealPlan removeSlot: date=\(MealPlanService.isoDate(from: date))")
-        let iso = MealPlanService.isoDate(from: date)
-        let snapshot = withAnimation(.easeInOut(duration: 0.25)) {
-            mealPlanService.removeLocalDay(dateISO: iso)
-        }
-
-        let cleared = await mealPlanService.clearDayWithGroceries(on: date, groceryService: groceryService)
-        if cleared {
-            await mealPlanService.fetchPlans(weekStart: weekStart, quiet: true)
-        } else {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                mealPlanService.restoreLocalPlans(snapshot, dateISO: iso)
-            }
+        let cleared = await mealPlanService.unplanDay(
+            date,
+            groceryService: groceryService,
+            applyLocally: animateLocalEdit
+        )
+        if !cleared {
             actionErrorMessage = "Couldn't remove that meal. Please try again."
         }
     }

@@ -211,12 +211,12 @@ struct SupabaseGroceryListView: View {
     /// Fetch grocery items and record whether it succeeded, so a failed
     /// load shows the retry banner instead of an empty state.
     private func reloadGroceries() async {
-        _ = await groceryService.fetchItems()
-        guard !Task.isCancelled else { return }
-        // Ignore canceled/superseded refreshes; only the current request's
-        // actual failure should produce a warning above a valid cached list.
-        // refreshError (not errorMessage) so a write that failed during
-        // the refresh never masquerades as a failed fetch.
+        // refresh() survives this task being cancelled (see there), so
+        // the outcome is always recorded. A superseded refresh leaves
+        // refreshError to the newer one. refreshError (not errorMessage)
+        // so a write that failed during the refresh never masquerades
+        // as a failed fetch.
+        await groceryService.refresh()
         fetchFailed = groceryService.refreshError != nil
     }
 

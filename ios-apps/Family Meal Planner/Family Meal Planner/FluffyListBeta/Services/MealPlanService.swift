@@ -55,8 +55,9 @@ enum MealSlotScope: Equatable {
 
 @MainActor
 final class MealPlanService: ObservableObject {
-    /// Plans for the currently-loaded week, keyed by ISO date string.
-    /// Each date maps to an array of meal plan rows (multi-meal per day).
+    /// Plans for the loaded planner span (the displayed week plus the
+    /// seven days after it), keyed by ISO date string. Each date maps
+    /// to an array of meal plan rows (multi-meal per day).
     @Published var plansByDate: [String: [MealPlanRow]] = [:]
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -70,17 +71,16 @@ final class MealPlanService: ObservableObject {
     /// so bumping and comparing it is race-free.
     private var fetchGeneration = 0
 
-    /// The fetchGeneration of the most recent LOUD fetch — the one that
-    /// replaces plansByDate wholesale (initial load, week navigation,
-    /// pull-to-refresh). A prefetch that started before it belongs to
-    /// a window that may no longer be next to the displayed week, so
-    /// it's dropped. Quiet reconciles don't count: they only rewrite
-    /// their own seven days, so a prefetch can safely land around them.
-    private var loudFetchGeneration = 0
+    /// The week the Meals screen is showing — set by loadPlanner. Every
+    /// quiet reconcile re-reads this week plus the window after it, so
+    /// callers never have to know (or guess) which week is on screen.
+    private(set) var plannerWeekStart: Date?
 
-    /// Bumped by every prefetchPlans call, so an older prefetch that
-    /// lands late never overwrites a newer one's rows.
-    private var prefetchGeneration = 0
+    /// Days the Meals screen keeps loaded: the displayed week plus the
+    /// seven days after it. The recipe picker's "Connects with this
+    /// week" looks seven days ahead of the day being planned, so a
+    /// Thursday pick reaches into next Sunday through Wednesday.
+    static let plannerDayCount = 14
 
     /// Formats a Date as an ISO "YYYY-MM-DD" string for Postgres date columns.
     static let dateFormatter: DateFormatter = {
@@ -98,30 +98,29 @@ final class MealPlanService: ObservableObject {
 
     // MARK: - Fetch
 
-    /// Load all meal plans for the 7 days starting at weekStart.
+    /// Load all meal plans for the `dayCount` days (default 7) starting
+    /// at weekStart.
     /// Returns false when the load failed (so the UI can show an error
     /// instead of an empty week); discardable for legacy call sites.
     ///
-    /// `quiet` reconciles without announcing: isLoading is never
-    /// touched, so no loading UI appears — used after an optimistic
+    /// `quiet` reconciles without announcing: it never raises
+    /// isLoading, so no loading UI appears — used after an optimistic
     /// local edit, where the screen already shows the expected result
     /// and the fetch only confirms it (or picks up another household
     /// member's concurrent changes).
     ///
-    /// A loud fetch REPLACES plansByDate with this week. A quiet one
-    /// MERGES: it rewrites only the seven dates it fetched and keeps
-    /// every other date — notably the next-week window prefetchPlans
-    /// loaded for the picker's rolling "Connects with this week"
-    /// section, which an add/replace/remove reconcile used to wipe.
+    /// A loud fetch REPLACES plansByDate with the fetched days. A quiet
+    /// one MERGES: it rewrites only the dates it fetched and keeps
+    /// every other date.
     @discardableResult
-    func fetchPlans(weekStart: Date, quiet: Bool = false) async -> Bool {
+    func fetchPlans(weekStart: Date, dayCount: Int = 7, quiet: Bool = false) async -> Bool {
         guard let householdID = SupabaseManager.shared.currentHouseholdID else {
             Logger.supabase.warning("fetchPlans: no household ID set")
             plansByDate = [:]
             return true
         }
 
-        let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+        let weekEnd = Calendar.current.date(byAdding: .day, value: dayCount, to: weekStart) ?? weekStart
         let startISO = Self.isoDate(from: weekStart)
         let endISO = Self.isoDate(from: weekEnd)
 
@@ -129,7 +128,6 @@ final class MealPlanService: ObservableObject {
         if !quiet { isLoading = true }
         fetchGeneration += 1
         let generation = fetchGeneration
-        if !quiet { loudFetchGeneration = generation }
 
         do {
             let rows: [MealPlanRow] = try await supabase
@@ -152,7 +150,11 @@ final class MealPlanService: ObservableObject {
             }
 
             Logger.supabase.info("fetchPlans: loaded \(rows.count) plan(s)")
-            if !quiet { isLoading = false }
+            // Quiet or loud, the newest fetch landing means nothing is
+            // loading — a quiet reconcile can supersede a loud load
+            // (an edit finishing mid-navigation), and that load skips
+            // its own reset.
+            isLoading = false
             return true
         } catch {
             guard generation == fetchGeneration else { return true }
@@ -160,56 +162,53 @@ final class MealPlanService: ObservableObject {
             // A quiet reconcile failing is not an event: the local
             // state already shows the confirmed result, so no
             // errorMessage either — the next loud fetch will report.
-            if !quiet {
-                errorMessage = error.localizedDescription
-                isLoading = false
-            }
+            if !quiet { errorMessage = error.localizedDescription }
+            isLoading = false
             return false
         }
     }
 
-    /// Quietly preload a future planning window without replacing the week
-    /// currently shown on screen. Used by the recipe picker so ingredient
-    /// connections can cross a Sunday boundary.
+    // MARK: - Planner window (the Meals screen)
+
+    /// Loud load for the Meals screen — first appear, pull-to-refresh,
+    /// week navigation: the displayed week AND the seven days after it,
+    /// in one request, replacing plansByDate.
+    ///
+    /// One request on purpose. The window used to arrive in a second
+    /// "prefetch" request that only a full reload repeated, while
+    /// edits re-read just the displayed week — so anything that
+    /// replaced or dropped those days (recipe detail and the Recipes
+    /// tab planned meals with a loud seven-day fetch, for one) left
+    /// "Connects with this week" short until the user navigated away
+    /// and back (device pass 2026-10-29).
     @discardableResult
-    func prefetchPlans(startDate: Date, dayCount: Int) async -> Bool {
-        guard let householdID = SupabaseManager.shared.currentHouseholdID,
-              dayCount > 0,
-              let endDate = Calendar.current.date(byAdding: .day, value: dayCount, to: startDate)
-        else { return false }
+    func loadPlanner(weekStart: Date) async -> Bool {
+        plannerWeekStart = weekStart
+        return await fetchPlans(weekStart: weekStart, dayCount: Self.plannerDayCount)
+    }
 
-        let startISO = Self.isoDate(from: startDate)
-        let endISO = Self.isoDate(from: endDate)
-        let startedAfterGeneration = fetchGeneration
-        prefetchGeneration += 1
-        let generation = prefetchGeneration
+    /// Quiet re-read of the span loadPlanner loaded, merged in place.
+    /// Every add / Replace / Remove calls this afterwards — from any
+    /// screen — so the week AND the rolling window are fresh after an
+    /// edit, whatever happened to them before. No-op until the Meals
+    /// screen has loaded (it loads fresh on appear anyway).
+    @discardableResult
+    func reconcilePlanner() async -> Bool {
+        guard let start = plannerWeekStart else { return true }
+        return await fetchPlans(weekStart: start, dayCount: Self.plannerDayCount, quiet: true)
+    }
 
-        do {
-            let rows: [MealPlanRow] = try await supabase
-                .from("meal_plans")
-                .select()
-                .eq("household_id", value: householdID.uuidString)
-                .gte("date", value: startISO)
-                .lt("date", value: endISO)
-                .execute()
-                .value
-
-            // Drop the result if the household changed, the caller went
-            // away, a loud fetch replaced the week meanwhile (the window
-            // may no longer sit next to it), or a newer prefetch started.
-            guard SupabaseManager.shared.currentHouseholdID == householdID,
-                  !Task.isCancelled,
-                  loudFetchGeneration <= startedAfterGeneration,
-                  generation == prefetchGeneration else { return false }
-
-            // Replace the whole window, so a meal removed elsewhere
-            // (another household member) leaves no stale date behind.
-            plansByDate = Self.merging(rows, into: plansByDate, fromISO: startISO, toISO: endISO)
-            return true
-        } catch {
-            Logger.supabase.info("prefetchPlans: skipped future window — \(error.localizedDescription)")
-            return false
+    /// Recipe IDs planned from `date` through the next six days —
+    /// household and member meals — for the recipe picker's rolling
+    /// "Connects with this week" window. Rows with no recipe (deleted
+    /// recipes) are skipped.
+    func plannedRecipeIDs(from date: Date, dayCount: Int = 7) -> Set<UUID> {
+        let days = (0..<dayCount).compactMap {
+            Calendar.current.date(byAdding: .day, value: $0, to: date)
         }
+        return Set(days.flatMap { day in
+            (plansByDate[Self.isoDate(from: day)] ?? []).compactMap(\.recipeID)
+        })
     }
 
     /// `existing` with every date in [fromISO, toISO) replaced by the
@@ -440,6 +439,86 @@ final class MealPlanService: ObservableObject {
         // not stomp newer state), and no newer fetch exists yet to
         // clear it — so clear it here or it could stick true forever.
         isLoading = false
+    }
+
+    // MARK: - Planner edits (what the screens call)
+
+    /// Add or Replace, start to finish — the path every screen uses
+    /// to plan a meal: write through addMealWithGroceries, show the new
+    /// row at once (no week-row flicker), then reconcile the planner.
+    /// The reconcile runs on failure too, since a failed write can
+    /// still have changed the server (a cleared slot, a partial save).
+    ///
+    /// `applyLocally` wraps the local edit — the Meals screen passes
+    /// withAnimation; tests and other screens take the plain default.
+    func planMeal(
+        _ recipe: RecipeRow,
+        on date: Date,
+        memberID: UUID? = nil,
+        recipeService: RecipeService,
+        groceryService: GroceryService,
+        applyLocally: (() -> Void) -> Void = { $0() }
+    ) async -> UUID? {
+        let newPlanID = await addMealWithGroceries(
+            recipe: recipe,
+            on: date,
+            memberID: memberID,
+            recipeService: recipeService,
+            groceryService: groceryService
+        )
+        if let newPlanID, let householdID = SupabaseManager.shared.currentHouseholdID {
+            applyLocally {
+                replaceLocalSlot(with: MealPlanRow(
+                    id: newPlanID,
+                    householdID: householdID,
+                    recipeID: recipe.id,
+                    memberID: memberID,
+                    date: Self.isoDate(from: date)
+                ))
+            }
+        }
+        await reconcilePlanner()
+        return newPlanID
+    }
+
+    /// Remove one meal, optimistically: the row leaves at once, the
+    /// server delete (with its grocery unwind) runs, then success
+    /// reconciles the planner and failure puts the row back.
+    func unplanMeal(
+        _ planID: UUID,
+        on date: Date,
+        groceryService: GroceryService,
+        applyLocally: (() -> Void) -> Void = { $0() }
+    ) async -> Bool {
+        let iso = Self.isoDate(from: date)
+        var snapshot: [MealPlanRow]?
+        applyLocally { snapshot = removeLocalPlan(planID, dateISO: iso) }
+
+        guard await removeMeal(planID, groceryService: groceryService) else {
+            applyLocally { restoreLocalPlans(snapshot, dateISO: iso) }
+            return false
+        }
+        await reconcilePlanner()
+        return true
+    }
+
+    /// "Clear the Whole Day" — the same optimistic shape as
+    /// unplanMeal, for every meal on the date.
+    func unplanDay(
+        _ date: Date,
+        groceryService: GroceryService,
+        applyLocally: (() -> Void) -> Void = { $0() }
+    ) async -> Bool {
+        let iso = Self.isoDate(from: date)
+        var snapshot: [MealPlanRow]?
+        applyLocally { snapshot = removeLocalDay(dateISO: iso) }
+
+        guard await clearDayWithGroceries(on: date, groceryService: groceryService) else {
+            applyLocally { restoreLocalPlans(snapshot, dateISO: iso) }
+            return false
+        }
+        await reconcilePlanner()
+        return true
     }
 
     // MARK: - Remove Single Meal
