@@ -4,25 +4,31 @@
 
 "Where things stand" is the current state. The dated entries further down are a chronological log — build numbers and "device pass owed" lines in them were true when written; later entries supersede them.
 
-Last updated: 2026-10-30 (reliability-pass-2 branch, MacBook Air)
+Last updated: 2026-10-30 (main, Home iMac — build 130 shipped)
 
 ---
 
 ## Where things stand
 
-**main = `7e91b7d`** — `reliability-pass` (`a399eed` + `7e91b7d`) on top of `d7915bf`, the hybrid redesign fast-forward merged 2026-10-28; project build number is 129 (see the 2026-10-25/26 entries below; the build-123 line further down predates them). Before that, **main = `e3727ad`.** Every feature branch through `photo-attach-fixes` is merged (Press overhaul, per-person meals, seasonal, week nav, iPad phase 1, empty-week + region prompt, recipe-delete guard + grocery merge, photo-import accuracy arc, ingredient wording polish, photo-attach fixes). `e3727ad` adds the Xcode 27 project upgrade and the build-123 note.
+**main = `150f86d`** — `reliability-pass-2` (`150f86d`) on `reliability-pass` (`a399eed` + `7e91b7d`) on `d7915bf`, the hybrid redesign fast-forward merged 2026-10-28; all three device-passed. Project build number is 130. Before that, **main = `e3727ad`.** Every feature branch through `photo-attach-fixes` is merged (Press overhaul, per-person meals, seasonal, week nav, iPad phase 1, empty-week + region prompt, recipe-delete guard + grocery merge, photo-import accuracy arc, ingredient wording polish, photo-attach fixes). `e3727ad` adds the Xcode 27 project upgrade and the build-123 note.
 
-**Build 123 shipped 2026-09-24** (photo-attach fixes; migrations 018 + 019 applied to production). **NEXT BUILD NUMBER: 124.** TestFlight: five external testers; public link `https://testflight.apple.com/join/h6qxWgE1`.
+**Build 130 shipped 2026-10-30** (archived + uploaded from the Home iMac, main at `150f86d`: hybrid redesign + reliability-pass + reliability-pass-2; no new migrations). **NEXT BUILD NUMBER: 131.** (Build 123, 2026-09-24, was the last pre-redesign build; migrations 018 + 019 applied then.) TestFlight: five external testers; public link `https://testflight.apple.com/join/h6qxWgE1`.
 
 **Open branches (not merged):**
 - **`week-overlap-badge`** — Ingredient Chaining Phase 1: observational "ALSO USES CABBAGE, CILANTRO" line in the recipe picker. Built and rebased onto `e3727ad`; **289 tests, 0 failures** (272 + 8 `PhotoAttachTests` from main + 9 `WeekOverlapTests`), zero warnings. **Device pass owed — checklist in ACTIVE_TASK.md.** David merges after. Details in the 2026-10-21 entry at the bottom.
-- **`reliability-pass`** — now on main (see above). David's 12-step device pass (2026-10-29) failed or surfaced 7 items; those are on `reliability-pass-2`.
-- **`reliability-pass-2`** — 2026-10-30 fixes for the 7 device-pass items (no migrations, build number untouched at 129). Pushed, **not merged — device pass owed** (7-item checklist in the 2026-10-30 entry at the bottom).
+- **`content-filter-retry`** — two commits (`4670030` retry photo extraction once when Anthropic's content filter blocks the output; `a003523` attach the first scanned page as the recipe photo on photo import). Pushed, **not merged**; not in build 130.
 - **`rls-membership-hardening`** — PR #2. **Migration 016: APPLIED to production 2026-09-14; SQL lives on unmerged branch rls-membership-hardening.** (Earlier entries calling 016 unapplied/pending are superseded.) The branch itself is still unmerged.
 
 **Open decisions:** whether the app needs the 001 `meal_suggestions` table that is missing on V2 (likely drop it with the legacy CloudKit stack — see the 2026-09-24 evening entry). Still untriaged from Kristin's tester list: pantry-scan recipe suggestions, community recipe section.
 
 ---
+
+## Parked after build 130 (2026-10-30)
+
+- **Grocery note duplication** — a recipe's prep text can repeat in the grocery note (e.g. avocado prep text shown twice).
+- **Offline fresh-install banner wording** — when no grocery list has been saved yet, the offline banner copy doesn't fit the empty-list case.
+- **Status-bar overlap on Meals** — David is fine with it for now.
+- **`content-filter-retry` branch** still unmerged (see Open branches).
 
 ## Known issues / deferred (do not fix without a decision)
 
@@ -532,3 +538,5 @@ Branched from main `7e91b7d`. Fixes the 7 items David's 2026-10-29 iPhone pass o
   6. A long recipe shows "12 hr 30 min" (detail, Recipes list, Meals row).
   7. Add a dish photo: pick photo → note sheet → Save; Edit photos explains itself; tiles fill without gray bands.
 
+### 2026-10-30 — Build 130 shipped (Home iMac)
+`reliability-pass-2` device-passed and merged; main = `150f86d` (hybrid redesign + reliability-pass + reliability-pass-2). Archived + uploaded from the Home iMac as **build 130**; `CURRENT_PROJECT_VERSION` set to 130 in the project. **NEXT BUILD = 131.** No migrations. Parked: grocery note duplication (avocado prep text repeated), offline fresh-install banner wording when no list is saved, status-bar overlap on Meals (fine for now), and the still-unmerged `content-filter-retry` branch — see "Parked after build 130" near the top.
