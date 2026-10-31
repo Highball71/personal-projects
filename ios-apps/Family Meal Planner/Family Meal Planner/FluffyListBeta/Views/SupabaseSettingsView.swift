@@ -29,6 +29,8 @@ struct SupabaseSettingsView: View {
 
     @AppStorage("seasonalPalette") private var seasonalPalette = "Automatic"
     @AppStorage("southernHemisphereColors") private var southernHemisphereColors = false
+    /// Backdrop experiment: per-device page ground. Cream = shipped look.
+    @AppStorage("backdropExperiment") private var backdropChoice = FluffyBackdrop.cream.rawValue
 
     var body: some View {
         NavigationStack {
@@ -106,6 +108,11 @@ struct SupabaseSettingsView: View {
                         if seasonalPalette == "Automatic" {
                             toggleRow(label: "Southern hemisphere", detail: "Reverse the seasonal color calendar", isOn: $southernHemisphereColors)
                         }
+                        pickerRow(label: "Backdrop (experimental)", selection: $backdropChoice,
+                                  options: FluffyBackdrop.allCases.map(\.rawValue))
+                        Text("A cool sky behind the warm content — an experiment. Cream is today's look.")
+                            .font(.caption)
+                            .foregroundStyle(Color.fluffySecondary)
                     }
 
                     settingsGroup("App") {

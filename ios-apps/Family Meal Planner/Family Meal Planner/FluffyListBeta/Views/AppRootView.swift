@@ -31,6 +31,8 @@ struct AppRootView: View {
 
     @AppStorage("seasonalPalette") private var seasonalPalette = "Automatic"
     @AppStorage("southernHemisphereColors") private var southernHemisphereColors = false
+    /// Backdrop experiment: per-device page ground. Cream = shipped look.
+    @AppStorage("backdropExperiment") private var backdropChoice = FluffyBackdrop.cream.rawValue
 
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
@@ -55,6 +57,7 @@ struct AppRootView: View {
         .onAppear { refreshPalette() }
         .onChange(of: seasonalPalette) { _, _ in refreshPalette() }
         .onChange(of: southernHemisphereColors) { _, _ in refreshPalette() }
+        .onChange(of: backdropChoice) { _, _ in refreshPalette() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in refreshPalette() }
         .task {
             // Only check session if we're past onboarding and configured.
@@ -75,6 +78,7 @@ struct AppRootView: View {
 
     private func refreshPalette() {
         SeasonalAppearance.shared.refresh(choice: seasonalPalette, southernHemisphere: southernHemisphereColors)
+        SeasonalAppearance.shared.backdrop = FluffyBackdrop(rawValue: backdropChoice) ?? .cream
     }
 
     /// Routes on the auth-restore state so a returning user sees a brief
@@ -248,12 +252,27 @@ struct SupabaseContentView: View {
     /// screen for weekly planning.
     @State private var selectedTab: AppTab = .mealPlan
 
+    /// Backdrop experiment: the tab bar is UIKit appearance, set once,
+    /// so it must be rebuilt (and pushed to on-screen bars) when the
+    /// backdrop changes — SwiftUI's observation can't reach it.
+    @AppStorage("backdropExperiment") private var backdropChoice = FluffyBackdrop.cream.rawValue
+
     init() {
         // UITabBar appearance: The Press tab bar. SwiftUI's tabItem
         // can't set fonts/tracking, so this is configured once here.
+        // Read the backdrop straight from UserDefaults — at init time
+        // AppRootView's onAppear may not have primed the shared state.
+        let stored = UserDefaults.standard.string(forKey: "backdropExperiment") ?? ""
+        let appearance = Self.pressTabBarAppearance(backdrop: FluffyBackdrop(rawValue: stored) ?? .cream)
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
+    private static func pressTabBarAppearance(backdrop: FluffyBackdrop) -> UITabBarAppearance {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(Color.fluffyBackground)
+        appearance.backgroundColor = UIColor(
+            Color.fluffyAdaptive(backdrop.page.light, dark: backdrop.page.dark))
         // 1px ink top rule.
         appearance.shadowColor = UIColor(Color.fluffyPrimary)
 
@@ -274,8 +293,31 @@ struct SupabaseContentView: View {
             item.normal.titleTextAttributes = normalAttrs
             item.selected.titleTextAttributes = selectedAttrs
         }
+        return appearance
+    }
+
+    /// Re-applies the Press appearance to the proxy AND to tab bars
+    /// already on screen (the proxy only affects bars created later).
+    private static func refreshTabBars(choice: String) {
+        let appearance = pressTabBarAppearance(backdrop: FluffyBackdrop(rawValue: choice) ?? .cream)
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                applyToTabBars(in: window, appearance: appearance)
+            }
+        }
+    }
+
+    private static func applyToTabBars(in view: UIView, appearance: UITabBarAppearance) {
+        if let tabBar = view as? UITabBar {
+            tabBar.standardAppearance = appearance
+            tabBar.scrollEdgeAppearance = appearance
+        }
+        for subview in view.subviews {
+            applyToTabBars(in: subview, appearance: appearance)
+        }
     }
 
     var body: some View {
@@ -305,6 +347,9 @@ struct SupabaseContentView: View {
                 .tag(AppTab.settings)
         }
         .tint(Color.fluffyAccent)
+        .onChange(of: backdropChoice) { _, newChoice in
+            Self.refreshTabBars(choice: newChoice)
+        }
         .task {
             await householdService.loadCurrentHousehold()
             await recipeService.fetchRecipes()

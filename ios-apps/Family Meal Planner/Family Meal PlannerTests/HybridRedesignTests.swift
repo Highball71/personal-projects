@@ -62,21 +62,62 @@ final class HybridRedesignTests: XCTestCase {
             return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
         }
         let originalPalette = SeasonalAppearance.shared.palette
-        defer { SeasonalAppearance.shared.palette = originalPalette }
+        let originalBackdrop = SeasonalAppearance.shared.backdrop
+        defer {
+            SeasonalAppearance.shared.palette = originalPalette
+            SeasonalAppearance.shared.backdrop = originalBackdrop
+        }
         for text in [Color.fluffyPaperOnInk, .fluffyPaperDimOnInk] {
             let a = luminance(text, .dark), b = luminance(.fluffyInkGround, .dark)
             XCTAssertGreaterThanOrEqual((max(a,b) + 0.05) / (min(a,b) + 0.05), 4.5)
         }
+        // Backdrop experiment: fluffyBackground follows the chosen
+        // backdrop, so every text × season pair must clear 4.5:1 on
+        // every backdrop in both appearances, not just on cream.
+        for backdrop in FluffyBackdrop.allCases {
+            SeasonalAppearance.shared.backdrop = backdrop
         for palette in SeasonalPalette.allCases {
             SeasonalAppearance.shared.palette = palette
         for style in [UIUserInterfaceStyle.light, .dark] {
             for text in [Color.fluffyPrimary, .fluffySecondary, .fluffyAccent] {
                 for surface in [Color.fluffyBackground, .fluffyCard] {
                     let a = luminance(text, style), b = luminance(surface, style)
-                    XCTAssertGreaterThanOrEqual((max(a,b) + 0.05) / (min(a,b) + 0.05), 4.5)
+                    XCTAssertGreaterThanOrEqual(
+                        (max(a,b) + 0.05) / (min(a,b) + 0.05), 4.5,
+                        "\(backdrop.rawValue) backdrop, \(palette.rawValue), \(style == .dark ? "dark" : "light")")
                 }
             }
         }
+        }
+        }
+    }
+
+    /// Backdrop experiment hard rule: no teal or turquoise anywhere —
+    /// every sky backdrop hue stays between 205° and 225°. (Cream is
+    /// the shipped warm paper and is exempt by design.)
+    @MainActor
+    func testBackdropSkyHuesNeverDriftTowardTeal() {
+        func hueDegrees(_ hex: String) -> Double {
+            var int: UInt64 = 0
+            Scanner(string: hex).scanHexInt64(&int)
+            let r = Double((int >> 16) & 0xFF) / 255
+            let g = Double((int >> 8) & 0xFF) / 255
+            let b = Double(int & 0xFF) / 255
+            let maxC = max(r, g, b), minC = min(r, g, b)
+            let delta = maxC - minC
+            guard delta > 0 else { return 0 }
+            let hue: Double
+            if maxC == r      { hue = (g - b) / delta }
+            else if maxC == g { hue = 2 + (b - r) / delta }
+            else              { hue = 4 + (r - g) / delta }
+            return (hue * 60 + 360).truncatingRemainder(dividingBy: 360)
+        }
+        for backdrop in FluffyBackdrop.allCases where backdrop != .cream {
+            for hex in [backdrop.page.light, backdrop.page.dark] {
+                let hue = hueDegrees(hex)
+                XCTAssertGreaterThanOrEqual(hue, 205, "\(backdrop.rawValue) #\(hex) hue \(hue)")
+                XCTAssertLessThanOrEqual(hue, 225, "\(backdrop.rawValue) #\(hex) hue \(hue)")
+            }
         }
     }
 

@@ -10,14 +10,21 @@ extension Color {
 
     // -- Surfaces --
 
-    /// Paper ground — every screen (#F3F2F2)
-    static let fluffyBackground  = Color.fluffyAdaptive("FAF7F2", dark: "191715")
+    /// Page ground — every screen. Routed through the backdrop
+    /// experiment: Cream (the shipped paper) unless the device picks
+    /// a sky in Settings → Appearance. Computed like fluffyAccent so
+    /// views re-render when the choice changes.
+    static var fluffyBackground: Color {
+        let pair = SeasonalAppearance.shared.backdrop.page
+        return .fluffyAdaptive(pair.light, dark: pair.dark)
+    }
 
-    /// No longer a distinct surface; cards are gone. Same paper.
+    /// Cards/panels stay warm paper in every backdrop — they read as
+    /// a surface floating on the sky.
     static let fluffyCard        = Color.fluffyAdaptive("F1ECE6", dark: "292521")
 
-    /// Chrome is the same paper.
-    static let fluffyNavBar      = Color.fluffyAdaptive("FAF7F2", dark: "191715")
+    /// Chrome is the same ground as the page.
+    static var fluffyNavBar: Color { fluffyBackground }
 
     /// Ink ground — Store Mode background (#201E1D)
     static let fluffyInkGround   = Color(hex: "201E1D")

@@ -40,10 +40,40 @@ enum SeasonalPalette: String, CaseIterable, Identifiable {
     }
 }
 
+/// Backdrop experiment (2026-10-31, branch `backdrop-experiment`):
+/// the page ground behind every screen. Cream is the shipped look;
+/// the two skies test whether a cool backdrop makes the warm content
+/// (food photos, paper cards, seasonal accents) stand out more — the
+/// Pushing Daisies rule: blue only for skies. Cards and paper
+/// surfaces (`fluffyCard`) deliberately stay warm so they read as a
+/// surface floating on the sky. Device-only preference, like the
+/// seasonal palette.
+enum FluffyBackdrop: String, CaseIterable, Identifiable {
+    case cream = "Cream"
+    case paleSky = "Pale sky"
+    case sky = "Sky"
+    var id: String { rawValue }
+
+    /// Page-ground hex pair. Sky hues sit in the 205°–225° band —
+    /// never teal. Dark variants are deep night-sky navy, not grey.
+    var page: (light: String, dark: String) {
+        switch self {
+        case .cream:   return ("FAF7F2", "191715")
+        case .paleSky: return ("E8F2FC", "101C2E")
+        // Lightened from the proposed BFDDF6: the autumn accent
+        // (BA4111) only reached 3.9:1 on it. DCEDFB keeps every
+        // seasonal accent at ≥ 4.5:1 (autumn is the tightest, 4.56:1).
+        case .sky:     return ("DCEDFB", "0B1626")
+        }
+    }
+}
+
 @Observable
 final class SeasonalAppearance {
     static let shared = SeasonalAppearance()
     var palette: SeasonalPalette = .autumn
+    /// Backdrop experiment: which page ground every screen draws.
+    var backdrop: FluffyBackdrop = .cream
 
     func refresh(choice: String, southernHemisphere: Bool, date: Date = Date()) {
         palette = SeasonalPalette(rawValue: choice)

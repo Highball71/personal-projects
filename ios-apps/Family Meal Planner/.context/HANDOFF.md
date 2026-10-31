@@ -4,7 +4,7 @@
 
 "Where things stand" is the current state. The dated entries further down are a chronological log — build numbers and "device pass owed" lines in them were true when written; later entries supersede them.
 
-Last updated: 2026-10-30 (main, Home iMac — build 130 shipped)
+Last updated: 2026-10-31 (branch `backdrop-experiment`, MacBook Air — sky-backdrop design experiment)
 
 ---
 
@@ -540,3 +540,11 @@ Branched from main `7e91b7d`. Fixes the 7 items David's 2026-10-29 iPhone pass o
 
 ### 2026-10-30 — Build 130 shipped (Home iMac)
 `reliability-pass-2` device-passed and merged; main = `150f86d` (hybrid redesign + reliability-pass + reliability-pass-2). Archived + uploaded from the Home iMac as **build 130**; `CURRENT_PROJECT_VERSION` set to 130 in the project. **NEXT BUILD = 131.** No migrations. Parked: grocery note duplication (avocado prep text repeated), offline fresh-install banner wording when no list is saved, status-bar overlap on Meals (fine for now), and the still-unmerged `content-filter-retry` branch — see "Parked after build 130" near the top.
+
+### 2026-10-31 — Backdrop experiment (MacBook Air, branch `backdrop-experiment` — DO NOT MERGE)
+A design EXPERIMENT, not a redesign: does a cool sky-blue page ground make the warm content (food photos, paper cards, seasonal accents) pop more than the shipped cream? Pushing Daisies rule — blue only for skies. Branched off main at `1cab5db` (build 130). No migrations, build number untouched, **not for merging** — David evaluates on his phone and the branch is either promoted deliberately or deleted.
+- **How to switch:** Settings → Appearance → **"Backdrop (experimental)"** — Cream (shipped default), Pale sky, Sky. Per-device `@AppStorage("backdropExperiment")`; default Cream means nothing changes for anyone who doesn't touch it. Switching updates every screen live, tab bar included.
+- **What changed:** `FluffyBackdrop` enum in `Design/SeasonalAppearance.swift` (page-ground hex pairs); `Color.fluffyBackground` and `fluffyNavBar` are now computed from `SeasonalAppearance.shared.backdrop` (same observation pattern as `fluffyAccent`, so every screen already reading the token re-renders). AppRootView primes/refreshes the backdrop alongside the palette; SupabaseContentView rebuilds the UIKit tab-bar appearance on change (and pushes it to on-screen bars). `fluffyCard` and all text/accent/border tokens untouched — cards stay warm paper floating on the sky.
+- **Colors** (light / dark, hue): Cream `FAF7F2` 37.5° / `191715` 30° (unchanged shipped pair); Pale sky `E8F2FC` 210° / `101C2E` 216°; Sky `DCEDFB` 207° / `0B1626` 216°. Dark variants are night-sky navy, not grey. **Sky light was lightened from the proposed `BFDDF6`**: the autumn accent `BA4111` only reached 3.9:1 on it (summer 4.45:1); on `DCEDFB` every seasonal accent clears 4.5:1 (autumn is the tightest at 4.56:1).
+- **Tests:** 340 → 341, 0 failures before and after. `testTextContrastInBothAppearances` now loops all three backdrops × 4 seasons × light/dark (primary, secondary, accent on background + card — 4.5:1); new `testBackdropSkyHuesNeverDriftTowardTeal` pins both sky pairs inside the 205°–225° band (cream exempt by design).
+- **Known honest edges:** `fluffyTertiary` (checked/disabled text — checked grocery rows, PASSED day rows) is 4.31:1 on Sky light; WCAG exempts disabled text and the suite never covered tertiary, but it's the one sub-4.5 pair, noted here on purpose. WelcomeSplash's "Get started" label uses `fluffyBackground` as its text color on the ink-ground fill, so on a sky backdrop the label goes pale sky (contrast stays >13:1). Legacy CloudKit screens (`Views/`, `ContentView`) not routed — unreachable behind `useSupabase`. Store Mode keeps its fixed ink ground.
