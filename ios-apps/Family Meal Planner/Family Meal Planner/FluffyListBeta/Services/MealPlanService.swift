@@ -544,6 +544,7 @@ final class MealPlanService: ObservableObject {
         }
 
         // 2. Delete the meal plan row, verified.
+        var departingRecipeIDs: [UUID: UUID] = [:]
         do {
             let deleted: [MealPlanRow] = try await supabase
                 .from("meal_plans")
@@ -559,6 +560,7 @@ final class MealPlanService: ObservableObject {
                 return false
             }
             Logger.supabase.info("removeMeal: deleted")
+            for row in deleted { if let rid = row.recipeID { departingRecipeIDs[row.id] = rid } }
         } catch {
             Logger.supabase.error("removeMeal: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
@@ -566,7 +568,7 @@ final class MealPlanService: ObservableObject {
         }
 
         // 3. Settle groceries for the confirmed-deleted meal.
-        _ = await groceryService.settleContributions(snapshot)
+        _ = await groceryService.settleContributions(snapshot, departingRecipeIDs: departingRecipeIDs)
         return true
     }
 
@@ -714,6 +716,7 @@ final class MealPlanService: ObservableObject {
         // 3. Delete with .select() so we get back the rows the server
         //    actually removed.
         let deletedIDs: [UUID]
+        var departingRecipeIDs: [UUID: UUID] = [:]
         do {
             let query = supabase
                 .from("meal_plans")
@@ -725,6 +728,7 @@ final class MealPlanService: ObservableObject {
                 .execute()
                 .value
             deletedIDs = deleted.map(\.id)
+            for row in deleted { if let rid = row.recipeID { departingRecipeIDs[row.id] = rid } }
             Logger.supabase.info("clearMealsWithGroceries: server reported \(deletedIDs.count) row(s) deleted")
         } catch {
             Logger.supabase.error("clearMealsWithGroceries: delete failed — \(error.localizedDescription)")
@@ -743,7 +747,7 @@ final class MealPlanService: ObservableObject {
         //    the snapshot carries the amounts to subtract.
         let deletedSet = Set(deletedIDs)
         let toSettle = contributionSnapshot.filter { deletedSet.contains($0.mealPlanID) }
-        _ = await groceryService.settleContributions(toSettle)
+        _ = await groceryService.settleContributions(toSettle, departingRecipeIDs: departingRecipeIDs)
 
         if !afterRows.isEmpty {
             let leftover = afterRows.map { $0.id.uuidString }.joined(separator: ", ")

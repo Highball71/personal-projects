@@ -369,7 +369,16 @@ final class GroceryService: ObservableObject {
     /// contribution-row deletes just match nothing in that case.
     ///
     /// Safe to call with an empty array (no-op).
-    func settleContributions(_ contributions: [GroceryContributionRow]) async -> Bool {
+    ///
+    /// `departingRecipeIDs` (meal plan ID → recipe ID, captured from the
+    /// deleted meal_plans rows) lets a reduced row also shed the
+    /// departing meal's ingredient note. Without it the note stayed
+    /// behind and stacked with the next meal's ("…and diced; …cut into
+    /// large dice" on one avocado). Omit it and notes are untouched.
+    func settleContributions(
+        _ contributions: [GroceryContributionRow],
+        departingRecipeIDs: [UUID: UUID] = [:]
+    ) async -> Bool {
         guard !contributions.isEmpty else { return true }
 
         do {
@@ -407,11 +416,22 @@ final class GroceryService: ObservableObject {
                     Logger.supabase.info("settleContributions: deleted \"\(item.name)\" (would be \(newQty))")
                     // Cascade deletes the contribution row too.
                 } else {
-                    try await supabase
-                        .from("grocery_items")
-                        .update(["quantity": newQty])
-                        .eq("id", value: item.id.uuidString)
-                        .execute()
+                    let newNote = await noteAfterSettling(item, departing: contrib,
+                                                          departingRecipeIDs: departingRecipeIDs)
+                    if newNote != item.note {
+                        try await supabase
+                            .from("grocery_items")
+                            .update(QuantityNoteUpdate(quantity: newQty, note: newNote))
+                            .eq("id", value: item.id.uuidString)
+                            .execute()
+                        Logger.supabase.info("settleContributions: \"\(item.name)\" note now \"\(newNote ?? "")\"")
+                    } else {
+                        try await supabase
+                            .from("grocery_items")
+                            .update(["quantity": newQty])
+                            .eq("id", value: item.id.uuidString)
+                            .execute()
+                    }
 
                     try await supabase
                         .from("grocery_contributions")
@@ -429,6 +449,90 @@ final class GroceryService: ObservableObject {
             Logger.supabase.error("settleContributions: failed — \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    /// The row's note once `departing` leaves: its recipe's matching
+    /// ingredient notes are removed unless a meal still on the plan
+    /// contributes the same note. Best-effort — any lookup failure
+    /// keeps the note exactly as it was (never drops data on error).
+    private func noteAfterSettling(
+        _ item: SupabaseGroceryItem,
+        departing: GroceryContributionRow,
+        departingRecipeIDs: [UUID: UUID]
+    ) async -> String? {
+        guard let note = item.note, !note.isEmpty,
+              let departingRecipeID = departingRecipeIDs[departing.mealPlanID] else { return item.note }
+        let key = GroceryMerge.normalizeName(item.name)
+        do {
+            let departingNotes = try await ingredientNotes(recipeIDs: [departingRecipeID], matching: key)
+            guard !departingNotes.isEmpty else { return note }
+
+            // Meals still contributing to this row, and their notes.
+            let others: [GroceryContributionRow] = try await supabase
+                .from("grocery_contributions")
+                .select()
+                .eq("grocery_item_id", value: item.id.uuidString)
+                .neq("meal_plan_id", value: departing.mealPlanID.uuidString)
+                .execute()
+                .value
+            var remaining = Set<String>()
+            let otherPlanIDs = others.map(\.mealPlanID).filter { departingRecipeIDs[$0] == nil }
+            if !otherPlanIDs.isEmpty {
+                let plans: [PlanRecipeRef] = try await supabase
+                    .from("meal_plans")
+                    .select("id, recipe_id")
+                    .`in`("id", values: otherPlanIDs.map(\.uuidString))
+                    .execute()
+                    .value
+                let recipeIDs = plans.compactMap(\.recipeID)
+                remaining = Set(try await ingredientNotes(recipeIDs: recipeIDs, matching: key))
+            }
+            return GroceryMerge.noteRemovingDeparted(note, departingNotes: departingNotes,
+                                                     remainingNotes: remaining)
+        } catch {
+            Logger.supabase.error("settleContributions: note lookup failed for \"\(item.name)\" — keeping note (\(error.localizedDescription))")
+            return note
+        }
+    }
+
+    /// Notes on the given recipes' ingredients whose shopping name
+    /// merges onto the grocery row keyed `key`.
+    private func ingredientNotes(recipeIDs: [UUID], matching key: String) async throws -> [String] {
+        guard !recipeIDs.isEmpty else { return [] }
+        let rows: [IngredientNoteRef] = try await supabase
+            .from("recipe_ingredients")
+            .select("name, note")
+            .`in`("recipe_id", values: recipeIDs.map(\.uuidString))
+            .execute()
+            .value
+        return rows
+            .filter { GroceryMerge.normalizeName($0.name) == key }
+            .compactMap { $0.note?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    nonisolated private struct PlanRecipeRef: Decodable {
+        let id: UUID
+        let recipeID: UUID?
+        enum CodingKeys: String, CodingKey { case id; case recipeID = "recipe_id" }
+    }
+
+    nonisolated private struct IngredientNoteRef: Decodable {
+        let name: String
+        let note: String?
+    }
+
+    /// Writes quantity and note together; a nil note is written as SQL
+    /// NULL (the synthesized encoder would omit the key instead).
+    nonisolated private struct QuantityNoteUpdate: Encodable, Sendable {
+        let quantity: Double
+        let note: String?
+        enum CodingKeys: String, CodingKey { case quantity, note }
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(quantity, forKey: .quantity)
+            try c.encode(note, forKey: .note)
         }
     }
 

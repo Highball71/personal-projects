@@ -185,6 +185,27 @@ enum GroceryMerge {
         return "\(old); \(new)"
     }
 
+    /// The reverse of `joinedNotes` for a meal leaving the plan: drop
+    /// the departing meal's ingredient notes from the row's "; "-joined
+    /// note, unless a meal still on the plan contributes the same note.
+    /// Only whole, exactly matching fragments are removed — amount text
+    /// ("+ 2 tbsp") and anything else on the row is left untouched.
+    static func noteRemovingDeparted(
+        _ note: String?,
+        departingNotes: [String],
+        remainingNotes: Set<String>
+    ) -> String? {
+        guard let note else { return nil }
+        let leaving = Set(departingNotes
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && !remainingNotes.contains($0) })
+        guard !leaving.isEmpty else { return note }
+        let kept = note.components(separatedBy: "; ")
+            .filter { !leaving.contains($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        let joined = kept.joined(separator: "; ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return joined.isEmpty ? nil : joined
+    }
+
     // MARK: - Batch merge
 
     /// Merge a batch of inserts by normalized NAME. The first item of

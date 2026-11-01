@@ -25,6 +25,33 @@ final class GroceryMergeTests: XCTestCase {
         GroceryItemInsert(householdID: householdID, name: name, quantity: quantity, unit: unit)
     }
 
+    // Avocado, 2026-11-01: a removed meal's prep note stayed on the
+    // row and stacked with the next meal's.
+    func testDepartedMealNoteLeavesTheRow() {
+        let note = "split lengthwise, pitted, peeled, and diced; split lengthwise, pitted, peeled, and cut into large dice"
+        XCTAssertEqual(
+            GroceryMerge.noteRemovingDeparted(note,
+                departingNotes: ["split lengthwise, pitted, peeled, and diced"], remainingNotes: []),
+            "split lengthwise, pitted, peeled, and cut into large dice")
+    }
+
+    func testDepartedNoteStaysWhenAnotherMealStillUsesIt() {
+        let note = "halved; chopped"
+        XCTAssertEqual(
+            GroceryMerge.noteRemovingDeparted(note, departingNotes: ["halved"], remainingNotes: ["halved"]),
+            note)
+    }
+
+    func testDepartedNoteNeverTouchesAmountTextOrOtherFragments() {
+        XCTAssertEqual(
+            GroceryMerge.noteRemovingDeparted("1 piece + 2 tbsp; diced", departingNotes: ["diced"], remainingNotes: []),
+            "1 piece + 2 tbsp")
+        XCTAssertNil(GroceryMerge.noteRemovingDeparted("diced", departingNotes: ["diced"], remainingNotes: []))
+        XCTAssertEqual(
+            GroceryMerge.noteRemovingDeparted("diced", departingNotes: ["sliced"], remainingNotes: []),
+            "diced")
+    }
+
     func testPreparedProduceNamesStayInPantry() {
         XCTAssertEqual(GroceryCategory.classify("canned tomatoes"), .pantry)
         XCTAssertEqual(GroceryCategory.classify("pepper sauce"), .pantry)
