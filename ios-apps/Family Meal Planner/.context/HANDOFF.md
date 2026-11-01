@@ -4,9 +4,38 @@
 
 "Where things stand" is the current state. The dated entries further down are a chronological log — build numbers and "device pass owed" lines in them were true when written; later entries supersede them.
 
-Last updated: 2026-10-30 (main, Home iMac — build 130 shipped)
+Last updated: 2026-11-01 (branch `codex/fluffylist-cookbook-direction`, Home iMac — not merged, no build)
 
 ---
+
+## Resume here (2026-11-01 evening)
+
+**Branch `codex/fluffylist-cookbook-direction` @ `744a830`, pushed.** main is untouched (still `150f86d` / build 130). Next build number is still **131**. Nothing uploaded to TestFlight.
+
+On the branch (on top of Codex's design docs in `design/fluffylist-cookbook-direction/`):
+- `6828ce6` cookbook tokens + Recipes screen (`Design/CookbookStyle.swift`: leafy green / tomato / clear blue — never teal)
+- `d8c2cad` Meals + Grocery screens in the cookbook style (presentation only)
+- `1f96385` SCREENSHOT_REVIEW fix 1 — grocery rows no longer read through the floating tab bar (hard bottom scroll edge + 24pt margin); checked light, dark, Store Mode
+- `6f09245` SCREENSHOT_REVIEW fix 2 — **grocery note duplication fixed at the cause**: `settleContributions` subtracted a removed meal's quantity but left its prep note. Now removeMeal / clearMealsWithGroceries pass the deleted plans' recipe IDs and the departing note is dropped unless a remaining meal uses it (`GroceryMerge.noteRemovingDeparted`, +3 tests). Existing rows keep stale text until touched — the live avocado row clears if Sunday's steak salad is removed and re-planned.
+- `744a830` SCREENSHOT_REVIEW fix 3 — lead card only uses a family dish photo (220pt); no-image recipes get a quiet initial tile on browse. RecipeCardImage / detail / media roles unchanged.
+
+Built + run on iPhone 17 (iOS 26.4) sim with real data; David loaded it on his iPhone 2026-11-01 ("I think it's correct").
+
+**Next:**
+1. David's device pass on the branch (Recipes lead card + tiles, Meals week, Grocery bottom edge in light/dark/Store Mode, avocado note after re-planning).
+2. Codex review of the branch diff against `SCREENSHOT_REVIEW.md` (item 4: compare against real screens before larger changes).
+3. Only then: merge to main → build 131.
+
+**Open findings from this session (not fixed — need a decision):**
+- **Flaky tests:** full suite 343 tests; failures vary run to run (run 1: `ReliabilityPass2Tests.testReconcileBeforePlannerLoadIsANoOp`, `ReliabilityPassTests.testPlannerLoadCoversWindowAndClearsEmptiedDates`; run 2: 4× `CopyWeekTests.testCopyIntoDisplayedFutureWeekPullsFromItsPreviousWeek` + the ReliabilityPass one). All count `meal_plans` requests on the shared FakePostgRESTStore — likely request leakage between tests (possibly the host app); 2026-11-01 was also the DST change day. None touch the changed code.
+- **Tab bar in system dark mode** stays light (UITabBarAppearance paper color set once in `SupabaseContentView.init`). Pre-existing. A `.toolbarColorScheme(.dark, for: .tabBar)` attempt in Store Mode made icons white-on-light — reverted.
+- Ratatouille's "family" photo (homemade_image_path) shows a cookbook page edge — may really be a cookbook photo; David to re-save if so.
+- Home iMac has an unrelated uncommitted `.claude/settings.local.json` change at the repo root (left alone).
+
+**Starting on another machine:**
+```
+cd ~/Developer/personal-projects && git fetch origin && git switch codex/fluffylist-cookbook-direction && git pull --ff-only
+```
 
 ## Where things stand
 
@@ -25,7 +54,7 @@ Last updated: 2026-10-30 (main, Home iMac — build 130 shipped)
 
 ## Parked after build 130 (2026-10-30)
 
-- **Grocery note duplication** — a recipe's prep text can repeat in the grocery note (e.g. avocado prep text shown twice).
+- ~~**Grocery note duplication**~~ — fixed on `codex/fluffylist-cookbook-direction` (`6f09245`), not yet merged.
 - **Offline fresh-install banner wording** — when no grocery list has been saved yet, the offline banner copy doesn't fit the empty-list case.
 - **Status-bar overlap on Meals** — David is fine with it for now.
 - **`content-filter-retry` branch** still unmerged (see Open branches).
