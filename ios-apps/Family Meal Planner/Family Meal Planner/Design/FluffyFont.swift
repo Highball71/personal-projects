@@ -98,6 +98,9 @@ struct FluffyMetadataLine: View {
 struct FluffyTextLink: View {
     let title: String
     var showArrow: Bool = true
+    /// Link ink. Defaults to the seasonal accent; cookbook screens pass
+    /// leafy green for primary actions.
+    var color: Color = .fluffyAccent
     let action: () -> Void
 
     var body: some View {
@@ -105,9 +108,9 @@ struct FluffyTextLink: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(showArrow ? "\(title) \u{2192}" : title)
                     .font(.fluffyButton)
-                    .foregroundStyle(Color.fluffyAccent)
+                    .foregroundStyle(color)
                     .fixedSize(horizontal: false, vertical: true)
-                FluffyRule(weight: 2, color: .fluffyAccent)
+                FluffyRule(weight: 2, color: color)
             }
             .fixedSize()
         }
@@ -174,14 +177,16 @@ struct FluffyCheckbox: View {
     let isChecked: Bool
     var size: CGFloat = 20
     var onInk: Bool = false
+    /// Checked fill on paper. Defaults to the seasonal accent.
+    var tint: Color = .fluffyAccent
 
     private var strokeColor: Color {
-        if isChecked { return onInk ? .fluffyPaperOnInk : .fluffyAccent }
+        if isChecked { return onInk ? .fluffyPaperOnInk : tint }
         return onInk ? .fluffyPaperDimOnInk : .fluffySecondary
     }
     private var fillColor: Color {
         guard isChecked else { return .clear }
-        return onInk ? .fluffyPaperOnInk : .fluffyAccent
+        return onInk ? .fluffyPaperOnInk : tint
     }
     private var checkColor: Color {
         onInk ? .fluffyInkGround : .fluffyBackground

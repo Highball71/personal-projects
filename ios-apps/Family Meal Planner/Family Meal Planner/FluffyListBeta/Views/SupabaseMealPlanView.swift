@@ -274,15 +274,28 @@ struct SupabaseMealPlanView: View {
 
     // MARK: - Masthead & Week State
 
+    /// Cookbook header: brand/household line, green week-of line, and
+    /// the large serif week title.
     private var masthead: some View {
-        FluffyMasthead(title: weekNav.title, dateline: mastheadDateline)
-            .padding(.horizontal, 22)
+        VStack(alignment: .leading, spacing: 6) {
+            CookbookTopline(trailing: householdService.household?.name)
+            Text(mastheadDateline)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Color.fluffyLeaf)
+                .padding(.top, 8)
+            Text(weekNav.title)
+                .font(.fluffyCookbookTitle)
+                .fluffyTracking(-0.03, at: 44)
+                .foregroundStyle(Color.fluffyPrimary)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 6)
     }
 
     private var mastheadDateline: String {
         let fmt = DateFormatter()
-        fmt.dateFormat = "MMM d"
-        return "WEEK OF \(fmt.string(from: weekStart).uppercased())"
+        fmt.dateFormat = "MMMM d"
+        return "Week of \(fmt.string(from: weekStart))"
     }
 
     /// Masthead plus the week navigation row — what every state of the
@@ -305,7 +318,7 @@ struct SupabaseMealPlanView: View {
                       destination: weekNav.previousWeekStart)
             Spacer()
             if !weekNav.isCurrentWeek {
-                FluffyTextLink(title: "This week", showArrow: false) {
+                FluffyTextLink(title: "This week", showArrow: false, color: .fluffyLeaf) {
                     changeWeek(to: weekNav.currentWeekStart)
                 }
             }
@@ -330,10 +343,13 @@ struct SupabaseMealPlanView: View {
             changeWeek(to: destination)
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(destination == nil
                                  ? Color.fluffyTertiary : Color.fluffyPrimary)
-                .frame(width: 44, height: 32, alignment: .center)
+                .frame(width: 44, height: 40, alignment: .center)
+                .overlay(RoundedRectangle(cornerRadius: 8)
+                    .stroke(destination == nil ? Color.fluffyControlLine.opacity(0.5) : Color.fluffyControlLine,
+                            lineWidth: 1))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -479,10 +495,10 @@ struct SupabaseMealPlanView: View {
                     // read-only note stands in for the state line.
                     Text(weekNav.isPastWeek ? Self.pastWeekNoteText
                                             : weekSummary.stateLine)
-                        .font(.custom(FluffyFace.italic, size: 14))
+                        .font(.fluffyCookbookLede)
                         .foregroundStyle(Color.fluffySecondary)
                         .padding(.horizontal, 22)
-                        .padding(.bottom, 15)
+                        .padding(.bottom, 12)
                 }
 
                 ForEach(weekDates, id: \.self) { date in
@@ -516,11 +532,11 @@ struct SupabaseMealPlanView: View {
 
                     VStack(alignment: .leading, spacing: 20) {
                         if isFooterVisible {
-                            FluffyTextLink(title: "Copy last week's meals") {
+                            FluffyTextLink(title: "Copy last week's meals", color: .fluffyLeaf) {
                                 Task { await copyLastWeek() }
                             }
                         }
-                        FluffyTextLink(title: "Build the grocery list") {
+                        FluffyTextLink(title: "Build the grocery list", color: .fluffyLeaf) {
                             Task {
                                 await groceryService.fetchItems()
                                 selectedTab = .groceries
@@ -612,19 +628,22 @@ struct SupabaseMealPlanView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isPast ? "Nothing planned" : "Plan a meal")
-                        .font(.fluffyHeadline)
-                        .fluffyTracking(-0.01, at: 19)
+                        .font(.custom(FluffyFace.italic, size: 19, relativeTo: .body))
                         .foregroundStyle(Color.fluffyTertiary)
-                    FluffyMetadataLine(
-                        text: isPast ? "PASSED" : "TAP TO ADD",
-                        color: isPast ? .fluffyTertiary : .fluffySecondary
-                    )
+                    Text(isPast ? "Passed" : "Tap to add a meal")
+                        .font(.footnote)
+                        .foregroundStyle(isPast ? Color.fluffyTertiary : Color.fluffySecondary)
                 }
 
                 Spacer()
+
+                if !isPast {
+                    plusBadge.accessibilityHidden(true)
+                }
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 14)
+            .background(today ? Color.fluffyLeafPale : Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -663,12 +682,12 @@ struct SupabaseMealPlanView: View {
 
                 Group {
                     if let plan = line.plan {
-                        mealLine(plan, member: line.member, date: date, isPast: isPast)
+                        mealLine(plan, member: line.member, date: date, isPast: isPast,
+                                 showsEveryoneKicker: !dayPlan.memberMeals.isEmpty)
                     } else {
                         emptyHouseholdLine(date)
                     }
                 }
-                .padding(.leading, line.member != nil ? 14 : 0)
 
                 Spacer()
 
@@ -681,9 +700,7 @@ struct SupabaseMealPlanView: View {
                             memberID: defaultPickerMember(for: dayPlan)
                         )
                     } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(Color.fluffyAccent)
+                        plusBadge
                             .frame(minWidth: 44, minHeight: 44)
                             .accessibilityLabel("Plan a meal for this day")
                             .contentShape(Rectangle())
@@ -695,9 +712,12 @@ struct SupabaseMealPlanView: View {
             .padding(.top, isFirst ? 14 : 6)
             .padding(.bottom, isLast ? 14 : 6)
         }
-        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 4)
+        // Ruled rows, not cards: the day's first line carries the rule;
+        // today is washed in pale leaf.
+        .overlay(alignment: .top) {
+            if isFirst { FluffyRule().padding(.horizontal, 22) }
+        }
+        .background(today ? Color.fluffyLeafPale : Color.clear)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color.fluffyBackground)
@@ -728,7 +748,8 @@ struct SupabaseMealPlanView: View {
         _ plan: MealPlanRow,
         member: HouseholdMemberRow?,
         date: Date,
-        isPast: Bool
+        isPast: Bool,
+        showsEveryoneKicker: Bool = false
     ) -> some View {
         let resolvedRecipe = recipeService.recipes.first(where: { $0.id == plan.recipeID })
 
@@ -761,8 +782,12 @@ struct SupabaseMealPlanView: View {
                 }
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
+                    // Who the meal is for — household vs. member meals
+                    // stay visibly distinct on a shared day.
                     if let member {
-                        FluffyMetadataLine(text: member.displayName)
+                        whoKicker("For \(member.displayName)", color: .fluffyClearBlue)
+                    } else if showsEveryoneKicker {
+                        whoKicker("For everyone", color: .fluffyLeaf)
                     }
                     if let recipe = resolvedRecipe {
                         Text(recipe.name)
@@ -824,11 +849,13 @@ struct SupabaseMealPlanView: View {
             pickerContext = MealPickerContext(date: date, memberID: nil)
         } label: {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Nothing for everyone")
-                    .font(.fluffyHeadline)
-                    .fluffyTracking(-0.01, at: 19)
+                whoKicker("For everyone", color: .fluffyLeaf)
+                Text("Nothing planned yet")
+                    .font(.custom(FluffyFace.italic, size: 19, relativeTo: .body))
                     .foregroundStyle(Color.fluffyTertiary)
-                FluffyMetadataLine(text: "TAP TO ADD")
+                Text("Tap to add a meal")
+                    .font(.footnote)
+                    .foregroundStyle(Color.fluffySecondary)
             }
             .contentShape(Rectangle())
         }
@@ -853,16 +880,36 @@ struct SupabaseMealPlanView: View {
     /// tight tracking.
     private func dateColumn(date: Date, today: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(dayName(for: date).uppercased())
-                .font(.custom(FluffyFace.regular, size: 10))
-                .fluffyTracking(0.14, at: 10)
-                .foregroundStyle(today ? Color.fluffyPrimary : Color.fluffySecondary)
+            Text(today ? "TODAY" : dayName(for: date).uppercased())
+                .font(.caption2.weight(.bold))
+                .tracking(0.8)
+                .foregroundStyle(today ? Color.fluffyLeaf : Color.fluffyTomato)
+                .lineLimit(1)
+                .fixedSize()
             Text(dayNumber(for: date))
-                .font(.custom(FluffyFace.bold, size: 26))
-                .fluffyTracking(-0.03, at: 26)
-                .foregroundStyle(Color.fluffyPrimary)
+                .font(.custom(FluffyFace.bold, size: 28))
+                .fluffyTracking(-0.03, at: 28)
+                .foregroundStyle(today ? Color.fluffyLeaf : Color.fluffyPrimary)
         }
         .frame(width: 42, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Green circle "+" for adding a meal to a day.
+    private var plusBadge: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Color.fluffyLeaf)
+            .frame(width: 32, height: 32)
+            .background(Color.fluffyLeafPale, in: Circle())
+            .overlay(Circle().stroke(Color.fluffyLeaf.opacity(0.35), lineWidth: 1))
+    }
+
+    /// Small "For Shannon" / "For everyone" label over a meal title.
+    private func whoKicker(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(color)
     }
 
     // MARK: - Overlays

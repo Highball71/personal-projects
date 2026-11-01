@@ -13,6 +13,7 @@ import SwiftUI
 
 struct SupabaseGroceryListView: View {
     @EnvironmentObject private var groceryService: GroceryService
+    @EnvironmentObject private var householdService: HouseholdService
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("groceryStoreMode") private var storeMode = false
 
@@ -79,7 +80,11 @@ struct SupabaseGroceryListView: View {
     private var secondaryTextColor: Color { storeMode ? .fluffyPaperDimOnInk : .fluffySecondary }
     private var dimTextColor: Color { storeMode ? .fluffyPaperDimOnInk : .fluffyTertiary }
     private var lineColor: Color { storeMode ? .fluffyRuleOnInk : .fluffyDivider }
-    private var headColor: Color { storeMode ? .fluffyPaperOnInk : .fluffySecondary }
+    private var headColor: Color { storeMode ? .fluffyPaperOnInk : .fluffyPrimary }
+    /// Primary-action ink: leafy green on paper; on the ink ground a
+    /// lighter green that keeps high contrast.
+    private var actionColor: Color { storeMode ? Color(hex: "8FD9A6") : .fluffyLeaf }
+    private var lineStrong: Color { storeMode ? .fluffyPaperOnInk.opacity(0.28) : .fluffyControlLine }
 
     // MARK: - Body
 
@@ -129,7 +134,7 @@ struct SupabaseGroceryListView: View {
                         }
                     } label: {
                         Image(systemName: storeMode ? "sun.max.fill" : "flashlight.on.fill")
-                            .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyAccent)
+                            .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyLeaf)
                     }
                     .accessibilityLabel(storeMode ? "Exit Store Mode" : "Store Mode")
                 }
@@ -155,7 +160,7 @@ struct SupabaseGroceryListView: View {
                             }
                         }
                         .font(.fluffyButton)
-                        .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyAccent)
+                        .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyLeaf)
                     }
                 }
             }
@@ -175,15 +180,31 @@ struct SupabaseGroceryListView: View {
 
     private var masthead: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(storeMode ? "STORE MODE" : "FLUFFYLIST")
-                .font(.caption2.weight(.semibold))
-                .tracking(1.5)
-                .foregroundStyle(secondaryTextColor)
+            HStack {
+                Text("FLUFFYLIST")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.6)
+                    .foregroundStyle(textColor)
+                Spacer()
+                if let name = householdService.household?.name {
+                    Text(name.uppercased())
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(secondaryTextColor)
+                        .lineLimit(1)
+                }
+            }
+            Text(storeMode ? "Store mode \u{00B7} \(Date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))"
+                           : "Your shopping list")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(actionColor)
+                .padding(.top, 8)
             Text(storeMode ? "Aisle by aisle" : "Grocery")
-                .font(.custom(FluffyFace.bold, size: 36, relativeTo: .largeTitle))
+                .font(.fluffyCookbookTitle)
+                .fluffyTracking(-0.03, at: 44)
                 .foregroundStyle(textColor)
             Text("\(groceryService.items.count - checkedCount) to buy · \(checkedCount) in the cart")
-                .font(.subheadline)
+                .font(storeMode ? .body : .fluffyCookbookLede)
                 .foregroundStyle(secondaryTextColor)
             HStack(spacing: 6) {
                 if groceryService.isLoading {
@@ -201,7 +222,7 @@ struct SupabaseGroceryListView: View {
             .accessibilityElement(children: .combine)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 22)
         .padding(.top, 8)
         .padding(.bottom, 12)
     }
@@ -253,7 +274,7 @@ struct SupabaseGroceryListView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Image(systemName: "cart")
                         .font(.system(size: 64, weight: .light))
-                        .foregroundStyle(Color.fluffyAccent)
+                        .foregroundStyle(Color.fluffyLeaf)
                         .padding(.bottom, 30)
 
                     Text("The list writes itself.")
@@ -268,7 +289,7 @@ struct SupabaseGroceryListView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 30)
 
-                    FluffyTextLink(title: "Plan a night") {
+                    FluffyTextLink(title: "Plan a night", color: .fluffyLeaf) {
                         selectedTab = .mealPlan
                     }
                 }
@@ -298,8 +319,8 @@ struct SupabaseGroceryListView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Share the list \u{2192}")
                             .font(.fluffyButton)
-                            .foregroundStyle(storeMode ? Color.fluffyPaperOnInk : Color.fluffyAccent)
-                        FluffyRule(weight: 2, color: storeMode ? .fluffyPaperOnInk : .fluffyAccent)
+                            .foregroundStyle(actionColor)
+                        FluffyRule(weight: 2, color: actionColor)
                     }
                     .fixedSize()
                 }
@@ -320,10 +341,21 @@ struct SupabaseGroceryListView: View {
         items: [SupabaseGroceryItem]
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            FluffySectionHead(title: category.rawValue, color: headColor)
-                .padding(.horizontal, 22)
-                .padding(.top, 30)
-                .padding(.bottom, 10)
+            HStack(alignment: .firstTextBaseline) {
+                Text(category.rawValue)
+                    .font(.fluffyCookbookSection)
+                    .foregroundStyle(headColor)
+                Spacer()
+                let open = items.filter { !$0.isChecked }.count
+                Text(open == 1 ? "1 to buy" : "\(open) to buy")
+                    .font(.footnote)
+                    .foregroundStyle(secondaryTextColor)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, 22)
+            .padding(.top, 30)
+            .padding(.bottom, 10)
 
             ForEach(items) { item in
                 VStack(spacing: 0) {
@@ -347,14 +379,18 @@ struct SupabaseGroceryListView: View {
                 }
             }
         } label: {
+            let rendering = quantityRendering(item)
             HStack(alignment: .top, spacing: 14) {
                 FluffyCheckbox(
                     isChecked: item.isChecked,
                     size: storeMode ? 30 : 24,
-                    onInk: storeMode
+                    onInk: storeMode,
+                    tint: .fluffyLeaf
                 )
                 .padding(.top, 2)
 
+                // Item name leads; alternatives and prep notes wrap
+                // underneath with room to breathe.
                 VStack(alignment: .leading, spacing: 4) {
                     Text(GroceryMerge.shoppingName(item.name))
                         .font(.system(storeMode ? .title3 : .body, weight: .medium))
@@ -365,13 +401,25 @@ struct SupabaseGroceryListView: View {
                             .font(.subheadline)
                             .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
                     }
-                    Text(quantityText(item))
-                        .font(storeMode ? .body : .subheadline)
-                        .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
+                    if let detail = rendering.detailText {
+                        Text(detail)
+                            .font(storeMode ? .body : .subheadline)
+                            .foregroundStyle(item.isChecked ? dimTextColor : secondaryTextColor)
+                    }
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .multilineTextAlignment(.leading)
+
+                // Quantity kept distinct in its own trailing column.
+                Text(rendering.quantityLabel)
+                    .font(.system(storeMode ? .body : .subheadline, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(item.isChecked ? dimTextColor : textColor)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 120, alignment: .trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, storeMode ? 3 : 1)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, storeMode ? 16 : 12)
@@ -405,6 +453,11 @@ struct SupabaseGroceryListView: View {
     }
 
     // MARK: - Quantity Formatting
+
+    /// Quantity and detail kept apart for the row's two columns.
+    private func quantityRendering(_ item: SupabaseGroceryItem) -> IngredientDisplay.Rendering {
+        IngredientDisplay.render(quantity: item.quantity, unit: item.unit, note: item.note)
+    }
 
     private func quantityText(_ item: SupabaseGroceryItem) -> String {
         // One shared formatter with the recipe-detail rows — container
