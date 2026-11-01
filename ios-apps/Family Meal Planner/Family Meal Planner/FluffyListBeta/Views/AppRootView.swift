@@ -236,7 +236,7 @@ private struct HouseholdMembershipRetryView: View {
 
 /// Main tab bar for the Supabase path, styled for "The Press":
 /// paper ground, a 1px ink rule along the top, the active tab in the
-/// current seasonal accent (`.tint(Color.fluffyAccent)`), inactive
+/// base leafy green (`.tint(Color.fluffyLeaf)`), inactive
 /// tabs in #7D7979, and 10pt tracked serif labels in their normal
 /// case. No filled pill, no per-tab tint.
 struct SupabaseContentView: View {
@@ -304,7 +304,9 @@ struct SupabaseContentView: View {
                 }
                 .tag(AppTab.settings)
         }
-        .tint(Color.fluffyAccent)
+        // Cookbook direction: navigation uses the base leafy green;
+        // seasonal accents stay on their own moments inside screens.
+        .tint(Color.fluffyLeaf)
         .task {
             await householdService.loadCurrentHousehold()
             await recipeService.fetchRecipes()

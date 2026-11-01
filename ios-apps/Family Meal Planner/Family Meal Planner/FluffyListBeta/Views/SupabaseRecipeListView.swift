@@ -351,7 +351,7 @@ struct SupabaseRecipeListView: View {
 
                 // Recently added — a horizontal strip of small cards.
                 if !recentlyAdded.isEmpty {
-                    FluffySectionHead(title: "Recently added")
+                    CookbookSectionHeader(title: "Recently added")
                         .padding(.horizontal, 22)
                         .padding(.bottom, 10)
 
@@ -361,7 +361,8 @@ struct SupabaseRecipeListView: View {
 
                 // The rest of the box — same ruled list treatment.
                 if !gridRecipes.isEmpty {
-                    FluffySectionHead(title: "The recipe box")
+                    CookbookSectionHeader(title: "The recipe box",
+                                          detail: gridRecipes.count == 1 ? "1 more" : "\(gridRecipes.count) more")
                         .padding(.horizontal, 22)
                         .padding(.bottom, 10)
 
@@ -405,20 +406,36 @@ struct SupabaseRecipeListView: View {
             || selectedTag != .all || showFavoritesOnly || maximumMinutes > 0 || mealCategory != "All meals"
     }
 
+    /// Cookbook header: brand/household line, large serif title with
+    /// favorites + add, and a real-data lede (recipe count).
     private var browseHeader: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Button { showingHouseholdInfo = true } label: {
-                    Text("FLUFFYLIST").font(.system(size: 10, weight: .semibold)).tracking(1)
-                }.buttonStyle(.plain).accessibilityLabel("FluffyList household")
-                Text("Recipes").font(.custom(FluffyFace.bold, size: 36, relativeTo: .largeTitle))
+        VStack(alignment: .leading, spacing: 4) {
+            CookbookTopline(trailing: householdService.household?.name) {
+                showingHouseholdInfo = true
             }
-            Spacer()
-            RecipeIconButton(symbol: showFavoritesOnly ? "heart.fill" : "heart", label: "Show favorites") { showFavoritesOnly.toggle() }
-            RecipeIconButton(symbol: "plus", label: "Add recipe", filled: true) { showingAddRecipe = true }
+            .padding(.trailing, 6)
+            HStack(alignment: .center) {
+                Text("Recipes")
+                    .font(.fluffyCookbookTitle)
+                    .fluffyTracking(-0.03, at: 44)
+                    .foregroundStyle(Color.fluffyPrimary)
+                Spacer()
+                RecipeIconButton(symbol: showFavoritesOnly ? "heart.fill" : "heart", label: "Show favorites") { showFavoritesOnly.toggle() }
+                RecipeIconButton(symbol: "plus", label: "Add recipe", filled: true) { showingAddRecipe = true }
+            }
+            Text(recipeCountLede)
+                .font(.fluffyCookbookLede)
+                .foregroundStyle(Color.fluffySecondary)
         }
-        .foregroundStyle(Color.fluffyPrimary)
-        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 8)
+        .padding(.leading, 22).padding(.trailing, 16).padding(.top, 6).padding(.bottom, 12)
+    }
+
+    /// "14 recipes · 6 with photos" — counts only, from saved data.
+    private var recipeCountLede: String {
+        let total = recipeService.recipes.count
+        let photos = recipeService.recipes.filter(\.hasDishPhoto).count
+        let base = total == 1 ? "1 recipe in the box" : "\(total) recipes in the box"
+        return photos > 0 ? "\(base) \u{00B7} \(photos) with photos" : base
     }
 
     private var searchRule: some View {
@@ -439,39 +456,43 @@ struct SupabaseRecipeListView: View {
                         .buttonStyle(.plain).accessibilityLabel("Clear search")
                 }
             }
-            .padding(.horizontal, 12).frame(minHeight: 44)
-            .background(Color.fluffyCard, in: Capsule())
-            RecipeIconButton(symbol: "slider.horizontal.3", label: "Recipe filters") {
+            .padding(.horizontal, 12).frame(minHeight: 46)
+            .background(Color.fluffyPaperRaised, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.fluffyControlLine, lineWidth: 1))
+            Button {
                 searchFocused = false; showingFilters = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(filtersActive ? Color.white : Color.fluffyPrimary)
+                    .frame(width: 46, height: 46)
+                    .background(filtersActive ? Color.fluffyLeaf : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(filtersActive ? Color.fluffyLeaf : Color.fluffyControlLine, lineWidth: 1))
+                    .contentShape(Rectangle())
             }
-            .accessibilityValue(maximumMinutes > 0 || mealCategory != "All meals" ? "Filters active" : "No extra filters")
+            .buttonStyle(.plain)
+            .accessibilityLabel("Recipe filters")
+            .accessibilityValue(filtersActive ? "Filters active" : "No extra filters")
         }
         .foregroundStyle(Color.fluffySecondary)
     }
+
+    private var filtersActive: Bool { maximumMinutes > 0 || mealCategory != "All meals" }
 
     private var chipBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(BrowseTag.allCases) { tag in
-                    Button { selectedTag = tag } label: {
-                        Text(tag.rawValue)
-                            .font(.subheadline)
-                            .fixedSize()
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 36)
-                            .foregroundStyle(selectedTag == tag ? Color.white : Color.fluffyPrimary)
-                            .background(selectedTag == tag ? Color.fluffyButtonFill : Color.fluffyCard, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selectedTag == tag ? .isSelected : [])
+                    CookbookChip(title: tag.rawValue, isSelected: selectedTag == tag) { selectedTag = tag }
                 }
             }
+            .padding(.vertical, 1)
         }
     }
 
     private var categoryShelf: some View {
         VStack(alignment: .leading, spacing: 8) {
-            FluffySectionHead(title: "Browse by Category", color: .fluffyPrimary)
+            CookbookSectionHeader(title: "Browse by category")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(BrowseTag.allCases.filter { $0 != .all }) { tag in
@@ -485,7 +506,8 @@ struct SupabaseRecipeListView: View {
                                 } else {
                                     Image(systemName: tag == .vegetarian ? "leaf" : tag == .fish ? "fish" : "fork.knife")
                                         .font(.title3).frame(width: 76, height: 70)
-                                        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 12))
+                                        .foregroundStyle(Color.fluffyLeaf)
+                                        .background(Color.fluffyLeafPale, in: RoundedRectangle(cornerRadius: 12))
                                 }
                                 Text(tag.rawValue).font(.caption).lineLimit(1)
                                 Text("(\(matches.count))").font(.caption2).foregroundStyle(Color.fluffySecondary)
@@ -506,15 +528,21 @@ struct SupabaseRecipeListView: View {
             HStack(alignment: .top, spacing: 12) {
                 ForEach(recentlyAdded) { recipe in
                     NavigationLink { SupabaseRecipeDetailView(recipe: recipe) } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            RecipeCardImage(recipe: recipe, height: 92)
-                            Text(recipe.name).font(.caption.weight(.medium)).lineLimit(2)
-                            Text(recipeSubtitle(recipe)).font(.caption).foregroundStyle(Color.fluffySecondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            RecipeCardImage(recipe: recipe, height: 112)
+                            Text(recipe.name)
+                                .font(.fluffyCookbookCard)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                            Text(recipeCardMeta(recipe))
+                                .font(.caption)
+                                .foregroundStyle(Color.fluffySecondary)
+                                .lineLimit(2)
                         }
                         .foregroundStyle(Color.fluffyPrimary)
-                        .padding(6)
-                        .frame(width: 120, alignment: .leading)
-                        .background(Color.fluffyCard, in: RoundedRectangle(cornerRadius: 16))
+                        .frame(width: 136, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .contextMenu { recipeContextMenu(recipe) }
@@ -539,8 +567,7 @@ struct SupabaseRecipeListView: View {
                 }
             } label: {
                 HStack {
-                    FluffySectionHead(title: "In season now")
-                    Spacer()
+                    CookbookSectionHeader(title: "In season now")
                     Image(systemName: seasonalShelfCollapsed ? "chevron.down" : "chevron.up")
                         .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(Color.fluffySecondary)
@@ -586,31 +613,52 @@ struct SupabaseRecipeListView: View {
 
     // MARK: - Hero
 
+    /// The family's saved media leads. With a photo, a scrim carries
+    /// the kicker, serif title, metadata, and an honest media-role tag
+    /// (family vs. cookbook photo); without one, a plain paper card.
     private func heroBlock(_ recipe: RecipeRow) -> some View {
         let hasPhoto = recipe.hasDishPhoto
+        let heroHeight: CGFloat = hasPhoto ? 290 : 160
         return ZStack(alignment: .bottomLeading) {
             if hasPhoto {
-                RecipeCardImage(recipe: recipe, height: 225, role: .family, showsPlaceholder: false)
-                LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .center, endPoint: .bottom)
-            } else { Color.fluffyCard }
-            VStack(alignment: .leading, spacing: 5) {
-                Text(recipe.isFavorite ? "FAMILY FAVORITE" : "FROM YOUR RECIPE BOX")
-                    .font(.caption2.weight(.semibold)).tracking(0.6)
+                RecipeCardImage(recipe: recipe, height: heroHeight, role: .family, showsPlaceholder: false)
+                // Scrim starts high enough to sit behind the kicker even
+                // when a long title wraps onto two lines.
+                LinearGradient(colors: [.clear, .black.opacity(0.55), .black.opacity(0.85)],
+                               startPoint: UnitPoint(x: 0.5, y: 0.2), endPoint: .bottom)
+            } else {
+                Color.fluffyCard
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(recipe.isFavorite ? "A family favorite" : "From your recipe box")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(hasPhoto ? Color.white : Color.fluffyTomato)
+                    .shadow(color: hasPhoto ? .black.opacity(0.5) : .clear, radius: 3)
                 Text(recipe.name)
-                    .font(.custom(FluffyFace.bold, size: 25, relativeTo: .title2))
+                    .font(.fluffyCookbookHero)
+                    .fluffyTracking(-0.02, at: 30)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Text(recipeSubtitle(recipe)).font(.caption)
+                HStack(alignment: .center) {
+                    Text(recipeSubtitle(recipe)).font(.subheadline)
                     Spacer()
                     Image(systemName: "arrow.right.circle.fill").font(.title2)
+                        .accessibilityHidden(true)
+                }
+                if hasPhoto, let media = recipe.coverMediaLabel {
+                    Label(media, systemImage: recipe.usesCookbookCover ? "book.closed" : "camera")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.fluffyPrimary)
+                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .background(Color.fluffyBackground.opacity(0.92), in: RoundedRectangle(cornerRadius: 5))
+                        .padding(.top, 4)
                 }
             }
             .foregroundStyle(hasPhoto ? Color.white : Color.fluffyPrimary)
-            .padding(16)
+            .padding(20)
         }
-        .frame(minHeight: hasPhoto ? 225 : 150)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 16)
+        .frame(minHeight: heroHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 18)
     }
 
     // MARK: - Ruled Recipe List
@@ -636,7 +684,7 @@ struct SupabaseRecipeListView: View {
                 }
             } label: {
                 Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
-                    .font(.system(size: 17)).foregroundStyle(Color.fluffyAccent)
+                    .font(.system(size: 17)).foregroundStyle(Color.fluffyTomato)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain).accessibilityLabel(recipe.isFavorite ? "Remove favorite" : "Favorite recipe")
@@ -649,14 +697,14 @@ struct SupabaseRecipeListView: View {
 
     private func listRow(_ recipe: RecipeRow, showsLeaf: Bool = false) -> some View {
         HStack(spacing: 14) {
-            RecipeCardImage(recipe: recipe, height: 70)
-                .frame(width: 70, height: 70)
+            RecipeCardImage(recipe: recipe, height: 64)
+                .frame(width: 64, height: 64)
                 .clipped()
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(recipe.name)
-                        .font(.system(.subheadline, weight: .medium))
+                        .font(.fluffyCookbookRow)
                         .fluffyTracking(-0.01, at: 18)
                         .foregroundStyle(Color.fluffyPrimary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -682,6 +730,14 @@ struct SupabaseRecipeListView: View {
     }
 
     // MARK: - Card Helpers
+
+    /// Shelf card metadata: saved-media role (when there is one) plus
+    /// category/time, e.g. "Family photo · 45 min".
+    private func recipeCardMeta(_ recipe: RecipeRow) -> String {
+        guard let media = recipe.coverMediaLabel else { return recipeSubtitle(recipe) }
+        let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
+        return total > 0 ? "\(media) \u{00B7} \(DurationText.totalTime(minutes: total))" : "\(media) \u{00B7} \(recipe.categoryDisplayName)"
+    }
 
     private func recipeSubtitle(_ recipe: RecipeRow) -> String {
         let total = recipe.prepTimeMinutes + recipe.cookTimeMinutes

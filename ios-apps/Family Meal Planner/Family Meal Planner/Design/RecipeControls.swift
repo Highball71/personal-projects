@@ -12,7 +12,7 @@ struct RecipeIconButton: View {
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(filled ? Color.white : Color.fluffyPrimary)
                 .frame(width: 38, height: 38)
-                .background(filled ? Color.fluffyButtonFill : Color.fluffyBackground, in: Circle())
+                .background(filled ? Color.fluffyLeaf : Color.fluffyBackground, in: Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
