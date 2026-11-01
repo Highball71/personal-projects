@@ -331,6 +331,12 @@ struct SupabaseGroceryListView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.always)
+        // The floating tab bar must never sit on top of a live row:
+        // a hard bottom edge stops rows reading through the glass bar
+        // (worst on Store Mode's ink ground), and the extra margin
+        // lets the last rows scroll fully clear of it.
+        .scrollEdgeEffectStyle(.hard, for: .bottom)
+        .contentMargins(.bottom, 24, for: .scrollContent)
         .refreshable { await reloadGroceries() }
     }
 
