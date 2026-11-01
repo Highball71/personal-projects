@@ -110,11 +110,13 @@ struct SupabaseRecipeListView: View {
         }
     }
 
-    /// The hero card recipe — first favorite, or newest recipe.
+    /// The lead card — only a real dish photo the family took (favorite
+    /// first). Cookbook-page photos and scans are source documents, so
+    /// they never become a full-bleed hero; with no family dish photo
+    /// there is no hero and the recipe box leads.
     private var heroRecipe: RecipeRow? {
-        let photographed = displayedRecipes.filter { $0.hasDishPhoto }
-        return photographed.first { $0.isFavorite } ?? photographed.first
-            ?? displayedRecipes.first { $0.isFavorite } ?? displayedRecipes.first
+        let dishPhotos = displayedRecipes.filter { $0.hasFamilyDishPhoto }
+        return dishPhotos.first { $0.isFavorite } ?? dishPhotos.first
     }
 
     /// Grid recipes — everything except the hero and recently-added.
@@ -529,7 +531,11 @@ struct SupabaseRecipeListView: View {
                 ForEach(recentlyAdded) { recipe in
                     NavigationLink { SupabaseRecipeDetailView(recipe: recipe) } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            RecipeCardImage(recipe: recipe, height: 112)
+                            if recipe.hasAnySavedImage {
+                                RecipeCardImage(recipe: recipe, height: 112)
+                            } else {
+                                RecipeMonogramTile(name: recipe.name, size: 112, width: 136)
+                            }
                             Text(recipe.name)
                                 .font(.fluffyCookbookCard)
                                 .lineLimit(2)
@@ -618,7 +624,8 @@ struct SupabaseRecipeListView: View {
     /// (family vs. cookbook photo); without one, a plain paper card.
     private func heroBlock(_ recipe: RecipeRow) -> some View {
         let hasPhoto = recipe.hasDishPhoto
-        let heroHeight: CGFloat = hasPhoto ? 290 : 160
+        // Modest height: a family photo framing the box, not a banner.
+        let heroHeight: CGFloat = hasPhoto ? 220 : 160
         return ZStack(alignment: .bottomLeading) {
             if hasPhoto {
                 RecipeCardImage(recipe: recipe, height: heroHeight, role: .family, showsPlaceholder: false)
@@ -697,9 +704,13 @@ struct SupabaseRecipeListView: View {
 
     private func listRow(_ recipe: RecipeRow, showsLeaf: Bool = false) -> some View {
         HStack(spacing: 14) {
-            RecipeCardImage(recipe: recipe, height: 64)
-                .frame(width: 64, height: 64)
-                .clipped()
+            if recipe.hasAnySavedImage {
+                RecipeCardImage(recipe: recipe, height: 64)
+                    .frame(width: 64, height: 64)
+                    .clipped()
+            } else {
+                RecipeMonogramTile(name: recipe.name)
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {

@@ -125,9 +125,48 @@ struct CookbookChip: View {
     }
 }
 
+// MARK: - Quiet no-image tile
+
+/// What a recipe with no saved image shows on browse surfaces: a paper
+/// index-card tile with the recipe's initial, instead of a grey box and
+/// a fork-and-knife glyph. Never stands in for a real photo.
+struct RecipeMonogramTile: View {
+    let name: String
+    var size: CGFloat = 64
+    var width: CGFloat? = nil
+
+    private var initial: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).first.map { String($0).uppercased() } ?? "\u{2022}"
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color.fluffyPaperRaised)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.fluffyControlLine, lineWidth: 1))
+            .overlay {
+                Text(initial)
+                    .font(.custom(FluffyFace.italic, size: size * 0.42))
+                    .foregroundStyle(Color.fluffySecondary)
+            }
+            .frame(width: width ?? size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Media label (display only)
 
 extension RecipeRow {
+    /// A finished-dish photo the family took (cover or legacy homemade).
+    /// Cookbook-page photos and source scans are documents, not dishes.
+    var hasFamilyDishPhoto: Bool {
+        familyCoverImagePath != nil || homemadeImagePath != nil
+    }
+
+    /// Any saved image at all — dish photo, cookbook photo, or scan.
+    var hasAnySavedImage: Bool {
+        hasFamilyDishPhoto || cookbookImagePath != nil || sourceImagePath != nil
+    }
+
     /// Which saved media a `.family`-role cover shows, mirroring
     /// RecipeCardImage's family → legacy homemade → cookbook order.
     /// Label only; selection logic stays in RecipeCardImage.
